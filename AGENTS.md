@@ -665,6 +665,16 @@ Deferred (Phase 4 remainder): richer graph-driven placement honouring `preferred
 - [x] **Verification:** frontend tests 153 passed, frontend TypeScript check passed, frontend production build passed, backend tests 558 passed. Focused session-expiry simulations cover concurrent 401s, refresh success/failure, retry limits, non-refresh status codes, autosave, manual save, and local input preservation.
 - [ ] **Live browser acceptance:** deterministic automated tests cover the Sprint 20 session-expiry scenario; full live browser acceptance with a running app session was not performed in this Codex environment.
 
+### Sprint 25 — Hosted LLM Swap & Generation Experience Redesign 🚧 In progress (mockup approved)
+
+> Branch: `sprint-25/hosted-llm-and-generation-ui` (off `main`). Design direction:
+> [`docs/EDITOR_3D_AND_SPACE_PLANNER_DIRECTION.md`](docs/EDITOR_3D_AND_SPACE_PLANNER_DIRECTION.md).
+> Reference mockup: `docs/mockups/generation-redesign.html` (self-contained, open in a browser; Three.js loads from cdnjs).
+
+- [x] Step 1 — Clickable redesign mockup approved by the owner: hero prompt card, staged generation progress with cancel, brief-review with answer chips, result state with a working alternatives gallery (fed by best-of-64 runners-up in production), honest save states, refinement playback with skip, a real Three.js **3D edit state** (walls with door openings cut in as real gaps — per the shared Gill Road floor-plan document — plus the commercial space-planner tools: café template, brand color picker, capacity planner, cost estimator, animated egress arrows, plan↔3D camera swing), and a scroll-driven 3D landing story ending in Revit/AutoCAD export messaging.
+- [ ] Step 2 — Config-driven hosted LLM for extraction (AWS Bedrock OpenAI-compatible preset, plus Groq/Gemini/OpenRouter/local LM Studio presets; `LLM_API_KEY` + conditional `reasoning_effort`/model discovery/semaphore in `llm_client.py`; provider-neutral error strings). Replaces the local-model requirement — the owner's PC slowed when the local model ran.
+- [ ] Step 3 — Production generation-UI rework per the approved mockup + direction doc (alternatives on `POST /api/generate`, accent token, motion system, dead-control fixes, 3D walls-with-openings per Pillar F).
+
 ### MVP Rework 🚧 — LLM-first pipeline per `ArchiAI_Implementation_Workflow_fable.md` (in-place, started 2026-07)
 
 > The owner's MVP Implementation Workflow (prompt → **local LLM extraction** (LM Studio + Qwen3.5 9B on the host RTX 4060) → clarification → deterministic subdivision engine → quality+Vastu score → editable 2D SVG + the existing 3D editor with two-way sync → save/version → PNG/PDF/share/**IFC/DXF**) is being implemented **in place in this repo** (owner decision — not a greenfield sibling). Everything is additive: the legacy `parse_prompt → generate_layout` path, its 550+ tests, auth, workspaces, and billing remain untouched and green. Auth is KEPT (the workflow's "no accounts" was greenfield scope-cutting; ours is already built). Graph2Plan/fine-tuning/multi-candidate/native plugins stay excluded per the workflow.
@@ -766,6 +776,7 @@ Deferred (Phase 4 remainder): richer graph-driven placement honouring `preferred
 ## Development Rules
 
 - **Never hardcode secrets.** All credentials and keys go in `.env` (gitignored). Use `.env.example` for documentation.
+- **Never credit AI as a contributor.** No `Co-Authored-By` trailers naming AI models (Claude, Codex, Copilot, etc.) in commit messages, and no AI-identifying author/committer emails — commits always use the human owner's git identity.
 - **Never push directly to `main`.** Use feature branches. Branch naming: `sprint-1/feature-name`.
 - **Write tests before or alongside code**, not after.
 - **Every significant action must be logged.** Canvas edits, generation events, team changes — all go to `ActivityLog`.
@@ -796,6 +807,7 @@ docker-compose up
 | Document | Purpose |
 |---|---|
 | `docs/PROJECT_STRATEGY.md` | Full product strategy, all 20 sections |
+| `docs/EDITOR_3D_AND_SPACE_PLANNER_DIRECTION.md` | Owner-approved 3D-editor + commercial space-planner design direction (Sprint 25+) |
 | `docs/superpowers/specs/2026-05-23-sprint1-auth-design.md` | Sprint 1 detailed design spec |
 
 ---

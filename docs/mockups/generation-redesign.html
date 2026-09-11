@@ -1070,6 +1070,186 @@ button:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 
 .l-footer .links button { font-size: 12px; color: var(--muted-light); }
 .l-footer .links button:hover { color: var(--ink); }
 
+/* ============================================================
+   3D EDIT state — real Three.js view (walls with openings cut in),
+   fused with the commercial space-planner direction
+   ============================================================ */
+.threed-holder {
+  position: absolute; inset: 18px 18px 74px;
+  border-radius: 12px; overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.07);
+  background: #12151a;
+}
+.threed-holder canvas { display: block; }
+
+.open3d-btn { position: absolute; top: 16px; right: 16px; z-index: 5; animation: fadeUp .4s .9s cubic-bezier(.22,.9,.3,1) both; }
+
+.t3d-rail {
+  position: absolute; left: 14px; top: 14px; width: 214px;
+  background: rgba(27, 28, 29, 0.93); backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 12px;
+  padding: 12px; z-index: 4;
+  max-height: calc(100% - 28px); overflow: auto;
+}
+.t3d-grp { margin-bottom: 12px; }
+.t3d-grp:last-child { margin-bottom: 0; }
+.t3d-grp > span.lbl, .t3d-grp .lbl {
+  display: block; font-size: 9.5px; font-weight: 700; letter-spacing: 0.12em;
+  color: var(--muted-light); margin-bottom: 6px;
+}
+.t3d-tpl { display: flex; flex-wrap: wrap; gap: 5px; }
+.t3d-tpl button {
+  font-size: 11px; font-weight: 600; color: var(--muted);
+  border: 1px solid rgba(255,255,255,0.1); background: var(--graphite-800);
+  border-radius: 7px; padding: 5px 9px;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.t3d-tpl button:hover { color: var(--ink); }
+.t3d-tpl button.on { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); }
+.t3d-swatches { display: flex; gap: 7px; }
+.t3d-swatches button {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.15);
+  transition: transform .12s, border-color .15s;
+}
+.t3d-swatches button:hover { transform: scale(1.14); }
+.t3d-swatches button.on { border-color: var(--ink); }
+.t3d-cap { font-size: 11px; color: var(--muted); margin-bottom: 5px; display: flex; justify-content: space-between; align-items: baseline; }
+.t3d-cap b { color: var(--ink); font-family: var(--mono); }
+.t3d-cap .per { font-size: 9.5px; color: var(--muted-light); font-family: var(--mono); }
+.t3d-meter { height: 6px; border-radius: 3px; background: var(--graphite-700); overflow: hidden; margin-bottom: 8px; }
+.t3d-meter .fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--accent-bright)); transition: width .35s ease; }
+.t3d-row { display: flex; gap: 5px; }
+.t3d-row button {
+  flex: 1; font-size: 11px; font-weight: 600; color: var(--muted);
+  background: var(--graphite-800); border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 7px; padding: 6px 0;
+  transition: color .15s, border-color .15s;
+}
+.t3d-row button:hover { color: var(--ink); border-color: rgba(255,255,255,0.22); }
+.t3d-costbtn {
+  width: 100%; font-size: 11.5px; font-weight: 700; color: var(--ink);
+  background: var(--accent-soft); border: 1px solid var(--accent);
+  border-radius: 8px; padding: 8px 0; transition: background .15s;
+}
+.t3d-costbtn:hover { background: rgba(118, 99, 215, 0.28); }
+.t3d-toggle {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  font-size: 11.5px; font-weight: 600; color: var(--muted);
+  background: none; padding: 4px 0; text-align: left;
+}
+.t3d-toggle .sw {
+  width: 26px; height: 15px; border-radius: 999px; background: var(--graphite-700);
+  position: relative; transition: background .2s; flex-shrink: 0;
+}
+.t3d-toggle .sw::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 11px; height: 11px;
+  border-radius: 50%; background: var(--muted-light); transition: left .2s, background .2s;
+}
+.t3d-toggle.on { color: var(--ink); }
+.t3d-toggle.on .sw { background: var(--accent); }
+.t3d-toggle.on .sw::after { left: 13px; background: #fff; }
+input[type=range].t3d-range { width: 100%; accent-color: var(--accent-bright); height: 14px; }
+
+.t3d-info {
+  position: absolute; right: 14px; top: 14px; width: 242px;
+  background: rgba(27, 28, 29, 0.93); backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 12px;
+  padding: 13px 14px; z-index: 4;
+}
+.t3d-info h2 { font-size: 15px; font-weight: 700; margin: 0; }
+.t3d-info .sub { font-size: 11px; color: var(--muted); margin: 3px 0 0; }
+.t3d-info .hd { font-size: 9.5px; font-weight: 700; letter-spacing: 0.12em; color: var(--muted-light); margin: 10px 0 5px; }
+.t3d-info ul { list-style: none; margin: 0; padding: 0; }
+.t3d-info li {
+  font-size: 12px; padding: 4px 0; display: flex; gap: 8px; align-items: baseline;
+  border-bottom: 1px dotted rgba(255,255,255,0.1);
+}
+.t3d-info li:last-child { border-bottom: 0; }
+.t3d-info li em { font-style: normal; color: var(--muted-light); font-size: 10px; margin-left: auto; font-family: var(--mono); white-space: nowrap; }
+.t3d-info .empty { font-size: 12px; color: var(--muted-light); line-height: 1.5; margin: 0; }
+
+.t3d-cost {
+  position: absolute; right: 14px; bottom: 14px; width: 246px;
+  background: rgba(27, 28, 29, 0.96); backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 12px;
+  padding: 13px 14px; z-index: 5;
+  transform: translateX(calc(100% + 24px));
+  transition: transform .35s cubic-bezier(.22,.9,.3,1);
+}
+.t3d-cost.open { transform: none; }
+.t3d-cost h2 { font-size: 13px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; margin: 0 0 8px; }
+.t3d-cost h2 button { color: var(--muted-light); font-size: 12px; padding: 2px 6px; border-radius: 6px; }
+.t3d-cost h2 button:hover { color: var(--ink); background: rgba(255,255,255,0.07); }
+.t3d-cost table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.t3d-cost td { padding: 3px 0; color: var(--muted); border-bottom: 1px dotted rgba(255,255,255,0.08); }
+.t3d-cost td:last-child { text-align: right; font-family: var(--mono); color: var(--ink); }
+.t3d-cost tr.total td { border-bottom: 0; padding-top: 8px; font-weight: 700; color: var(--ink); font-size: 12.5px; }
+.three-fallback {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  text-align: center; padding: 30px; font-size: 13px; color: var(--muted); line-height: 1.7;
+}
+
+/* ============================================================
+   LANDING — scroll-driven 3D story (brief → building → export)
+   ============================================================ */
+#l3dStory { position: relative; }
+.l3d-sticky { position: sticky; top: 0; height: 100vh; overflow: hidden; background: #12151a; }
+#l3dCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.l3d-sec {
+  position: relative; z-index: 2; min-height: 100vh;
+  display: flex; align-items: center; padding: 0 8vw;
+  pointer-events: none;
+}
+.l3d-sec:nth-of-type(even) { justify-content: flex-end; }
+.l3d-panel {
+  max-width: 480px;
+  background: rgba(24, 25, 26, 0.84);
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 18px; padding: 26px 28px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 24px 60px rgba(0,0,0,0.45);
+  pointer-events: auto;
+  opacity: 0; transform: translateY(18px);
+  transition: opacity .5s ease, transform .5s ease;
+}
+.l3d-panel.in { opacity: 1; transform: none; }
+.l3d-panel .l-p { font-size: 14px; }
+.l3d-panel .l-h1 { font-size: 36px; }
+.l3d-kicker {
+  display: block; margin-bottom: 10px;
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em;
+  color: var(--accent-bright); font-weight: 600;
+}
+.l3d-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.l3d-chips span {
+  font-size: 11.5px; font-weight: 600; color: var(--muted);
+  border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04);
+  border-radius: 999px; padding: 6px 12px;
+}
+.l3d-badges { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 16px; }
+.l3d-badges span {
+  font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--ink);
+  border: 1px solid var(--accent); background: var(--accent-soft);
+  border-radius: 8px; padding: 7px 13px;
+}
+.l3d-steps {
+  position: absolute; right: 22px; top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column; gap: 12px; z-index: 3;
+}
+.l3d-steps span {
+  font-family: var(--mono); font-size: 10px; color: var(--muted-light);
+  display: flex; align-items: center; gap: 8px; justify-content: flex-end;
+  opacity: 0.55; transition: opacity .3s, color .3s;
+}
+.l3d-steps span::before { content: ''; width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid var(--muted-light); order: 2; }
+.l3d-steps span.on { opacity: 1; color: var(--ink); }
+.l3d-steps span.on::before { background: var(--accent-bright); border-color: var(--accent-bright); box-shadow: 0 0 8px var(--accent-glow); }
+.l3d-hint {
+  position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%);
+  font-family: var(--mono); font-size: 10.5px; color: var(--muted-light); z-index: 3;
+}
+
 /* shared motion keyframes */
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(12px); }
@@ -1099,8 +1279,9 @@ button:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 
     <button data-jump="result">3 · Result</button>
     <button data-jump="docked">4 · Docked + Refine</button>
     <button data-jump="review">5 · Brief review</button>
+    <button data-jump="threed">6 · 3D edit</button>
   </div>
-  <span class="note">Every control is clickable — or just follow the flow: Hero → Generate → answer → Result</span>
+  <span class="note">Every control is clickable — or follow the flow: Hero → Generate → answer → Result → Open 3D edit</span>
 </div>
 
 <!-- ============ EDITOR FRAME ============ -->
@@ -1227,6 +1408,8 @@ button:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 
           <button class="pill-close" id="pillClose" aria-label="Dismiss">✕</button>
         </div>
 
+        <button class="ghost-btn open3d-btn" id="open3dBtn">Open 3D edit →</button>
+
         <button class="insights-chip" id="insightsChip">
           <span class="q-dot">87</span>
           <span class="meta">
@@ -1302,6 +1485,77 @@ button:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
           </button>
           <div class="p-done-note">✓ Refinement applied — review the canvas, then save.</div>
+        </div>
+      </div>
+
+      <!-- ===== STATE 6: REAL 3D EDIT (Three.js, café program) ===== -->
+      <div class="overlay hidden" id="state-threed">
+        <div class="threed-holder hidden" id="threedHolder"></div>
+
+        <div class="t3d-rail">
+          <div class="t3d-grp">
+            <span class="lbl">TEMPLATE</span>
+            <div class="t3d-tpl" id="tTpl">
+              <button class="on" data-tpl="cafe">Café</button>
+              <button data-tpl="coworking">Co-working</button>
+              <button data-tpl="boutique">Boutique</button>
+              <button data-tpl="restaurant">Restaurant</button>
+            </div>
+          </div>
+          <div class="t3d-grp">
+            <span class="lbl">BRAND COLOR</span>
+            <div class="t3d-swatches" id="tBrands"></div>
+          </div>
+          <div class="t3d-grp">
+            <span class="lbl">CAPACITY PLANNER</span>
+            <div class="t3d-cap">
+              <span>Seats <b id="capVal">11 / 42</b></span>
+              <span class="per" id="capPer"></span>
+            </div>
+            <div class="t3d-meter"><div class="fill" id="capFill"></div></div>
+            <div class="t3d-row" style="margin-bottom:5px;">
+              <button id="tDelTable">− Table</button><button id="tAddTable">+ Table</button>
+            </div>
+            <div class="t3d-row">
+              <button id="tDelStool">− Stool</button><button id="tAddStool">+ Stool</button>
+            </div>
+          </div>
+          <div class="t3d-grp">
+            <span class="lbl">SAFETY</span>
+            <button class="t3d-toggle" id="tFire"><span class="sw"></span>Show fire safety</button>
+          </div>
+          <div class="t3d-grp">
+            <span class="lbl">VIEW</span>
+            <div class="t3d-row" style="margin-bottom:7px;">
+              <button id="tPlan">Plan view</button><button id="tReset">Reset 3D</button>
+            </div>
+            <span class="lbl" style="margin-bottom:4px;">WALL HEIGHT</span>
+            <input type="range" class="t3d-range" id="tWallH" min="4" max="100" value="100">
+          </div>
+          <div class="t3d-grp">
+            <button class="t3d-costbtn" id="tCost">Cost estimator ▸</button>
+          </div>
+        </div>
+
+        <div class="t3d-info">
+          <h2 id="tiName">Pick a room</h2>
+          <p class="sub" id="tiSub">Tap any floor slab to trace how it connects.</p>
+          <div class="hd">CONNECTIONS</div>
+          <div id="tiBody"><p class="empty">Doors are cut into the walls as real gaps, so you can read the circulation straight off the model.</p></div>
+        </div>
+
+        <div class="t3d-cost" id="costPanel">
+          <h2>Cost estimator <button id="costClose">✕</button></h2>
+          <table>
+            <tr><td>Counter run + espresso</td><td>₹1.60L</td></tr>
+            <tr><td>Pastry display case</td><td>₹34,000</td></tr>
+            <tr><td>Retail shelf + goods</td><td>₹12,000</td></tr>
+            <tr><td>Bench + plants</td><td>₹10,000</td></tr>
+            <tr><td>Tables × <span id="ctTables">4</span></td><td id="ctTablesV"></td></tr>
+            <tr><td>Chairs × <span id="ctChairs">8</span></td><td id="ctChairsV"></td></tr>
+            <tr><td>Stools × <span id="ctStools">3</span></td><td id="ctStoolsV"></td></tr>
+            <tr class="total"><td>Rough total</td><td id="ctTotal"></td></tr>
+          </table>
         </div>
       </div>
 
@@ -1390,6 +1644,8 @@ button:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 
     <span class="seg">Validation <b id="bbValid">0 / 0</b></span>
     <span class="seg">Quality <b id="bbQuality">—</b></span>
     <span class="seg">Spaces <b id="bbSpaces">0</b></span>
+    <span class="seg">Seats <b id="bbSeats">—</b></span>
+    <span class="seg">Est. cost <b id="bbCost">—</b></span>
     <span class="seg">Units <b>Meters</b></span>
   </div>
 </div>
@@ -1408,12 +1664,21 @@ button:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 
     <button class="cta" data-cta="trial">Start free</button>
   </nav>
 
-  <div class="l-wrap">
-    <section class="l-hero">
-      <div>
+  <!-- scroll story: a fixed 3D scene builds the café as you scroll -->
+  <div id="l3dStory">
+    <div class="l3d-sticky">
+      <canvas id="l3dCanvas"></canvas>
+      <div class="l3d-steps" id="l3dSteps">
+        <span class="on">Brief</span><span>Walls</span><span>Plan</span><span>Furniture</span><span>Export</span>
+      </div>
+      <div class="l3d-hint">Scroll — watch a brief become a building · drag to orbit</div>
+    </div>
+
+    <section class="l3d-sec">
+      <div class="l3d-panel">
         <span class="l-badge"><span class="pulse"></span>AI-powered architectural design</span>
-        <h1 class="l-h1">Design better spaces, <span class="accent">faster</span>.</h1>
-        <p class="l-p">Describe the building in plain language. ArchiAI extracts the program, generates an editable floor plan in seconds, and hands you a real 2D + 3D editor — with compliance checked before you ever see it.</p>
+        <h1 class="l-h1">Watch a brief become a <span class="accent">building</span>.</h1>
+        <p class="l-p">This page is the actual journey. Below is a real 3D model — the same kind ArchiAI generates — building itself as you scroll. Drag anywhere to orbit it.</p>
         <div class="l-ctas">
           <button class="l-btn-primary" data-cta="trial">Start Free Trial
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
@@ -1425,18 +1690,50 @@ button:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 
         </div>
         <p class="l-micro">Free plan available · No credit card required</p>
       </div>
+    </section>
 
-      <div class="l-preview-wrap">
-        <div class="l-glow"></div>
-        <div class="l-preview">
-          <div class="l-room" style="left:4%;top:7%;width:44%;height:42%;background:#7A8CA82e;border-color:#7A8CA873;"><span class="n" style="color:#7A8CA8">Living Room</span><span class="d" style="color:#7A8CA8">6.0 × 4.0 m</span></div>
-          <div class="l-room" style="left:4%;top:53%;width:44%;height:40%;background:#C9C39A2e;border-color:#C9C39A73;"><span class="n" style="color:#C9C39A">Kitchen</span><span class="d" style="color:#C9C39A">4.6 × 2.5 m</span></div>
-          <div class="l-room" style="left:52%;top:7%;width:44%;height:30%;background:#8FAE942e;border-color:#8FAE9473;"><span class="n" style="color:#8FAE94">Bedroom 1</span><span class="d" style="color:#8FAE94">4.4 × 3.0 m</span></div>
-          <div class="l-room" style="left:52%;top:41%;width:20%;height:24%;background:#7FA8A02e;border-color:#7FA8A073;"><span class="n" style="color:#7FA8A0">Bath</span></div>
-          <div class="l-room" style="left:76%;top:41%;width:20%;height:24%;background:#B08D6E2e;border-color:#B08D6E73;"><span class="n" style="color:#B08D6E">Entry</span></div>
-          <div class="l-room" style="left:52%;top:69%;width:44%;height:24%;background:#9A86B82e;border-color:#9A86B873;"><span class="n" style="color:#9A86B8">Bedroom 2</span><span class="d" style="color:#9A86B8">4.4 × 2.5 m</span></div>
-          <div class="l-float" style="left:14px;bottom:14px;"><span class="dot"></span><span class="score">87/100</span><span style="color:var(--muted);font-weight:500;">concept quality</span></div>
-          <div class="l-float" style="right:14px;top:14px;"><span class="opts">4 options ▸</span></div>
+    <section class="l3d-sec">
+      <div class="l3d-panel">
+        <span class="l3d-kicker">01 — DESCRIBE</span>
+        <h2 class="l-h2">Say it in plain words.</h2>
+        <p class="l-p">“A 16 × 9 m café — about 30 seats, the counter near the kitchen, a retail wall by the entrance, east entry.”</p>
+        <p class="l-p">No CAD to learn. No template hunting. The brief is the input — the empty plot on the right is the canvas.</p>
+      </div>
+    </section>
+
+    <section class="l3d-sec">
+      <div class="l3d-panel">
+        <span class="l3d-kicker">02 — GENERATE</span>
+        <h2 class="l-h2">The engine partitions, checks, scores.</h2>
+        <p class="l-p">Walls rise where the program says they belong. Every layout is validated before you ever see it.</p>
+        <div class="l3d-chips">
+          <span>Best-of-64 candidate search</span>
+          <span>Zero-overlap guarantee</span>
+          <span>Walkable door graph</span>
+          <span>Quality score 87/100</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="l3d-sec">
+      <div class="l3d-panel">
+        <span class="l3d-kicker">03 — EDIT IN 3D</span>
+        <h2 class="l-h2">Then shape it yourself.</h2>
+        <p class="l-p">Furniture in, brand color applied. Drag rooms, resize with real dimensions, watch capacity and cost respond — with doors cut into the walls as real openings.</p>
+        <div class="l-ctas">
+          <button class="l-btn-primary" id="open3dDemo">Open the interactive 3D demo →</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="l3d-sec">
+      <div class="l3d-panel">
+        <span class="l3d-kicker">04 — EXPORT</span>
+        <h2 class="l-h2">Take it to Revit &amp; AutoCAD.</h2>
+        <p class="l-p">Download the same model as DXF or IFC — walls, door openings and room data intact — and keep refining in the tools your studio already runs.</p>
+        <div class="l3d-badges"><span>DXF</span><span>IFC</span><span>DWG</span><span>RVT · via IFC</span></div>
+        <div class="l-ctas">
+          <button class="l-btn-primary" data-cta="trial">Start Free Trial</button>
         </div>
       </div>
     </section>
@@ -1539,6 +1836,7 @@ button:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 
 
 <div class="toast" id="toast"></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 /* ============================================================
    Room data — the generated apartment shown in Result/Docked
@@ -1587,7 +1885,7 @@ function renderRooms() {
    State machine
    ============================================================ */
 const $ = id => document.getElementById(id);
-const states = ['hero', 'generating', 'result', 'docked', 'review'];
+const states = ['hero', 'generating', 'result', 'docked', 'threed', 'review'];
 let timers = [];
 let current = 'hero';
 
@@ -1604,6 +1902,8 @@ function show(state, opts = {}) {
     document.querySelector('.editor-frame').classList.add('hidden');
     document.querySelectorAll('.mockup-bar .states button').forEach(b =>
       b.classList.toggle('active', b.dataset.jump === 'landing'));
+    window.__mockState = 'landing';
+    if (window.__mock3d) window.__mock3d.enter('landing');
     return;
   }
   $('landingView').classList.add('hidden');
@@ -1642,6 +1942,14 @@ function show(state, opts = {}) {
 
   setSave(state === 'docked' ? 'saved' : state === 'result' ? 'unsaved' : 'notgen');
   $('bbSpaces').textContent = hasRooms ? '8' : '0';
+
+  // 3D edit state swaps the flat sheet for the real Three.js scene
+  const is3d = state === 'threed';
+  sheet.classList.toggle('hidden', is3d);
+  $('threedHolder').classList.toggle('hidden', !is3d);
+  if (!is3d) { $('bbSeats').textContent = '—'; $('bbCost').textContent = '—'; }
+  window.__mockState = state;
+  if (window.__mock3d) window.__mock3d.enter(state);
 
   if (state === 'generating' && !opts.noAuto) runGeneration();
   if (state === 'docked') runPlayback();
@@ -1796,6 +2104,8 @@ document.querySelectorAll('.g-option').forEach(opt => {
   });
 });
 
+$('open3dBtn').addEventListener('click', () => show('threed'));
+
 $('relayoutBtn').addEventListener('click', () => {
   if ($('relayoutBtn').disabled) return;
   $('gallery').classList.remove('hidden');
@@ -1872,6 +2182,7 @@ function showToast(msg) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
 }
+window.showToast = showToast;
 
 /* switcher */
 document.querySelectorAll('.mockup-bar .states button').forEach(btn =>
@@ -1904,6 +2215,608 @@ document.querySelectorAll('[data-cta]').forEach(btn =>
 
 /* boot */
 show('hero');
+</script>
+
+<script>
+/* =====================================================================
+   Mockup 3D module — a real, orbitable 3D edit view in the spirit of the
+   shared Gill Road floor-plan document (walls with door openings cut in as
+   real gaps, room slabs, labels, room inspector), fused with the commercial
+   space-planner direction: café program, brand color picker, capacity
+   planner, cost estimator, animated egress arrows, blueprint grid.
+   Geometry in meters. One render loop serves both scenes (editor + landing).
+   ===================================================================== */
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  function toast(msg) { if (window.showToast) window.showToast(msg); }
+
+  if (!window.THREE) {
+    var fb = '<div class="three-fallback">The 3D preview loads Three.js from the cdnjs CDN — open this mockup once while online.<br>The production app bundles it locally; this is only a mockup limitation.</div>';
+    var h = $('threedHolder'); if (h) h.innerHTML = fb;
+    var st = document.querySelector('.l3d-sticky'); if (st) st.innerHTML = fb;
+    window.__mock3d = { enter: function () {} };
+    return;
+  }
+
+  /* ---------- design constants (merged: charcoal base, warm white + oat surfaces, pickable brand accent) ---------- */
+  var WALL_H = 3.0, T = 0.24, SLAB_H = 0.18, DOOR_H = 2.1, Y0 = SLAB_H;
+  var CX = 8, CZ = 4.5;                      // model centroid → geometry re-centered on origin
+  var CAT = {
+    public:  { c: 0xe6dcc6, label: 'Guest area' },
+    back:    { c: 0xcdbb98, label: 'Back of house' },
+    service: { c: 0x9fae9a, label: 'Service' }
+  };
+  var OPEN_TYPE = {
+    door:   { c: 0xc8402f, label: 'door' },
+    slider: { c: 0x5f8fb5, label: 'glazing' },
+    open:   { c: 0x8fa3b3, label: 'open threshold' }
+  };
+  var BRANDS = [
+    ['Purple', '#7663D7'], ['Terracotta', '#C97B70'], ['Forest', '#6F9B84'],
+    ['Ochre', '#C9A96E'], ['Steel', '#7FA2BA']
+  ];
+
+  /* ---------- the café program (the brief's hero: a coffee shop you can lay out) ---------- */
+  var ROOMS = [
+    { n: 'Café Floor',   poly: [[0,0],[11,0],[11,9],[2.4,9],[2.4,6.4],[0,6.4]], cat: 'public',  d: '11.0 × 9.0 m' },
+    { n: 'Prep Kitchen', r: [11,0,16,5],  cat: 'back',    d: '5.0 × 5.0 m' },
+    { n: 'Store',        r: [11,5,16,9],  cat: 'back',    d: '5.0 × 4.0 m' },
+    { n: 'WC',           r: [0,6.4,2.4,9],cat: 'service', d: '2.4 × 2.6 m' }
+  ];
+  var WALLS = [
+    { a:[0,0],   b:[16,0], o:[ {at:[3.0,8.4], t:'slider', link:['Café Floor','Street']}, {at:[9.2,10.2], t:'door', link:['Café Floor','Street']} ] },
+    { a:[16,0],  b:[16,9] },
+    { a:[16,9],  b:[0,9] },
+    { a:[0,9],   b:[0,0] },
+    { a:[11,0],  b:[11,5], o:[ {at:[1.0,1.9], t:'door', link:['Café Floor','Prep Kitchen']} ] },
+    { a:[11,5],  b:[11,9], o:[ {at:[1.2,2.1], t:'door', link:['Café Floor','Store']} ] },
+    { a:[11,5],  b:[16,5], o:[ {at:[2.0,3.2], t:'open', link:['Prep Kitchen','Store']} ] },
+    { a:[2.4,6.4], b:[2.4,9], o:[ {at:[0.5,1.4], t:'door', link:['Café Floor','WC']} ] },
+    { a:[0,6.4], b:[2.4,6.4] }
+  ];
+  var TABLE_SPOTS = [[3.2,2.2],[6.0,2.4],[3.4,5.3],[6.4,5.1],[8.4,4.7],[4.9,7.4]];
+  var STOOL_SPOTS = [[8.2,2.5],[8.9,2.5],[9.6,2.5],[10.3,2.5]];
+  var COSTS = { table: 8500, chair: 2400, stool: 1900, counter: 62000, espresso: 98000, display: 34000, shelf: 12000, bench: 7000, plant: 1500 };
+  var EGRESS_MAX = 42;
+
+  /* ---------- builders ---------- */
+  function mat(hex, opts) { return new THREE.MeshLambertMaterial(Object.assign({ color: hex }, opts || {})); }
+  function brandMat() { return mat(new THREE.Color(BRANDS[0][1]).getHex()); }
+
+  function slabRect(r) {
+    var g = new THREE.BoxGeometry(r[2]-r[0], SLAB_H, r[3]-r[1]);
+    g.translate((r[0]+r[2])/2 - CX, SLAB_H/2, (r[1]+r[3])/2 - CZ);
+    return g;
+  }
+  function slabPoly(poly) {
+    var sh = new THREE.Shape(poly.map(function (p) { return new THREE.Vector2(p[0]-CX, p[1]-CZ); }));
+    var g = new THREE.ExtrudeGeometry(sh, { depth: SLAB_H, bevelEnabled: false });
+    g.rotateX(Math.PI/2);
+    g.translate(0, SLAB_H, 0);
+    return g;
+  }
+  function centroid(rm) {
+    if (rm.r) return [(rm.r[0]+rm.r[2])/2, (rm.r[1]+rm.r[3])/2];
+    var x = 0, z = 0;
+    rm.poly.forEach(function (p) { x += p[0]; z += p[1]; });
+    return [x/rm.poly.length, z/rm.poly.length];
+  }
+  function labelSprite(text, sub) {
+    var c = document.createElement('canvas'), g = c.getContext('2d');
+    var pad = 14;
+    g.font = '600 38px Archivo, sans-serif';
+    var w1 = g.measureText(text).width;
+    g.font = '400 26px "IBM Plex Mono", monospace';
+    var w2 = sub ? g.measureText(sub).width : 0;
+    c.width = Math.ceil(Math.max(w1, w2)) + pad*2;
+    c.height = sub ? 100 : 62;
+    g.fillStyle = 'rgba(14,17,21,0.66)';
+    g.fillRect(0, 0, c.width, c.height);
+    g.fillStyle = '#f2ecdd';
+    g.font = '600 38px Archivo, sans-serif';
+    g.textAlign = 'center'; g.fillText(text, c.width/2, 40);
+    if (sub) {
+      g.fillStyle = '#a8bccb';
+      g.font = '400 26px "IBM Plex Mono", monospace';
+      g.fillText(sub, c.width/2, 78);
+    }
+    var tx = new THREE.CanvasTexture(c); tx.anisotropy = 4;
+    var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tx, transparent: true }));
+    sp.scale.set(c.width/46, c.height/46, 1);
+    return sp;
+  }
+
+  /* one wall run, with the openings cut out as real gaps (lintel above, colored sill below) */
+  function buildWall(w, group, meta) {
+    var ax = w.a[0], az = w.a[1], bx = w.b[0], bz = w.b[1];
+    var len = Math.hypot(bx-ax, bz-az);
+    var ang = Math.atan2(bz-az, bx-ax);
+    var segs = [], cur = 0;
+    var ops = (w.o || []).slice().sort(function (p, q) { return p.at[0] - q.at[0]; });
+    ops.forEach(function (o) { if (o.at[0] > cur) segs.push([cur, o.at[0]]); cur = Math.max(cur, o.at[1]); });
+    if (cur < len) segs.push([cur, len]);
+    var place = function (t1, t2, y, hh, material) {
+      var L = t2 - t1; if (L <= 0.01) return;
+      var m = new THREE.Mesh(new THREE.BoxGeometry(L, hh, T), material);
+      var mid = (t1 + t2)/2;
+      m.position.set(ax + Math.cos(ang)*mid - CX, y + hh/2, az + Math.sin(ang)*mid - CZ);
+      m.rotation.y = -ang;
+      group.add(m);
+    };
+    var wallMat = mat(0xd8d2c4);
+    segs.forEach(function (s) { place(s[0], s[1], Y0, WALL_H, wallMat); });
+    ops.forEach(function (o) {
+      var oh = Math.min(DOOR_H, WALL_H);
+      if (WALL_H - oh > 0.05) place(o.at[0], o.at[1], Y0 + oh, WALL_H - oh, mat(0xc4beb0));
+      var col = OPEN_TYPE[o.t] ? OPEN_TYPE[o.t].c : 0xc8402f;
+      place(o.at[0], o.at[1], Y0, 0.22, mat(col, { emissive: col, emissiveIntensity: 0.35 }));
+      if (o.link) meta.links.push({ a: o.link[0], b: o.link[1], t: o.t });
+    });
+  }
+
+  function buildFurniture() {
+    var root = new THREE.Group();
+    var brand = { seats: brandMat(), counter: brandMat(), sign: brandMat(), packs: [brandMat(), brandMat()] };
+    var wood = mat(0xcdbb98), warm = mat(0xe9e3d6), dark = mat(0x3f4247),
+        steel = mat(0x8fa6b5), glass = mat(0xbfd8e6, { transparent: true, opacity: 0.35 }),
+        terra = mat(0xb08d6e), sage = mat(0x8fae94);
+    function bx(w, h, d, m, x, y, z) {
+      var ms = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
+      ms.position.set(x - CX, Y0 + y + h/2, z - CZ);
+      root.add(ms); return ms;
+    }
+    function cy(r, h, m, x, y, z) {
+      var ms = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 18), m);
+      ms.position.set(x - CX, Y0 + y + h/2, z - CZ);
+      root.add(ms); return ms;
+    }
+    /* counter run + espresso machine + pastry case + brand front panel + sign */
+    bx(2.2, 0.92, 1.0, warm, 9.7, 0, 1.2);
+    bx(2.4, 0.06, 1.16, wood, 9.7, 0.92, 1.2);
+    bx(2.2, 0.72, 0.06, brand.counter, 9.7, 0.06, 1.74);
+    bx(0.62, 0.44, 0.5, dark, 9.2, 0.98, 1.15);
+    bx(1.3, 0.86, 0.72, glass, 7.5, 0, 1.25);
+    bx(1.36, 0.1, 0.78, wood, 7.5, 0, 1.25);
+    bx(0.06, 0.5, 1.6, brand.sign, 10.86, 1.9, 1.4);
+    /* bench along the west wall */
+    bx(0.55, 0.4, 2.4, wood, 0.62, 0, 3.2);
+    /* retail shelf + packaged goods (some in brand color) */
+    bx(0.5, 1.8, 2.4, wood, 10.6, 0, 4.4);
+    for (var i = 0; i < 6; i++) {
+      var pm = i % 3 === 0 ? brand.packs[0] : (i % 3 === 1 ? brand.packs[1] : warm);
+      bx(0.16, 0.24, 0.16, pm, 10.42, 0.62 + (i % 3) * 0.5, 3.5 + (i >> 1) * 0.7);
+    }
+    /* plants */
+    [[0.8, 7.9], [10.2, 8.2]].forEach(function (p) {
+      cy(0.16, 0.3, terra, p[0], 0, p[1]);
+      var s = new THREE.Mesh(new THREE.SphereGeometry(0.27, 12, 10), sage);
+      s.position.set(p[0] - CX, Y0 + 0.62, p[1] - CZ);
+      root.add(s);
+    });
+    /* round tables with 2 branded chairs each */
+    var tables = TABLE_SPOTS.map(function (sp, i) {
+      var g = new THREE.Group();
+      var top = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.05, 20), wood);
+      top.position.set(sp[0] - CX, Y0 + 0.74, sp[1] - CZ); g.add(top);
+      var leg = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.72, 10), steel);
+      leg.position.set(sp[0] - CX, Y0 + 0.36, sp[1] - CZ); g.add(leg);
+      [[0, -0.68], [0, 0.68]].forEach(function (off) {
+        var seat = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.06, 0.42), brand.seats);
+        seat.position.set(sp[0] + off[0] - CX, Y0 + 0.45, sp[1] + off[1] - CZ); g.add(seat);
+        var back = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.5, 0.05), wood);
+        back.position.set(sp[0] + off[0] - CX, Y0 + 0.72, sp[1] + off[1] + (off[1] > 0 ? 0.2 : -0.2) - CZ); g.add(back);
+        [[-0.16, -0.16], [0.16, -0.16], [-0.16, 0.16], [0.16, 0.16]].forEach(function (l) {
+          var lg = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.44, 0.04), steel);
+          lg.position.set(sp[0] + off[0] + l[0] - CX, Y0 + 0.22, sp[1] + off[1] + l[1] - CZ); g.add(lg);
+        });
+      });
+      g.visible = i < 4;
+      root.add(g); return g;
+    });
+    /* counter stools */
+    var stools = STOOL_SPOTS.map(function (sp, i) {
+      var g = new THREE.Group();
+      var col = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 0.62, 10), steel);
+      col.position.set(sp[0] - CX, Y0 + 0.31, sp[1] - CZ); g.add(col);
+      var seat = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.19, 0.07, 16), brand.seats);
+      seat.position.set(sp[0] - CX, Y0 + 0.66, sp[1] - CZ); g.add(seat);
+      g.visible = i < 3;
+      root.add(g); return g;
+    });
+    return { root: root, brand: brand, tables: tables, stools: stools };
+  }
+
+  function buildModel() {
+    var scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x12151a);
+    scene.fog = new THREE.Fog(0x12151a, 40, 130);
+    scene.add(new THREE.HemisphereLight(0xcfe0ee, 0x1b232c, 0.95));
+    var key = new THREE.DirectionalLight(0xfff2dd, 1.05); key.position.set(24, 34, 16); scene.add(key);
+    var fill = new THREE.DirectionalLight(0x8fb4d4, 0.4); fill.position.set(-26, 18, -20); scene.add(fill);
+
+    var gp = new THREE.Mesh(new THREE.PlaneGeometry(160, 160), mat(0x141920));
+    gp.rotation.x = -Math.PI/2; gp.position.y = -0.12; scene.add(gp);
+    var grid = new THREE.GridHelper(80, 80, 0x2c4a63, 0x1d2c3a);   // subtle blueprint tint
+    grid.position.y = -0.1; scene.add(grid);
+
+    var walls = new THREE.Group();
+    var meta = { links: [] };
+    WALLS.forEach(function (w) { buildWall(w, walls, meta); });
+    scene.add(walls);
+
+    var slabMeshes = [], edges = [], labels = [], pickables = [];
+    ROOMS.forEach(function (rm) {
+      var geo = rm.r ? slabRect(rm.r) : slabPoly(rm.poly);
+      var m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: CAT[rm.cat].c, transparent: true }));
+      m.userData.room = rm;
+      scene.add(m); pickables.push(m); slabMeshes.push(m);
+      var ln = new THREE.LineSegments(new THREE.EdgesGeometry(geo),
+        new THREE.LineBasicMaterial({ color: 0x2c3a45, transparent: true }));
+      scene.add(ln); edges.push(ln);
+      var cxy = centroid(rm);
+      var sp = labelSprite(rm.n, rm.d);
+      sp.position.set(cxy[0] - CX, 2.3, cxy[1] - CZ);
+      scene.add(sp); labels.push(sp);
+    });
+
+    var furn = buildFurniture();
+    scene.add(furn.root);
+
+    return { scene: scene, walls: walls, slabMeshes: slabMeshes, edges: edges, labels: labels, pickables: pickables, furn: furn, meta: meta };
+  }
+
+  function buildEgress(scene) {
+    var paths = [
+      [[2.5, 5.2], [4.5, 4.6], [7.0, 3.4], [9.6, 1.9], [9.7, 0.25]],
+      [[13.5, 2.5], [11.5, 1.45], [9.6, 1.3], [9.7, 0.25]]
+    ].map(function (pts) {
+      return new THREE.CatmullRomCurve3(pts.map(function (p) {
+        return new THREE.Vector3(p[0] - CX, Y0 + 0.12, p[1] - CZ);
+      }));
+    });
+    var group = new THREE.Group();
+    var arrowMat = mat(0x8fae94, { emissive: 0x8fae94, emissiveIntensity: 0.5 });
+    var arrows = [];
+    paths.forEach(function (curve) {
+      var lineGeo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(60));
+      group.add(new THREE.Line(lineGeo, mat(0x8fae94, { transparent: true, opacity: 0.4 })));
+      for (var i = 0; i < 4; i++) {
+        var cone = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.34, 10), arrowMat);
+        group.add(cone);
+        arrows.push({ cone: cone, curve: curve, t: i / 4 });
+      }
+    });
+    group.visible = false;
+    scene.add(group);
+    return { group: group, arrows: arrows };
+  }
+
+  /* ---------- orbit (from the shared document, adapted) ---------- */
+  function makeOrbit(dom, cam, opts) {
+    var st = { theta: opts.theta, phi: opts.phi, r: opts.r, tx: 0, ty: opts.ty, tz: 0 };
+    function apply() {
+      var p = Math.max(0.06, Math.min(1.5, st.phi));
+      cam.position.set(
+        st.tx + st.r * Math.sin(p) * Math.sin(st.theta),
+        st.ty + st.r * Math.cos(p),
+        st.tz + st.r * Math.sin(p) * Math.cos(st.theta));
+      cam.lookAt(st.tx, st.ty, st.tz);
+    }
+    var drag = null;
+    dom.addEventListener('pointerdown', function (e) {
+      drag = { x: e.clientX, y: e.clientY, pan: e.button === 2 || e.shiftKey, moved: 0 };
+      dom.setPointerCapture(e.pointerId);
+    });
+    dom.addEventListener('pointermove', function (e) {
+      if (!drag) return;
+      var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      drag.moved += Math.abs(dx) + Math.abs(dy);
+      if (drag.pan) {
+        var s = st.r * 0.0016;
+        var rx = Math.cos(st.theta), rz = -Math.sin(st.theta);
+        var fx = -Math.sin(st.theta), fz = -Math.cos(st.theta);
+        st.tx -= dx*s*rx - dy*s*fx; st.tz -= dx*s*rz - dy*s*fz;
+      } else {
+        st.theta -= dx * 0.006; st.phi -= dy * 0.006;
+        if (opts.onDelta) opts.onDelta(dx, dy);
+      }
+      drag.x = e.clientX; drag.y = e.clientY;
+      apply();
+    });
+    window.addEventListener('pointerup', function () { drag = null; });
+    dom.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    if (opts.wheel !== false) {
+      dom.addEventListener('wheel', function (e) {
+        e.preventDefault();
+        st.r = Math.max(5, Math.min(60, st.r * (1 + Math.sign(e.deltaY) * 0.09)));
+        apply();
+      }, { passive: false });
+    }
+    return { st: st, apply: apply, moved: function () { return drag && drag.moved > 6; } };
+  }
+
+  /* =====================================================================
+     EDITOR 3D SCENE (state: threed)
+     ===================================================================== */
+  var M = buildModel();
+  var EG = buildEgress(M.scene);
+  var eCam = new THREE.PerspectiveCamera(40, 1, 0.1, 300);
+  var eRen = new THREE.WebGLRenderer({ antialias: true });
+  eRen.setPixelRatio(Math.min(devicePixelRatio, 2));
+  $('threedHolder').appendChild(eRen.domElement);
+
+  var V3D = { theta: -0.75, phi: 0.98, r: 14.5, tx: 0, ty: 1.4, tz: 0 };
+  var VPLAN = { theta: 0, phi: 0.07, r: 13.5, tx: 0, ty: 1.0, tz: 0 };
+  var view = makeOrbit(eRen.domElement, eCam, { theta: V3D.theta, phi: V3D.phi, r: V3D.r, ty: V3D.ty });
+  view.apply();
+
+  var tween = null;
+  function swingTo(target, dur) {
+    tween = { t0: performance.now(), dur: dur || 650, from: JSON.parse(JSON.stringify(view.st)), to: target };
+  }
+  function easeC(t) { return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3)/2; }
+
+  /* picking */
+  var ray = new THREE.Raycaster(), mouse = new THREE.Vector2(), selected = null;
+  eRen.domElement.addEventListener('pointerup', function (e) {
+    if (view.moved()) return;
+    var rect = eRen.domElement.getBoundingClientRect();
+    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    ray.setFromCamera(mouse, eCam);
+    var hits = ray.intersectObjects(M.pickables, false);
+    if (selected) selected.material.emissive.setHex(0x000000);
+    if (!hits.length) { selected = null; infoEmpty(); return; }
+    selected = hits[0].object;
+    selected.material.emissive.setHex(0x3d3560);
+    showInfo(selected.userData.room);
+  });
+
+  function connectionsFor(name) {
+    var out = [];
+    M.meta.links.forEach(function (l) {
+      if (l.a === name) out.push({ to: l.b, t: l.t });
+      else if (l.b === name) out.push({ to: l.a, t: l.t });
+    });
+    return out;
+  }
+  function showInfo(rm) {
+    var rows = connectionsFor(rm.n).map(function (c) {
+      return '<li>' + c.to + '<em>' + OPEN_TYPE[c.t].label + '</em></li>';
+    }).join('');
+    var extra = rm.n === 'Café Floor'
+      ? '<li>Seats ' + seats() + ' of ' + EGRESS_MAX + '<em>egress limit</em></li><li>Est. ' + inr(costTotal()) + '<em>fixtures</em></li>'
+      : '';
+    $('tiName').textContent = rm.n;
+    $('tiSub').textContent = CAT[rm.cat].label + ' · ' + rm.d;
+    $('tiBody').innerHTML = (rows || extra)
+      ? '<ul>' + rows + extra + '</ul>'
+      : '<p class="empty">No doorway on this side.</p>';
+  }
+  function infoEmpty() {
+    $('tiName').textContent = 'Pick a room';
+    $('tiSub').textContent = 'Tap any floor slab to trace how it connects.';
+    $('tiBody').innerHTML = '<p class="empty">Doors are cut into the walls as real gaps, so you can read the circulation straight off the model.</p>';
+  }
+
+  /* capacity + cost */
+  var nTables = 4, nStools = 3;
+  function seats() { return nTables * 2 + nStools; }
+  function costTotal() {
+    return COSTS.counter + COSTS.espresso + COSTS.display + COSTS.shelf + COSTS.bench + COSTS.plant * 2
+      + nTables * COSTS.table + nTables * 2 * COSTS.chair + nStools * COSTS.stool;
+  }
+  function inr(v) { return '₹' + (v >= 100000 ? (v/100000).toFixed(2) + 'L' : v.toLocaleString('en-IN')); }
+  function refreshBiz() {
+    var s = seats();
+    $('capVal').textContent = s + ' / ' + EGRESS_MAX;
+    $('capFill').style.width = Math.min(100, s / EGRESS_MAX * 100) + '%';
+    $('capPer').textContent = (96 / Math.max(1, s)).toFixed(1) + ' m²/seat';
+    $('bbSeats').textContent = s;
+    $('bbCost').textContent = inr(costTotal());
+    $('ctTables').textContent = nTables;
+    $('ctTablesV').textContent = inr(nTables * COSTS.table);
+    $('ctChairs').textContent = nTables * 2;
+    $('ctChairsV').textContent = inr(nTables * 2 * COSTS.chair);
+    $('ctStools').textContent = nStools;
+    $('ctStoolsV').textContent = inr(nStools * COSTS.stool);
+    $('ctTotal').textContent = inr(costTotal());
+    if (selected && selected.userData.room.n === 'Café Floor') showInfo(selected.userData.room);
+  }
+  function bindTap(id, fn) { $(id).addEventListener('click', fn); }
+  bindTap('tAddTable', function () {
+    if (nTables >= TABLE_SPOTS.length) { toast('No floor space left — that is the capacity planner doing its job'); return; }
+    M.furn.tables[nTables].visible = true; nTables++; refreshBiz();
+  });
+  bindTap('tDelTable', function () {
+    if (nTables <= 1) { toast('Keep at least one table'); return; }
+    nTables--; M.furn.tables[nTables].visible = false; refreshBiz();
+  });
+  bindTap('tAddStool', function () {
+    if (nStools >= STOOL_SPOTS.length) { toast('The counter is full'); return; }
+    M.furn.stools[nStools].visible = true; nStools++; refreshBiz();
+  });
+  bindTap('tDelStool', function () {
+    if (nStools <= 0) { toast('No stools to remove'); return; }
+    nStools--; M.furn.stools[nStools].visible = false; refreshBiz();
+  });
+  bindTap('tCost', function () { $('costPanel').classList.toggle('open'); });
+  bindTap('costClose', function () { $('costPanel').classList.remove('open'); });
+  bindTap('tFire', function () {
+    var on = $('tFire').classList.toggle('on');
+    EG.group.visible = on;
+    toast(on ? 'Egress paths shown — arrows flow toward the exit' : 'Fire safety hidden');
+  });
+  bindTap('tPlan', function () { swingTo(VPLAN); });
+  bindTap('tReset', function () { swingTo(V3D); });
+  $('tWallH').addEventListener('input', function () {
+    M.walls.scale.y = Math.max(0.04, $('tWallH').value / 100);
+  });
+
+  /* brand color picker — recolors branded elements live */
+  var swWrap = $('tBrands');
+  BRANDS.forEach(function (b, i) {
+    var btn = document.createElement('button');
+    btn.style.background = b[1];
+    btn.title = b[0];
+    if (i === 0) btn.className = 'on';
+    btn.addEventListener('click', function () {
+      swWrap.querySelectorAll('button').forEach(function (x) { x.classList.remove('on'); });
+      btn.classList.add('on');
+      var c = new THREE.Color(b[1]).getHex();
+      [M.furn.brand.seats, M.furn.brand.counter, M.furn.brand.sign].concat(M.furn.brand.packs)
+        .forEach(function (m) { m.color.setHex(c); });
+      toast('Brand color applied across the room — live');
+    });
+    swWrap.appendChild(btn);
+  });
+
+  /* templates (direction preview — furniture-set swapping lands in production) */
+  document.querySelectorAll('#tTpl button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('#tTpl button').forEach(function (x) { x.classList.remove('on'); });
+      b.classList.add('on');
+      if (b.dataset.tpl !== 'cafe') toast(b.textContent + ' template — furniture-set swapping lands with the production build');
+    });
+  });
+
+  /* the editor chrome's Plan / 3D Edit tabs swing the camera in this state */
+  document.getElementById('viewTabs').addEventListener('click', function (e) {
+    if (window.__mockState !== 'threed') return;
+    var t = e.target.textContent.trim();
+    if (t === 'Plan') swingTo(VPLAN);
+    if (t === '3D Edit') swingTo(V3D);
+  });
+
+  function sizeEditor() {
+    var h = $('threedHolder');
+    var w = h.clientWidth, ht = h.clientHeight;
+    if (w && ht) { eRen.setSize(w, ht); eCam.aspect = w / ht; eCam.updateProjectionMatrix(); }
+  }
+
+  /* =====================================================================
+     LANDING SCENE (state: landing) — the same café builds itself on scroll
+     ===================================================================== */
+  var L = { ready: false };
+  var lCam = new THREE.PerspectiveCamera(42, 1, 0.1, 400);
+  var lRen = new THREE.WebGLRenderer({ antialias: true, canvas: $('l3dCanvas') });
+  lRen.setPixelRatio(Math.min(devicePixelRatio, 2));
+  var LM = buildModel();
+  var lUserTheta = 0;
+  var lView = makeOrbit(lRen.domElement, lCam, {
+    theta: -0.3, phi: 0.35, r: 26, ty: 1.5, wheel: false,
+    onDelta: function (dx) { lUserTheta -= dx * 0.006; }
+  });
+
+  var landingP = 0;
+  function smooth(a, b, p) {
+    var x = Math.min(1, Math.max(0, (p - a) / (b - a)));
+    return x * x * (3 - 2 * x);
+  }
+  function applyLanding() {
+    var p = landingP;
+    var grow = smooth(0.12, 0.36, p);
+    var planDip = smooth(0.86, 0.97, p) * 0.47;          // wall-height eases down for the export sheet look
+    LM.walls.scale.y = Math.max(0.03, 0.03 + grow * (0.97 - planDip));
+    LM.slabMeshes.forEach(function (m, i) {
+      m.material.opacity = smooth(0.36 + i * 0.05, 0.47 + i * 0.05, p);
+    });
+    LM.edges.forEach(function (m, i) {
+      m.material.opacity = smooth(0.36 + i * 0.05, 0.47 + i * 0.05, p) * 0.9;
+    });
+    LM.labels.forEach(function (sp, i) {
+      sp.material.opacity = smooth(0.40 + i * 0.05, 0.52 + i * 0.05, p);
+    });
+    var f = smooth(0.60, 0.82, p);
+    LM.furn.root.scale.set(Math.max(0.001, f), Math.max(0.001, f), Math.max(0.001, f));
+    lView.st.theta = -0.3 + p * 1.3 + lUserTheta;
+    lView.st.phi = 0.35 + p * 0.6;
+    lView.st.r = 26 - p * 11;
+    lView.st.ty = 1.5 + p * 1.1;
+    lView.apply();
+  }
+  function sizeLanding() {
+    var stEl = document.querySelector('.l3d-sticky');
+    var w = stEl.clientWidth, ht = stEl.clientHeight;
+    lRen.setSize(w, ht);
+    lCam.aspect = w / ht;
+    lCam.updateProjectionMatrix();
+  }
+  var story = $('l3dStory'), lv = $('landingView');
+  function onScroll() {
+    var total = story.offsetHeight - window.innerHeight;
+    landingP = total > 0 ? Math.min(1, Math.max(0, lv.scrollTop / total)) : 0;
+    var step = Math.min(4, Math.floor(landingP * 5));
+    document.querySelectorAll('#l3dSteps span').forEach(function (sp, i) {
+      sp.classList.toggle('on', i === step);
+    });
+  }
+  lv.addEventListener('scroll', onScroll, { passive: true });
+
+  /* story panels fade in as they enter the sticky viewport */
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) { if (en.isIntersecting) en.target.classList.add('in'); });
+    }, { root: lv, threshold: 0.35 });
+    document.querySelectorAll('.l3d-panel').forEach(function (p) { io.observe(p); });
+  } else {
+    document.querySelectorAll('.l3d-panel').forEach(function (p) { p.classList.add('in'); });
+  }
+
+  $('open3dDemo').addEventListener('click', function () {
+    if (typeof show === 'function') show('threed');
+  });
+
+  /* ---------- render loop (only the active scene renders) ---------- */
+  var lastT = performance.now();
+  function loop(now) {
+    requestAnimationFrame(loop);
+    var dt = Math.min(0.05, (now - lastT) / 1000);
+    lastT = now;
+    if (window.__mockState === 'threed') {
+      if (tween) {
+        var k = Math.min(1, (now - tween.t0) / tween.dur), e = easeC(k);
+        ['theta', 'phi', 'r', 'tx', 'ty', 'tz'].forEach(function (key) {
+          view.st[key] = tween.from[key] + (tween.to[key] - tween.from[key]) * e;
+        });
+        view.apply();
+        if (k >= 1) tween = null;
+      }
+      if (EG.group.visible) {
+        EG.arrows.forEach(function (a) {
+          a.t = (a.t + dt * 0.22) % 1;
+          var p = a.curve.getPointAt(a.t), d = a.curve.getTangentAt(a.t);
+          a.cone.position.copy(p);
+          a.cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d);
+        });
+      }
+      eRen.render(M.scene, eCam);
+    } else if (window.__mockState === 'landing' && L.ready) {
+      applyLanding();
+      lRen.render(LM.scene, lCam);
+    }
+  }
+  requestAnimationFrame(loop);
+
+  window.addEventListener('resize', function () {
+    if (window.__mockState === 'threed') sizeEditor();
+    if (window.__mockState === 'landing') sizeLanding();
+  });
+
+  window.__mock3d = {
+    enter: function (state) {
+      if (state === 'threed') {
+        requestAnimationFrame(function () { sizeEditor(); });
+        refreshBiz();
+        infoEmpty();
+      }
+      if (state === 'landing') {
+        requestAnimationFrame(function () { sizeLanding(); onScroll(); L.ready = true; });
+      }
+    }
+  };
+})();
 </script>
 </body>
 </html>
