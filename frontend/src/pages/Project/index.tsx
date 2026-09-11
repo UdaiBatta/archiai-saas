@@ -410,7 +410,7 @@ export default function ProjectPage() {
       setGenerateError(
         getApiErrorMessage(
           err,
-          'I could not understand that brief. Check that LM Studio is running, then try again.',
+          'I could not understand that brief. Check the AI provider configuration, then try again.',
         ),
       )
     } finally {

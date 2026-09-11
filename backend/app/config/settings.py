@@ -38,15 +38,21 @@ class Settings(BaseSettings):
     # credentials.
     ALLOWED_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
 
-    # LM Studio (OpenAI-compatible) local server for the MVP extraction pipeline.
-    # LM Studio runs on the HOST; from inside Docker the backend reaches it via
-    # http://host.docker.internal:1234/v1 (set in docker-compose). Enable
-    # "Serve on Local Network" in LM Studio or the container cannot reach it.
+    # OpenAI-compatible server for the MVP extraction pipeline. Local default:
+    # LM Studio on the host machine (from inside Docker, compose overrides this
+    # with http://host.docker.internal:1234/v1 — enable "Serve on Local
+    # Network" in LM Studio or the container cannot reach it).
     LLM_BASE_URL: str = "http://localhost:1234/v1"
     LLM_TIMEOUT_S: float = 60.0
-    # Optional override. Empty = read the exact identifier of whatever model LM
-    # Studio has loaded from GET /v1/models (a mismatched hard-coded name errors).
+    # Optional override. Empty = read the exact identifier of whatever model the
+    # server has loaded from GET /v1/models (a mismatched hard-coded name errors).
+    # Set it when using a hosted provider (see .env.example presets).
     LLM_MODEL: str = ""
+    # Optional bearer API key for a HOSTED provider (AWS Bedrock's
+    # OpenAI-compatible endpoint, Groq, Gemini, OpenRouter). Empty = local
+    # mode: no auth header, strict /models discovery, GPU-serialized calls.
+    # Never commit a real key.
+    LLM_API_KEY: str = ""
 
     # Razorpay (Phase 3). All optional so dev/tests run without them; order
     # creation is disabled and the webhook rejects everything until set.

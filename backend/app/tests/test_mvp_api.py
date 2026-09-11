@@ -112,22 +112,23 @@ async def test_extract_returns_deterministic_route_summary_and_optional_fields(
     ("failure", "expected_status", "expected_code", "expected_message"),
     [
         (
-            LLMUnavailable("LM Studio is down"),
+            LLMUnavailable("provider is down"),
             503,
             "SERVICE_UNAVAILABLE",
-            "Local AI is unavailable. Start LM Studio, load qwen/qwen3.5-9b, and try again.",
+            "The AI provider is unavailable. Check the LLM provider "
+            "configuration (LLM_BASE_URL / LLM_API_KEY) and try again.",
         ),
         (
-            LLMTimeout("LM Studio exceeded the timeout"),
+            LLMTimeout("provider exceeded the timeout"),
             504,
             "GATEWAY_TIMEOUT",
-            "Local AI took too long to respond. Keep LM Studio open and try again.",
+            "The AI provider took too long to respond. Please try again.",
         ),
         (
-            LLMInvalidOutput("LM Studio returned malformed JSON"),
+            LLMInvalidOutput("provider returned malformed JSON"),
             502,
             "BAD_GATEWAY",
-            "Local AI returned an invalid structured response. Try again or simplify the brief.",
+            "The AI provider returned an invalid structured response. Try again or simplify the brief.",
         ),
     ],
 )

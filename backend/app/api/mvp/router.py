@@ -86,31 +86,31 @@ async def extract_brief(
     except LLMTimeout as exc:
         raise HTTPException(
             status_code=504,
-            detail=(
-                "Local AI took too long to respond. Keep LM Studio open and try "
-                "again."
-            ),
+            detail="The AI provider took too long to respond. Please try again.",
         ) from exc
     except LLMInvalidOutput as exc:
         raise HTTPException(
             status_code=502,
             detail=(
-                "Local AI returned an invalid structured response. Try again or "
-                "simplify the brief."
+                "The AI provider returned an invalid structured response. Try "
+                "again or simplify the brief."
             ),
         ) from exc
     except LLMUnavailable as exc:
         raise HTTPException(
             status_code=503,
             detail=(
-                "Local AI is unavailable. Start LM Studio, load "
-                "qwen/qwen3.5-9b, and try again."
+                "The AI provider is unavailable. Check the LLM provider "
+                "configuration (LLM_BASE_URL / LLM_API_KEY) and try again."
             ),
         ) from exc
     except LLMError as exc:
         raise HTTPException(
             status_code=503,
-            detail="Local AI failed unexpectedly. Check LM Studio and try again.",
+            detail=(
+                "The AI provider failed unexpectedly. Check the LLM provider "
+                "configuration and try again."
+            ),
         ) from exc
     except ExtractionFailed as exc:
         raise HTTPException(
