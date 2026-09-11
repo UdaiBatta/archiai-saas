@@ -1,0 +1,1565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ArchiAI — Generation Redesign Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   Design tokens — mirror of the app's real system
+   (tailwind.config.ts graphite ladder + editorPalette accents)
+   ============================================================ */
+:root {
+  --graphite-950: #18191a;
+  --graphite-900: #1b1c1d;
+  --graphite-850: #1d1e1f;
+  --graphite-800: #232425;
+  --graphite-700: #2a2b2c;
+  --graphite-500: #4a4b4d;
+  --ink: #F5F5F6;
+  --muted: #A8A8AC;
+  --muted-light: #7C7C80;
+  --accent: #7663D7;
+  --accent-bright: #8069DF;
+  --accent-soft: rgba(118, 99, 215, 0.16);
+  --accent-glow: rgba(118, 99, 215, 0.35);
+  --ok: #8FAE94;
+  --warn: #C9A96E;
+  --danger: #C97B70;
+  --paper: #242526;
+  --room-living: #7A8CA8;
+  --room-kitchen: #C9C39A;
+  --room-bed1: #8FAE94;
+  --room-bed2: #9A86B8;
+  --room-bath: #7FA8A0;
+  --room-entry: #B08D6E;
+  --room-hall: #6E6F72;
+  --sans: 'Archivo', system-ui, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { height: 100%; }
+
+body {
+  font-family: var(--sans);
+  background: #121314;
+  color: var(--ink);
+  overflow: hidden;
+}
+
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+button { font-family: var(--sans); cursor: pointer; border: none; background: none; color: inherit; }
+button:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 2px; }
+
+/* ============================================================
+   MOCKUP switcher bar (chrome — not part of the design)
+   ============================================================ */
+.mockup-bar {
+  height: 46px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 16px;
+  background: #0d0e0f;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow-x: auto;
+}
+.mockup-bar .tag {
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  font-size: 10px;
+  color: var(--accent-bright);
+  border: 1px solid var(--accent-glow);
+  border-radius: 4px;
+  padding: 3px 7px;
+  flex-shrink: 0;
+}
+.mockup-bar .hint { color: var(--muted-light); flex-shrink: 0; }
+.mockup-bar .states { display: flex; gap: 6px; flex-shrink: 0; }
+.mockup-bar .states button {
+  padding: 5px 11px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.09);
+  background: var(--graphite-850);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  transition: border-color .15s, color .15s, background .15s;
+}
+.mockup-bar .states button:hover { color: var(--ink); border-color: rgba(255,255,255,0.2); }
+.mockup-bar .states button.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--ink);
+}
+.mockup-bar .note { color: var(--muted-light); margin-left: auto; flex-shrink: 0; font-size: 11px; }
+
+/* ============================================================
+   Editor frame — a stand-in for the real app shell
+   ============================================================ */
+.editor-frame {
+  height: calc(100vh - 46px);
+  display: flex;
+  flex-direction: column;
+  background: var(--graphite-900);
+}
+
+/* top bar */
+.topbar {
+  height: 48px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 14px;
+  background: rgba(25, 26, 27, 0.94);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.wordmark { font-weight: 800; letter-spacing: 0.22em; font-size: 12px; color: var(--ink); }
+.wordmark span { color: var(--accent-bright); }
+.project-title { font-size: 13px; font-weight: 600; color: var(--muted); }
+.topbar .spacer { flex: 1; }
+.ghost-btn {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  padding: 6px 11px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: var(--graphite-800);
+  transition: color .15s, border-color .15s;
+}
+.ghost-btn:hover { color: var(--ink); border-color: rgba(255,255,255,0.18); }
+
+/* honest save-state button */
+.save-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  padding: 6px 11px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: var(--graphite-800);
+  transition: color .15s, border-color .15s;
+}
+.save-btn:hover { color: var(--ink); border-color: rgba(255,255,255,0.18); }
+.save-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted-light); flex-shrink: 0; }
+.save-btn[data-save="notgen"] .save-dot { background: transparent; border: 1.5px solid var(--muted-light); }
+.save-btn[data-save="unsaved"] .save-dot { background: var(--warn); }
+.save-btn[data-save="saving"] .save-dot { background: var(--accent-bright); animation: pulseDot 1s ease-in-out infinite; }
+.save-btn[data-save="saved"] .save-dot { background: var(--ok); }
+.save-btn[data-save="error"] .save-dot { background: var(--danger); }
+@keyframes pulseDot { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+/* view tabs */
+.viewtabs { flex-shrink: 0; display: flex; justify-content: center; gap: 4px; padding: 6px 0 0; background: var(--graphite-900); }
+.viewtabs button {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  padding: 7px 14px;
+  border-radius: 8px 8px 0 0;
+  border-bottom: 2px solid transparent;
+  transition: color .15s, border-color .15s;
+}
+.viewtabs button:hover { color: var(--ink); }
+.viewtabs button.active { color: var(--ink); border-bottom-color: var(--accent-bright); }
+
+/* main row: viewport + right panel */
+.main-row { flex: 1; display: flex; min-height: 0; }
+
+.viewport { flex: 1; position: relative; background: var(--graphite-900); min-width: 0; }
+
+/* the drawing sheet */
+.sheet {
+  position: absolute;
+  inset: 18px 18px 74px;
+  background:
+    linear-gradient(rgba(255,255,255,0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.045) 1px, transparent 1px),
+    var(--paper);
+  background-size: 28px 28px, 28px 28px, auto;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.sheet.breathing { animation: breathe 2.6s ease-in-out infinite; }
+@keyframes breathe {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(118,99,215,0); }
+  50% { box-shadow: 0 0 42px -6px var(--accent-glow); }
+}
+
+/* room tiles */
+.room {
+  position: absolute;
+  border-radius: 6px;
+  border: 1px solid;
+  padding: 8px 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  opacity: 0;
+}
+.room .r-name { font-size: 12px; font-weight: 600; letter-spacing: 0.01em; }
+.room .r-dims { font-family: var(--mono); font-size: 9.5px; opacity: 0.75; }
+.room .r-area { font-family: var(--mono); font-size: 9.5px; opacity: 0.55; }
+.room.selected { border-color: var(--accent-bright) !important; box-shadow: 0 0 0 1.5px var(--accent-bright); }
+.reveal .room { animation: roomIn .5s cubic-bezier(.22,.9,.3,1) forwards; }
+@keyframes roomIn {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* entry marker */
+.entry-mark {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  opacity: 0;
+}
+.reveal .entry-mark { animation: fadeIn .4s ease forwards; animation-delay: 1s; }
+.entry-mark .tick { width: 26px; height: 3px; border-radius: 2px; background: var(--accent-bright); box-shadow: 0 0 10px var(--accent-glow); }
+.entry-mark .lbl { font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.18em; color: var(--muted); }
+
+/* right panel */
+.right-panel {
+  width: 232px;
+  flex-shrink: 0;
+  background: rgba(28, 29, 30, 0.96);
+  border-left: 1px solid rgba(255,255,255,0.06);
+  padding: 14px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+}
+.panel-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--muted-light);
+}
+.panel-empty { font-size: 12px; line-height: 1.55; color: var(--muted-light); padding: 8px 0; }
+.prog-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  padding: 6px 7px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.prog-row:hover { background: rgba(255,255,255,0.05); color: var(--ink); }
+.prog-row .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.prog-row .name { flex: 1; font-weight: 500; }
+.prog-row .val { font-family: var(--mono); font-size: 11px; color: var(--muted-light); }
+.panel-footer { margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding-top: 10px; }
+.panel-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: var(--graphite-800);
+  color: var(--muted);
+  transition: color .15s, border-color .15s, background .15s;
+}
+.panel-btn:hover:not(:disabled) { color: var(--ink); border-color: rgba(255,255,255,0.2); }
+.panel-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.panel-btn.primary:hover:not(:disabled) { background: var(--accent-bright); }
+.panel-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.panel-btn .why { display: block; font-size: 10px; font-weight: 400; color: var(--muted-light); margin-top: 2px; }
+
+/* bottom status bar */
+.bottombar {
+  height: 34px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 0 14px;
+  background: rgba(24, 25, 26, 0.97);
+  border-top: 1px solid rgba(255,255,255,0.06);
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: var(--muted-light);
+}
+.bottombar .seg b { color: var(--muted); font-weight: 500; }
+
+/* ============================================================
+   Overlays — the five mockup states
+   ============================================================ */
+.overlay { position: absolute; inset: 0; pointer-events: none; }
+.overlay > * { pointer-events: auto; }
+.hidden { display: none !important; }
+
+/* ---------- shared prompt card ---------- */
+.prompt-card {
+  background: rgba(35, 36, 37, 0.96);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.45);
+  backdrop-filter: blur(10px);
+}
+
+.mode-tabs {
+  display: inline-flex;
+  border-radius: 9px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: var(--graphite-900);
+  overflow: hidden;
+}
+.mode-tabs button {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 15px;
+  color: var(--muted);
+  transition: color .15s, background .15s;
+  position: relative;
+}
+.mode-tabs button.active { background: var(--accent); color: #fff; }
+.mode-tabs button:not(.active):hover { color: var(--ink); }
+.mode-tabs button.locked:active { animation: shake .35s ease; }
+.mode-tabs .lock-ico { font-size: 10px; margin-left: 4px; opacity: 0.8; }
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  50% { transform: translateX(3px); }
+  75% { transform: translateX(-2px); }
+}
+.lock-hint {
+  font-size: 11px;
+  color: var(--warn);
+  opacity: 0;
+  transition: opacity .2s;
+}
+.lock-hint.show { opacity: 1; }
+
+/* ---------- State 1: HERO ---------- */
+#state-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.hero-headline {
+  font-size: 27px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  text-align: center;
+  animation: fadeUp .55s cubic-bezier(.22,.9,.3,1) both;
+}
+.hero-headline .accent { color: var(--accent-bright); }
+.hero-sub {
+  margin-top: 9px;
+  font-size: 13.5px;
+  color: var(--muted);
+  text-align: center;
+  max-width: 440px;
+  line-height: 1.55;
+  animation: fadeUp .55s .08s cubic-bezier(.22,.9,.3,1) both;
+}
+.hero-card {
+  margin-top: 26px;
+  width: min(600px, 92%);
+  padding: 16px;
+  animation: fadeUp .55s .16s cubic-bezier(.22,.9,.3,1) both;
+}
+.hero-card .card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.spark-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.spark-row svg { flex-shrink: 0; }
+.hero-card textarea {
+  width: 100%;
+  min-height: 74px;
+  resize: none;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 14.5px;
+  line-height: 1.5;
+  outline: none;
+}
+.hero-card textarea::placeholder { color: var(--muted-light); }
+.hero-card .card-bottom { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
+.params-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--muted);
+  padding: 6px 10px;
+  border-radius: 8px;
+  transition: color .15s, background .15s;
+}
+.params-toggle:hover { color: var(--ink); background: rgba(255,255,255,0.05); }
+.params-toggle .chev { transition: transform .2s; }
+.params-toggle[aria-expanded="true"] .chev { transform: rotate(180deg); }
+.gen-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--accent);
+  padding: 10px 20px;
+  border-radius: 10px;
+  box-shadow: 0 6px 22px -4px var(--accent-glow);
+  transition: background .15s, transform .12s, box-shadow .15s, opacity .15s;
+}
+.gen-btn:hover:not(:disabled) { background: var(--accent-bright); box-shadow: 0 8px 26px -4px var(--accent-glow); }
+.gen-btn:active:not(:disabled) { transform: scale(0.98); }
+.gen-btn:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+.gen-btn .spinner { display: none; }
+.gen-btn.busy .spinner { display: inline-block; }
+.gen-btn.busy .arrow { display: none; }
+.spinner {
+  width: 13px; height: 13px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.params-row {
+  display: none;
+  gap: 12px;
+  align-items: flex-end;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255,255,255,0.07);
+  animation: fadeUp .25s ease both;
+}
+.params-row.show { display: flex; }
+.params-row label { display: flex; flex-direction: column; gap: 4px; font-size: 10.5px; color: var(--muted); font-weight: 500; }
+.params-row input, .params-row select {
+  width: 86px;
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--graphite-700);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 6px 8px;
+  outline: none;
+}
+.params-row input:focus, .params-row select:focus { border-color: var(--accent-bright); }
+.params-row .hint { font-size: 10px; color: var(--muted-light); padding-bottom: 7px; }
+
+.quick-row {
+  margin-top: 22px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  animation: fadeUp .55s .24s cubic-bezier(.22,.9,.3,1) both;
+}
+.quick-row .lead { font-size: 12px; color: var(--muted-light); align-self: center; }
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  padding: 7px 13px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.09);
+  background: rgba(35,36,37,0.85);
+  transition: color .15s, border-color .15s, background .15s, transform .12s;
+}
+.chip:hover { color: var(--ink); border-color: var(--accent); background: var(--accent-soft); }
+.chip:active { transform: scale(0.97); }
+.chip svg { flex-shrink: 0; opacity: 0.9; }
+
+/* ---------- State 2: GENERATING ---------- */
+#state-generating {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 9vh 24px 0;
+}
+.gen-card {
+  width: min(600px, 92%);
+  padding: 18px;
+  animation: fadeUp .4s cubic-bezier(.22,.9,.3,1) both;
+}
+.gen-card .brief-echo {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+  border-left: 2px solid var(--accent);
+  padding-left: 11px;
+  margin-bottom: 18px;
+}
+.stage-track { display: flex; align-items: flex-start; position: relative; margin-bottom: 6px; }
+.stage { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 7px; position: relative; z-index: 1; }
+.stage .s-dot {
+  width: 15px; height: 15px;
+  border-radius: 50%;
+  border: 2px solid var(--graphite-500);
+  background: var(--graphite-800);
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color .3s, background .3s, box-shadow .3s;
+}
+.stage .s-dot svg { opacity: 0; transform: scale(0.4); transition: opacity .2s, transform .2s; }
+.stage .s-lbl { font-size: 11.5px; font-weight: 600; color: var(--muted-light); transition: color .3s; }
+.stage.active .s-dot { border-color: var(--accent-bright); box-shadow: 0 0 0 4px var(--accent-soft); }
+.stage.active .s-lbl { color: var(--ink); }
+.stage.active.running .s-dot::after {
+  content: '';
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--accent-bright);
+  animation: pulseDot 1s ease-in-out infinite;
+}
+.stage.done .s-dot { border-color: var(--ok); background: var(--ok); }
+.stage.done .s-dot svg { opacity: 1; transform: scale(1); }
+.stage.done .s-lbl { color: var(--muted); }
+.track-line {
+  position: absolute;
+  top: 7px; left: 12%; right: 12%;
+  height: 2px;
+  background: var(--graphite-500);
+  border-radius: 1px;
+  overflow: hidden;
+}
+.track-line .fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-bright));
+  transition: width 1s cubic-bezier(.4,0,.2,1);
+}
+.progress-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--graphite-700);
+  overflow: hidden;
+  margin: 14px 0 10px;
+}
+.progress-bar .fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-bright));
+  position: relative;
+  transition: width 1s cubic-bezier(.4,0,.2,1);
+}
+.progress-bar .fill::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.28), transparent);
+  animation: shimmer 1.4s linear infinite;
+}
+@keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(220%); } }
+.gen-status { font-size: 12px; color: var(--muted); min-height: 18px; font-family: var(--mono); }
+.gen-card .card-bottom { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+.cancel-btn {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 9px 16px;
+  border-radius: 9px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: var(--graphite-800);
+  transition: color .15s, border-color .15s;
+}
+.cancel-btn:hover { color: var(--danger); border-color: var(--danger); }
+
+/* ---------- State 3: RESULT ---------- */
+.success-pill {
+  position: absolute;
+  top: 16px; left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px 9px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(143, 174, 148, 0.35);
+  background: rgba(35, 36, 37, 0.96);
+  box-shadow: 0 14px 40px rgba(0,0,0,0.4);
+  font-size: 12.5px;
+  animation: slideDown .45s cubic-bezier(.22,.9,.3,1) both;
+  z-index: 5;
+  transition: opacity .6s, transform .6s;
+}
+.success-pill.fading { opacity: 0; transform: translateX(-50%) translateY(-8px); pointer-events: none; }
+@keyframes slideDown {
+  from { opacity: 0; transform: translateX(-50%) translateY(-14px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+.success-pill .check {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--ok);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.success-pill .stats { color: var(--muted); }
+.success-pill .stats b { color: var(--ink); font-weight: 600; }
+.pill-close {
+  width: 22px; height: 22px;
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--muted-light);
+  transition: color .15s, background .15s;
+  flex-shrink: 0;
+}
+.pill-close:hover { color: var(--ink); background: rgba(255,255,255,0.08); }
+
+/* insights chip + gallery */
+.insights-chip {
+  position: absolute;
+  left: 18px; bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 13px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.09);
+  background: rgba(35, 36, 37, 0.95);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+  z-index: 5;
+  animation: fadeUp .4s .9s cubic-bezier(.22,.9,.3,1) both;
+}
+.insights-chip:hover { border-color: rgba(255,255,255,0.2); }
+.insights-chip .q-dot { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--accent-bright); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--ink); flex-shrink: 0; }
+.insights-chip .meta { display: flex; flex-direction: column; gap: 1px; }
+.insights-chip .meta .t1 { font-weight: 600; color: var(--ink); }
+.insights-chip .meta .t2 { font-size: 10.5px; color: var(--muted-light); }
+.insights-chip .opts { font-family: var(--mono); font-size: 10.5px; color: var(--accent-bright); background: var(--accent-soft); padding: 3px 8px; border-radius: 999px; flex-shrink: 0; }
+
+.gallery {
+  position: absolute;
+  left: 18px; bottom: 66px;
+  width: 308px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.09);
+  background: rgba(35, 36, 37, 0.98);
+  box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+  padding: 13px;
+  z-index: 6;
+  animation: fadeUp .22s cubic-bezier(.22,.9,.3,1) both;
+}
+.gallery .g-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.gallery .g-title { font-size: 12.5px; font-weight: 700; }
+.gallery .g-sub { font-size: 10px; color: var(--muted-light); font-family: var(--mono); }
+.g-option {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  text-align: left;
+  padding: 8px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  transition: background .15s, border-color .15s;
+}
+.g-option:hover { background: rgba(255,255,255,0.05); }
+.g-option.current { border-color: var(--accent); background: var(--accent-soft); }
+.g-option .thumb { flex-shrink: 0; border-radius: 6px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); background: var(--paper); }
+.g-option .g-meta { flex: 1; min-width: 0; }
+.g-option .g-name { font-size: 12px; font-weight: 600; color: var(--ink); }
+.g-option .g-stats { font-family: var(--mono); font-size: 10px; color: var(--muted-light); margin-top: 2px; }
+.g-option .badge {
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.06em;
+  font-family: var(--mono);
+  color: var(--ok);
+  flex-shrink: 0;
+}
+.g-option .badge.hidden-badge { visibility: hidden; }
+.gallery .g-note { margin-top: 9px; padding-top: 9px; border-top: 1px solid rgba(255,255,255,0.07); font-size: 10.5px; color: var(--muted-light); line-height: 1.5; }
+.gallery .g-note b { color: var(--warn); font-weight: 600; }
+
+/* ---------- State 4: DOCKED ---------- */
+.docked-bar {
+  position: absolute;
+  bottom: 16px; left: 50%;
+  transform: translateX(-50%);
+  width: min(680px, calc(100% - 40px));
+  padding: 9px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(29, 30, 31, 0.97);
+  box-shadow: 0 18px 50px rgba(0,0,0,0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 5;
+  animation: fadeUp .35s cubic-bezier(.22,.9,.3,1) both;
+}
+.docked-bar .row { display: flex; align-items: center; gap: 8px; }
+.docked-bar textarea {
+  flex: 1;
+  min-width: 0;
+  resize: none;
+  font-family: var(--sans);
+  font-size: 12.5px;
+  color: var(--ink);
+  background: var(--graphite-800);
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 9px;
+  padding: 9px 11px;
+  outline: none;
+  height: 36px;
+}
+.docked-bar textarea:focus { border-color: var(--accent-bright); }
+.docked-bar textarea::placeholder { color: var(--muted-light); }
+.docked-gen {
+  flex-shrink: 0;
+  display: flex; align-items: center; gap: 7px;
+  font-size: 12px; font-weight: 700; color: #fff;
+  background: var(--accent);
+  padding: 9px 16px;
+  border-radius: 9px;
+  box-shadow: 0 4px 16px -3px var(--accent-glow);
+  transition: background .15s, transform .12s;
+}
+.docked-gen:hover { background: var(--accent-bright); }
+.docked-gen:active { transform: scale(0.97); }
+
+/* refinement playback panel */
+.playback {
+  position: absolute;
+  right: 18px; top: 50%;
+  transform: translateY(-50%);
+  width: 252px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.09);
+  background: rgba(35, 36, 37, 0.97);
+  box-shadow: 0 18px 50px rgba(0,0,0,0.45);
+  padding: 13px;
+  z-index: 5;
+  animation: fadeIn .3s ease both;
+}
+.playback .p-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.playback .p-title { font-size: 12px; font-weight: 700; }
+.playback .p-count { font-family: var(--mono); font-size: 10px; color: var(--accent-bright); background: var(--accent-soft); padding: 3px 8px; border-radius: 999px; }
+.pb-row {
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  opacity: 0.45;
+  transition: opacity .25s, background .25s;
+}
+.pb-row.done { opacity: 1; }
+.pb-row .ico {
+  width: 19px; height: 19px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; flex-shrink: 0;
+  background: var(--graphite-700); color: var(--muted-light);
+}
+.pb-row.done .ico { background: rgba(143,174,148,0.16); color: var(--ok); }
+.pb-row .act { font-weight: 600; }
+.playback .p-skip {
+  margin-top: 10px;
+  width: 100%;
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  font-size: 11.5px; font-weight: 600;
+  color: var(--muted);
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: var(--graphite-800);
+  transition: color .15s, border-color .15s;
+}
+.playback .p-skip:hover { color: var(--ink); border-color: var(--accent); }
+.playback.done .p-skip { display: none; }
+.playback .p-done-note {
+  display: none;
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--ok);
+  text-align: center;
+  font-weight: 600;
+}
+.playback.done .p-done-note { display: block; animation: fadeIn .3s ease both; }
+
+/* ---------- State 5: BRIEF REVIEW MODAL ---------- */
+.modal-backdrop {
+  position: absolute; inset: 0;
+  background: rgba(18, 19, 20, 0.62);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 10;
+  animation: fadeIn .2s ease both;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.review-modal {
+  width: min(540px, 100%);
+  max-height: calc(100% - 40px);
+  overflow-y: auto;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.09);
+  background: rgba(35, 36, 37, 0.99);
+  box-shadow: 0 30px 80px rgba(0,0,0,0.55);
+  padding: 20px;
+  animation: fadeUp .3s cubic-bezier(.22,.9,.3,1) both;
+}
+.review-modal .r-step {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px;
+}
+.review-modal .r-step .lbl {
+  font-family: var(--mono);
+  font-size: 10px; letter-spacing: 0.16em;
+  color: var(--accent-bright);
+  font-weight: 600;
+}
+.review-modal .r-step .count { font-family: var(--mono); font-size: 10.5px; color: var(--muted-light); }
+.review-modal h2 { font-size: 18px; font-weight: 800; letter-spacing: -0.01em; margin-bottom: 16px; }
+.review-modal h3 {
+  font-family: var(--mono);
+  font-size: 10px; font-weight: 600; letter-spacing: 0.14em;
+  color: var(--muted-light);
+  margin: 16px 0 9px;
+  display: flex; align-items: center; gap: 7px;
+}
+.review-modal h3 .ok-ico { color: var(--ok); }
+.understood-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.u-pill {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 500; color: var(--muted);
+  background: var(--graphite-800);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+.u-pill svg { flex-shrink: 0; }
+.q-block { margin-bottom: 14px; }
+.q-block .q-text { font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 8px; }
+.answer-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.achip {
+  font-size: 12px; font-weight: 500;
+  color: var(--muted);
+  padding: 7px 14px;
+  border-radius: 9px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: var(--graphite-800);
+  transition: color .13s, border-color .13s, background .13s, transform .1s;
+}
+.achip:hover { color: var(--ink); border-color: rgba(255,255,255,0.24); }
+.achip:active { transform: scale(0.96); }
+.achip.picked { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; box-shadow: 0 3px 14px -3px var(--accent-glow); }
+.assume-note {
+  display: flex; align-items: flex-start; gap: 8px;
+  font-size: 11.5px; line-height: 1.5;
+  color: var(--warn);
+  background: rgba(201, 169, 110, 0.08);
+  border: 1px solid rgba(201, 169, 110, 0.28);
+  border-radius: 10px;
+  padding: 9px 11px;
+  margin: 16px 0 18px;
+}
+.review-modal .r-actions { display: flex; justify-content: space-between; align-items: center; }
+.review-modal .r-actions .left, .review-modal .r-actions .right { display: flex; gap: 9px; }
+
+/* toast */
+.toast {
+  position: fixed;
+  bottom: 54px; left: 50%;
+  transform: translateX(-50%) translateY(8px);
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--graphite-800);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 10px;
+  padding: 9px 15px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.4);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s, transform .25s;
+  z-index: 50;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* shared motion keyframes */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* reduced motion: kill everything */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- ============ MOCKUP CHROME ============ -->
+<div class="mockup-bar">
+  <span class="tag">MOCKUP</span>
+  <span class="hint">Generation redesign — jump to a state:</span>
+  <div class="states">
+    <button data-jump="hero" class="active">1 · Hero</button>
+    <button data-jump="generating">2 · Generating</button>
+    <button data-jump="result">3 · Result</button>
+    <button data-jump="docked">4 · Docked + Refine</button>
+    <button data-jump="review">5 · Brief review</button>
+  </div>
+  <span class="note">Every control is clickable — or just follow the flow: Hero → Generate → answer → Result</span>
+</div>
+
+<!-- ============ EDITOR FRAME ============ -->
+<div class="editor-frame">
+
+  <!-- top bar -->
+  <div class="topbar">
+    <span class="wordmark">ARCHI<span>·</span>AI</span>
+    <span class="project-title">Untitled Project</span>
+    <span class="spacer"></span>
+    <button class="ghost-btn out-of-scope">History</button>
+    <button class="ghost-btn out-of-scope">Activity</button>
+    <button class="ghost-btn out-of-scope">Share</button>
+    <button class="save-btn" id="saveBtn" data-save="notgen">
+      <span class="save-dot"></span><span id="saveLabel">Not generated yet</span>
+    </button>
+  </div>
+
+  <!-- view tabs -->
+  <div class="viewtabs" id="viewTabs">
+    <button class="active">3D Edit</button>
+    <button>Plan</button>
+    <button>Zoning</button>
+    <button>Room Graph</button>
+  </div>
+
+  <div class="main-row">
+    <!-- viewport -->
+    <div class="viewport" id="viewport">
+      <div class="sheet" id="sheet">
+        <!-- rooms injected by JS -->
+      </div>
+
+      <!-- ===== STATE 1: HERO ===== -->
+      <div class="overlay" id="state-hero">
+        <div class="hero-headline">What should we <span class="accent">build</span>?</div>
+        <div class="hero-sub">Describe your building in plain language — the engine drafts an editable 2D floor plan and 3D model, then you refine it.</div>
+
+        <div class="prompt-card hero-card">
+          <div class="card-top">
+            <div class="mode-tabs" id="heroTabs">
+              <button class="active" data-mode="generate">Generate</button>
+              <button class="locked" data-mode="refine" id="heroRefineTab">Refine<span class="lock-ico">🔒</span></button>
+            </div>
+          </div>
+          <textarea id="heroPrompt" placeholder="A two-storey office with 12 desks, a lobby, 4 meeting rooms, a kitchen and 2 restrooms…"></textarea>
+          <div class="lock-hint" id="lockHint">Refine unlocks after your first generated layout.</div>
+          <div class="params-row" id="heroParams">
+            <label>Plot width (m)<input type="number" placeholder="auto" min="4" max="40"></label>
+            <label>Floors<input type="number" placeholder="auto" min="1" max="5"></label>
+            <label>Entry faces
+              <select><option value="">auto</option><option>South</option><option>North</option><option>East</option><option>West</option></select>
+            </label>
+            <span class="hint">Leave blank to infer from the prompt</span>
+          </div>
+          <div class="card-bottom">
+            <button class="params-toggle" id="paramsToggle" aria-expanded="false">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/></svg>
+              Plot params
+              <svg class="chev" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <button class="gen-btn" id="heroGenerate">
+              Generate
+              <svg class="arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+              <span class="spinner"></span>
+            </button>
+          </div>
+        </div>
+
+        <div class="quick-row">
+          <span class="lead">Try:</span>
+          <button class="chip" data-brief="A two-storey office building with 12 open desks, a reception lobby, 4 meeting rooms, a kitchen and 2 restrooms">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 21V5a1 1 0 011-1h9a1 1 0 011 1v16M15 9h4a1 1 0 011 1v11M4 21h17M8 8h2M8 12h2M8 16h2"/></svg>
+            Office building
+          </button>
+          <button class="chip" data-brief="A boutique hotel with 10 guest rooms, a lobby lounge, a restaurant and a rooftop terrace">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21V7l9-4 9 4v14M3 21h18M9 10h.01M15 10h.01M9 14h.01M15 14h.01M12 21v-4"/></svg>
+            Boutique hotel
+          </button>
+          <button class="chip" data-brief="A single-storey school with 6 classrooms, a hall, a library, staff room and administration office">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 10L12 4 2 10l10 6 10-6zM6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/></svg>
+            School
+          </button>
+          <button class="chip" data-brief="A small clinic with a reception and waiting area, 2 consultation rooms, a treatment room, lab and pharmacy">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M12 9v8M8 13h8M9 5V3h6v2"/></svg>
+            Clinic
+          </button>
+        </div>
+      </div>
+
+      <!-- ===== STATE 2: GENERATING ===== -->
+      <div class="overlay hidden" id="state-generating">
+        <div class="prompt-card gen-card">
+          <div class="brief-echo" id="briefEcho">A two-storey office building with 12 open desks, a reception lobby…</div>
+          <div class="stage-track">
+            <div class="track-line"><div class="fill" id="trackFill"></div></div>
+            <div class="stage" id="stage1">
+              <div class="s-dot"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#121314" stroke-width="4"><path d="M20 6L9 17l-5-5"/></svg></div>
+              <div class="s-lbl">Reading brief</div>
+            </div>
+            <div class="stage" id="stage2">
+              <div class="s-dot"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#121314" stroke-width="4"><path d="M20 6L9 17l-5-5"/></svg></div>
+              <div class="s-lbl">Designing layout</div>
+            </div>
+            <div class="stage" id="stage3">
+              <div class="s-dot"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#121314" stroke-width="4"><path d="M20 6L9 17l-5-5"/></svg></div>
+              <div class="s-lbl">Done</div>
+            </div>
+          </div>
+          <div class="progress-bar"><div class="fill" id="progressFill"></div></div>
+          <div class="gen-status" id="genStatus">Understanding your brief…</div>
+          <div class="card-bottom">
+            <button class="cancel-btn" id="cancelBtn">✕ Cancel</button>
+            <button class="gen-btn busy" disabled>Generating <span class="spinner"></span></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== STATE 3: RESULT ===== -->
+      <div class="overlay hidden" id="state-result">
+        <div class="success-pill" id="successPill">
+          <span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#121314" stroke-width="3.5"><path d="M20 6L9 17l-5-5"/></svg></span>
+          <span class="stats">Layout ready — <b>1 floor</b> · <b>8 spaces</b> · <b class="mono">96 m²</b> · score <b class="mono">87/100</b></span>
+          <button class="pill-close" id="pillClose" aria-label="Dismiss">✕</button>
+        </div>
+
+        <button class="insights-chip" id="insightsChip">
+          <span class="q-dot">87</span>
+          <span class="meta">
+            <span class="t1">Apartment · concept quality</span>
+            <span class="t2">Space program valid · zoning ok</span>
+          </span>
+          <span class="opts" id="optsBadge">4 options ▸</span>
+        </button>
+
+        <div class="gallery hidden" id="gallery">
+          <div class="g-head">
+            <span class="g-title">Layout options</span>
+            <span class="g-sub mono">best-of-64 search</span>
+          </div>
+          <button class="g-option current" data-score="87">
+            <svg class="thumb" width="52" height="38" viewBox="0 0 52 38">
+              <rect x="2" y="2" width="24" height="18" fill="#7A8CA8" opacity="0.55"/><rect x="2" y="21" width="24" height="15" fill="#C9C39A" opacity="0.5"/>
+              <rect x="27" y="2" width="23" height="13" fill="#8FAE94" opacity="0.5"/><rect x="27" y="16" width="11" height="20" fill="#9A86B8" opacity="0.5"/><rect x="39" y="16" width="11" height="9" fill="#7FA8A0" opacity="0.5"/><rect x="39" y="26" width="11" height="10" fill="#B08D6E" opacity="0.5"/>
+            </svg>
+            <span class="g-meta"><span class="g-name">Option 1</span><span class="g-stats">87 · 8 rooms · 96 m²</span></span>
+            <span class="badge">CURRENT</span>
+          </button>
+          <button class="g-option" data-score="84">
+            <svg class="thumb" width="52" height="38" viewBox="0 0 52 38">
+              <rect x="2" y="2" width="18" height="34" fill="#7A8CA8" opacity="0.55"/><rect x="21" y="2" width="14" height="20" fill="#C9C39A" opacity="0.5"/><rect x="21" y="23" width="14" height="13" fill="#7FA8A0" opacity="0.5"/>
+              <rect x="36" y="2" width="14" height="15" fill="#8FAE94" opacity="0.5"/><rect x="36" y="18" width="14" height="18" fill="#9A86B8" opacity="0.5"/>
+            </svg>
+            <span class="g-meta"><span class="g-name">Option 2</span><span class="g-stats">84 · 8 rooms · 94 m²</span></span>
+            <span class="badge hidden-badge">CURRENT</span>
+          </button>
+          <button class="g-option" data-score="82">
+            <svg class="thumb" width="52" height="38" viewBox="0 0 52 38">
+              <rect x="2" y="2" width="14" height="16" fill="#8FAE94" opacity="0.5"/><rect x="17" y="2" width="33" height="16" fill="#7A8CA8" opacity="0.55"/>
+              <rect x="2" y="19" width="20" height="17" fill="#C9C39A" opacity="0.5"/><rect x="23" y="19" width="12" height="17" fill="#9A86B8" opacity="0.5"/><rect x="36" y="19" width="14" height="17" fill="#7FA8A0" opacity="0.5"/>
+            </svg>
+            <span class="g-meta"><span class="g-name">Option 3</span><span class="g-stats">82 · 8 rooms · 92 m²</span></span>
+            <span class="badge hidden-badge">CURRENT</span>
+          </button>
+          <button class="g-option" data-score="80">
+            <svg class="thumb" width="52" height="38" viewBox="0 0 52 38">
+              <rect x="2" y="2" width="24" height="34" fill="#7A8CA8" opacity="0.55"/><rect x="27" y="2" width="23" height="10" fill="#C9C39A" opacity="0.5"/>
+              <rect x="27" y="13" width="10" height="23" fill="#8FAE94" opacity="0.5"/><rect x="38" y="13" width="12" height="23" fill="#9A86B8" opacity="0.5"/>
+            </svg>
+            <span class="g-meta"><span class="g-name">Option 4</span><span class="g-stats">80 · 8 rooms · 96 m²</span></span>
+            <span class="badge hidden-badge">CURRENT</span>
+          </button>
+          <div class="g-note">Options come from the engine's <b>best-of-64</b> candidate search — the same guarantees, different room orders. Swapping marks the layout <b>unsaved</b>.</div>
+        </div>
+      </div>
+
+      <!-- ===== STATE 4: DOCKED + REFINE ===== -->
+      <div class="overlay hidden" id="state-docked">
+        <div class="docked-bar">
+          <div class="row">
+            <div class="mode-tabs" id="dockedTabs">
+              <button class="active" data-mode="generate">Generate</button>
+              <button data-mode="refine" id="dockedRefineTab">Refine</button>
+            </div>
+            <textarea id="dockedPrompt" placeholder="Describe your layout… e.g. 3 bedroom apartment with open kitchen and living room"></textarea>
+            <button class="docked-gen" id="dockedGenerate">Generate</button>
+          </div>
+        </div>
+
+        <div class="playback" id="playback">
+          <div class="p-head">
+            <span class="p-title">Applying refinement</span>
+            <span class="p-count" id="pbCount">1 / 3</span>
+          </div>
+          <div class="pb-row" data-step="0"><span class="ico">✓</span><span><span class="act">Add Bedroom</span> — north wing</span></div>
+          <div class="pb-row" data-step="1"><span class="ico">✓</span><span><span class="act">Remove Office</span> — merged into hall</span></div>
+          <div class="pb-row" data-step="2"><span class="ico">⟳</span><span><span class="act">Resize Kitchen</span> — +3.5 m²</span></div>
+          <button class="p-skip" id="skipBtn">Skip — jump to final layout
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </button>
+          <div class="p-done-note">✓ Refinement applied — review the canvas, then save.</div>
+        </div>
+      </div>
+
+      <!-- ===== STATE 5: BRIEF REVIEW MODAL ===== -->
+      <div class="modal-backdrop hidden" id="state-review">
+        <div class="review-modal" role="dialog" aria-modal="true">
+          <div class="r-step">
+            <span class="lbl">STEP 2 OF 2 — REVIEW THE BRIEF</span>
+            <span class="count" id="answeredCount">Answered 0 / 2</span>
+          </div>
+          <h2>Did the engine understand you?</h2>
+
+          <h3><span class="ok-ico">✓</span> AI UNDERSTOOD</h3>
+          <div class="understood-list">
+            <span class="u-pill"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#8FAE94" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>2 bedrooms</span>
+            <span class="u-pill"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#8FAE94" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>2 bathrooms</span>
+            <span class="u-pill"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#8FAE94" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>12 × 15 m plot</span>
+            <span class="u-pill"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#8FAE94" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>east-facing</span>
+          </div>
+
+          <h3>A FEW DETAILS (2)</h3>
+          <div class="q-block">
+            <div class="q-text">Which direction should the home face?</div>
+            <div class="answer-chips" data-q="facing">
+              <button class="achip" data-v="N">North</button>
+              <button class="achip" data-v="S">South</button>
+              <button class="achip" data-v="E">East</button>
+              <button class="achip" data-v="W">West</button>
+            </div>
+          </div>
+          <div class="q-block">
+            <div class="q-text">How many floors?</div>
+            <div class="answer-chips" data-q="floors">
+              <button class="achip" data-v="1">1 floor</button>
+              <button class="achip" data-v="2">2 floors</button>
+              <button class="achip" data-v="3">3 floors</button>
+            </div>
+          </div>
+
+          <div class="assume-note">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
+            <span>If left unanswered, the engine may assume: ensuite bathroom for the master bedroom.</span>
+          </div>
+
+          <div class="r-actions">
+            <div class="left">
+              <button class="cancel-btn" id="editBriefBtn">← Edit brief</button>
+            </div>
+            <div class="right">
+              <button class="gen-btn" id="reviewGenerate" disabled>Generate →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- toast -->
+      <div class="toast" id="toast"></div>
+    </div>
+
+    <!-- right panel -->
+    <div class="right-panel">
+      <div class="panel-title">SPACE PROGRAM</div>
+      <div id="programEmpty" class="panel-empty">Generate or add rooms to see the space program for this floor.</div>
+      <div id="programList" class="hidden" style="display:flex;flex-direction:column;gap:2px;">
+        <div class="prog-row" data-room="living"><span class="dot" style="background:#7A8CA8"></span><span class="name">Living Room</span><span class="val">24.0 m² ×1</span></div>
+        <div class="prog-row" data-room="kitchen"><span class="dot" style="background:#C9C39A"></span><span class="name">Kitchen</span><span class="val">11.5 m² ×1</span></div>
+        <div class="prog-row" data-room="bed1"><span class="dot" style="background:#8FAE94"></span><span class="name">Bedroom 1</span><span class="val">13.2 m² ×1</span></div>
+        <div class="prog-row" data-room="bed2"><span class="dot" style="background:#9A86B8"></span><span class="name">Bedroom 2</span><span class="val">11.0 m² ×1</span></div>
+        <div class="prog-row" data-room="bath1"><span class="dot" style="background:#7FA8A0"></span><span class="name">Bathroom</span><span class="val">4.8 m² ×2</span></div>
+        <div class="prog-row" data-room="hall"><span class="dot" style="background:#6E6F72"></span><span class="name">Hallway</span><span class="val">6.2 m² ×1</span></div>
+        <div class="prog-row" data-room="entry"><span class="dot" style="background:#B08D6E"></span><span class="name">Entry</span><span class="val">3.4 m² ×1</span></div>
+      </div>
+      <div class="panel-footer">
+        <button class="panel-btn" id="relayoutBtn" disabled>
+          <span>↻ Re-layout<span class="why" id="relayoutWhy">Single optimal layout — no alternatives yet</span></span>
+        </button>
+        <button class="panel-btn out-of-scope">⚑ Report an issue</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- bottom status -->
+  <div class="bottombar">
+    <span class="seg">Scale <b>1:100</b></span>
+    <span class="seg">Grid <b>0.5 m</b></span>
+    <span class="seg">Floor <b id="bbFloor">—</b></span>
+    <span class="seg">Validation <b id="bbValid">0 / 0</b></span>
+    <span class="seg">Quality <b id="bbQuality">—</b></span>
+    <span class="seg">Spaces <b id="bbSpaces">0</b></span>
+    <span class="seg">Units <b>Meters</b></span>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   Room data — the generated apartment shown in Result/Docked
+   ============================================================ */
+const ROOMS = [
+  { name: 'Living Room', dims: '6.0 × 4.0 m', area: '24.0 m²', x: 2,  y: 8,  w: 34, h: 40, c: '#7A8CA8', key: 'living' },
+  { name: 'Kitchen',     dims: '4.6 × 2.5 m', area: '11.5 m²', x: 2,  y: 50, w: 34, h: 32, c: '#C9C39A', key: 'kitchen' },
+  { name: 'Hallway',     dims: '1.6 × 8.4 m', area: '6.2 m²',  x: 37, y: 8,  w: 9,  h: 74, c: '#6E6F72', key: 'hall' },
+  { name: 'Bedroom 1',   dims: '4.4 × 3.0 m', area: '13.2 m²', x: 47, y: 8,  w: 28, h: 42, c: '#8FAE94', key: 'bed1' },
+  { name: 'Bathroom',    dims: '2.4 × 2.0 m', area: '4.8 m²',  x: 76, y: 8,  w: 22, h: 19, c: '#7FA8A0', key: 'bath1' },
+  { name: 'Bedroom 2',   dims: '4.4 × 2.5 m', area: '11.0 m²', x: 47, y: 52, w: 28, h: 30, c: '#9A86B8', key: 'bed2' },
+  { name: 'Bathroom 2',  dims: '2.4 × 2.2 m', area: '5.3 m²',  x: 76, y: 29, w: 22, h: 21, c: '#7FA8A0', key: 'bath1' },
+  { name: 'Entry',       dims: '2.6 × 1.8 m', area: '3.4 m²',  x: 76, y: 52, w: 22, h: 12, c: '#B08D6E', key: 'entry' },
+];
+
+const sheet = document.getElementById('sheet');
+const SELECTABLE_KEYS = ['living', 'bed1'];
+
+function renderRooms() {
+  sheet.innerHTML = '';
+  ROOMS.forEach((r, i) => {
+    const el = document.createElement('div');
+    el.className = 'room';
+    el.style.cssText = `left:${r.x}%;top:${r.y}%;width:${r.w}%;height:${r.h}%;` +
+      `background:${r.c}2e;border-color:${r.c}73;animation-delay:${i * 55}ms;`;
+    el.innerHTML = `<span class="r-name" style="color:${r.c}">${r.name}</span>` +
+      `<span class="r-dims" style="color:${r.c}">${r.dims}</span>` +
+      `<span class="r-area" style="color:${r.c}">${r.area}</span>`;
+    el.addEventListener('click', () => {
+      document.querySelectorAll('.room').forEach(m => m.classList.remove('selected'));
+      el.classList.add('selected');
+      document.querySelectorAll('.prog-row').forEach(p =>
+        p.style.background = p.dataset.room === r.key && SELECTABLE_KEYS.includes(r.key) ? 'rgba(118,99,215,0.14)' : '');
+      showToast(`${r.name} selected — Inspector would open`);
+    });
+    sheet.appendChild(el);
+  });
+  const entry = document.createElement('div');
+  entry.className = 'entry-mark';
+  entry.style.cssText = 'left:83%;top:65.5%;';
+  entry.innerHTML = '<span class="tick"></span><span class="lbl">ENTRY</span>';
+  sheet.appendChild(entry);
+}
+
+/* ============================================================
+   State machine
+   ============================================================ */
+const $ = id => document.getElementById(id);
+const states = ['hero', 'generating', 'result', 'docked', 'review'];
+let timers = [];
+let current = 'hero';
+
+function clearTimers() { timers.forEach(t => clearTimeout(t)); timers = []; }
+function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
+
+function show(state, opts = {}) {
+  clearTimers();
+  current = state;
+  states.forEach(s => $('state-' + s).classList.toggle('hidden', s !== state));
+  document.querySelectorAll('.mockup-bar .states button').forEach(b =>
+    b.classList.toggle('active', b.dataset.jump === state));
+
+  sheet.classList.toggle('breathing', state === 'generating' || state === 'review');
+  sheet.classList.remove('reveal');
+
+  const hasRooms = state === 'result' || state === 'docked';
+  if (hasRooms) {
+    renderRooms();
+    requestAnimationFrame(() => requestAnimationFrame(() => sheet.classList.add('reveal')));
+  } else if (state !== 'review') {
+    sheet.innerHTML = '';
+  }
+
+  // right panel + bottom bar reflect state honestly
+  $('programEmpty').classList.toggle('hidden', hasRooms);
+  $('programList').classList.toggle('hidden', !hasRooms);
+  $('relayoutBtn').disabled = state !== 'result';
+  $('relayoutWhy').textContent = state === 'result'
+    ? 'Opens the options gallery'
+    : 'Generate a layout with alternatives first';
+  $('bbFloor').textContent = hasRooms ? '1 / 1' : '—';
+  $('bbValid').textContent = hasRooms ? '0 / 0' : '0 / 0';
+  $('bbQuality').textContent = hasRooms ? '87' : '—';
+  $('bbSpaces').textContent = hasRooms ? '8' : '0';
+
+  // gallery closed on entry; pill fresh
+  $('gallery').classList.add('hidden');
+  $('successPill').classList.remove('fading');
+
+  setSave(state === 'docked' ? 'saved' : state === 'result' ? 'unsaved' : 'notgen');
+  $('bbSpaces').textContent = hasRooms ? '8' : '0';
+
+  if (state === 'generating' && !opts.noAuto) runGeneration();
+  if (state === 'docked') runPlayback();
+  if (state === 'result') {
+    later(() => { if (current === 'result') $('successPill').classList.add('fading'); }, 6500);
+  }
+}
+
+/* ---------- save button (honest states) ---------- */
+const SAVE_LABELS = {
+  notgen: 'Not generated yet',
+  unsaved: 'Unsaved changes',
+  saving: 'Saving…',
+  saved: 'Saved · 14:02',
+  error: 'Save error — retry',
+};
+function setSave(v) {
+  $('saveBtn').dataset.save = v;
+  $('saveLabel').textContent = SAVE_LABELS[v];
+}
+$('saveBtn').addEventListener('click', () => {
+  const v = $('saveBtn').dataset.save;
+  if (v === 'unsaved' || v === 'error') {
+    setSave('saving');
+    later(() => { if (current !== 'generating') setSave('saved'); }, 900);
+    showToast('Save Layout creates a new version');
+  } else if (v === 'notgen') {
+    showToast('Nothing to save yet — generate a layout first');
+  } else if (v === 'saved') {
+    showToast('Already saved — edits will mark it unsaved');
+  }
+});
+
+/* ---------- hero ---------- */
+document.querySelectorAll('.chip').forEach(chip =>
+  chip.addEventListener('click', () => {
+    $('heroPrompt').value = chip.dataset.brief;
+    $('heroPrompt').focus();
+    $('heroGenerate').disabled = false;
+    showToast('Brief filled — press Generate');
+  }));
+
+$('heroPrompt').addEventListener('input', e => { $('heroGenerate').disabled = !e.target.value.trim(); });
+$('heroGenerate').disabled = true;
+
+$('heroGenerate').addEventListener('click', () => {
+  const brief = $('heroPrompt').value.trim() || 'A two-storey office building with 12 open desks, a reception lobby…';
+  $('briefEcho').textContent = brief;
+  startGenerationFlow();
+});
+
+function startGenerationFlow() {
+  show('generating');
+}
+
+$('heroRefineTab').addEventListener('click', () => {
+  const hint = $('lockHint');
+  hint.classList.add('show');
+  later(() => hint.classList.remove('show'), 2600);
+});
+
+$('paramsToggle').addEventListener('click', () => {
+  const open = $('paramsToggle').getAttribute('aria-expanded') === 'true';
+  $('paramsToggle').setAttribute('aria-expanded', String(!open));
+  $('heroParams').classList.toggle('show', !open);
+});
+
+/* ---------- generating (staged) ---------- */
+const STAGE_MSGS = [
+  'Understanding your brief…',
+  'Reading 8 spaces across 1 floor…',
+  'Placing rooms, carving the corridor…',
+  'Scoring 64 candidates — best wins…',
+];
+function setStage(n) {
+  for (let i = 1; i <= 3; i++) {
+    const el = $('stage' + i);
+    el.classList.toggle('done', i < n);
+    el.classList.toggle('active', i === n);
+    el.classList.toggle('running', i === n);
+  }
+  $('trackFill').style.width = ((n - 1) / 2) * 100 + '%';
+}
+function runGeneration() {
+  setStage(1);
+  $('progressFill').style.width = '14%';
+  $('genStatus').textContent = STAGE_MSGS[0];
+  later(() => { $('progressFill').style.width = '42%'; $('genStatus').textContent = STAGE_MSGS[1]; }, 800);
+  later(() => {
+    if (current !== 'generating') return;
+    // extraction done — the real app opens the brief review here
+    show('review');
+    setStage(2);
+  }, 1700);
+}
+$('cancelBtn').addEventListener('click', () => {
+  clearTimers();
+  showToast('Generation cancelled');
+  show('hero');
+});
+
+/* ---------- brief review ---------- */
+const answers = { facing: null, floors: null };
+function refreshAnswers() {
+  const n = Object.values(answers).filter(Boolean).length;
+  $('answeredCount').textContent = `Answered ${n} / 2`;
+  $('reviewGenerate').disabled = n < 2;
+}
+document.querySelectorAll('.answer-chips').forEach(group => {
+  group.querySelectorAll('.achip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      group.querySelectorAll('.achip').forEach(c => c.classList.remove('picked'));
+      chip.classList.add('picked');
+      answers[group.dataset.q] = chip.dataset.v;
+      refreshAnswers();
+    });
+  });
+});
+refreshAnswers();
+
+$('reviewGenerate').addEventListener('click', () => {
+  // answers are in — resume generation from the "designing" stage, no review loop
+  show('generating', { noAuto: true });
+  setStage(2);
+  $('progressFill').style.width = '58%';
+  $('genStatus').textContent = STAGE_MSGS[2];
+  later(() => { $('progressFill').style.width = '88%'; $('genStatus').textContent = STAGE_MSGS[3]; }, 900);
+  later(() => { setStage(3); $('progressFill').style.width = '100%'; }, 1800);
+  later(() => show('result'), 2400);
+});
+$('editBriefBtn').addEventListener('click', () => show('hero'));
+
+/* ---------- result ---------- */
+$('pillClose').addEventListener('click', () => $('successPill').classList.add('fading'));
+
+$('insightsChip').addEventListener('click', () => {
+  $('gallery').classList.toggle('hidden');
+});
+document.querySelectorAll('.g-option').forEach(opt => {
+  opt.addEventListener('click', () => {
+    document.querySelectorAll('.g-option').forEach(o => {
+      o.classList.remove('current');
+      o.querySelector('.badge').classList.add('hidden-badge');
+    });
+    opt.classList.add('current');
+    opt.querySelector('.badge').classList.remove('hidden-badge');
+    setSave('unsaved');
+    renderRooms(); // re-reveal to simulate the canvas swapping
+    requestAnimationFrame(() => requestAnimationFrame(() => sheet.classList.add('reveal')));
+    showToast(`${opt.querySelector('.g-name').textContent} loaded — layout marked unsaved`);
+    later(() => $('gallery').classList.add('hidden'), 500);
+  });
+});
+
+$('relayoutBtn').addEventListener('click', () => {
+  if ($('relayoutBtn').disabled) return;
+  $('gallery').classList.remove('hidden');
+  showToast('Pick an alternative layout');
+});
+document.querySelectorAll('.prog-row').forEach(row =>
+  row.addEventListener('click', () => {
+    document.querySelectorAll('.prog-row').forEach(p => p.style.background = '');
+    row.style.background = 'rgba(118,99,215,0.14)';
+    document.querySelectorAll('.room').forEach(m => m.classList.remove('selected'));
+    showToast(`${row.querySelector('.name').textContent} — Inspector would open`);
+  }));
+
+/* ---------- docked + playback ---------- */
+$('dockedTabs').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-mode]');
+  if (!btn) return;
+  document.querySelectorAll('#dockedTabs button').forEach(b => b.classList.toggle('active', b === btn));
+  const refine = btn.dataset.mode === 'refine';
+  $('dockedPrompt').placeholder = refine
+    ? "Refine your layout… e.g. 'add a bedroom', 'make the kitchen bigger'"
+    : 'Describe your layout… e.g. 3 bedroom apartment with open kitchen and living room';
+  $('dockedGenerate').textContent = refine ? 'Refine' : 'Generate';
+});
+$('dockedGenerate').addEventListener('click', () => {
+  const refine = document.querySelector('#dockedTabs button.active').dataset.mode === 'refine';
+  if (refine) {
+    showToast('Refine runs — playback on the right');
+    runPlayback();
+  } else {
+    show('generating');
+  }
+});
+
+let pbTimer = null;
+function runPlayback() {
+  clearTimeout(pbTimer);
+  const pb = $('playback');
+  pb.classList.remove('done');
+  $('pbCount').textContent = '1 / 3';
+  const rows = pb.querySelectorAll('.pb-row');
+  rows.forEach(r => { r.classList.remove('done'); r.querySelector('.ico').textContent = '⟳'; });
+  rows[0].querySelector('.ico').textContent = '✓'; rows[0].classList.add('done');
+  pbTimer = setTimeout(() => {
+    rows[1].querySelector('.ico').textContent = '✓'; rows[1].classList.add('done');
+    $('pbCount').textContent = '2 / 3';
+  }, 1400);
+}
+$('skipBtn').addEventListener('click', () => {
+  clearTimeout(pbTimer);
+  const pb = $('playback');
+  pb.querySelectorAll('.pb-row').forEach(r => { r.querySelector('.ico').textContent = '✓'; r.classList.add('done'); });
+  $('pbCount').textContent = '3 / 3 — applied';
+  pb.classList.add('done');
+  setSave('unsaved');
+  showToast('Jumped to the final refined layout');
+});
+
+/* ---------- chrome helpers ---------- */
+document.querySelectorAll('.viewtabs button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.viewtabs button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
+document.querySelectorAll('.out-of-scope').forEach(btn =>
+  btn.addEventListener('click', () => showToast('Outside this mockup — unchanged in production')));
+
+let toastTimer = null;
+function showToast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+/* switcher */
+document.querySelectorAll('.mockup-bar .states button').forEach(btn =>
+  btn.addEventListener('click', () => show(btn.dataset.jump)));
+
+/* Esc closes gallery / modal */
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (!$('gallery').classList.contains('hidden')) { $('gallery').classList.add('hidden'); return; }
+  if (current === 'review') show('hero');
+});
+
+/* boot */
+show('hero');
+</script>
+</body>
+</html>
