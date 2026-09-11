@@ -211,9 +211,27 @@ button:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 
   gap: 2px;
   opacity: 0;
 }
-.room .r-name { font-size: 12px; font-weight: 600; letter-spacing: 0.01em; }
-.room .r-dims { font-family: var(--mono); font-size: 9.5px; opacity: 0.75; }
-.room .r-area { font-family: var(--mono); font-size: 9.5px; opacity: 0.55; }
+.room { cursor: move; }
+.room .r-name { font-size: 12px; font-weight: 600; letter-spacing: 0.01em; pointer-events: none; }
+.room .r-area { font-family: var(--mono); font-size: 9.5px; opacity: 0.55; pointer-events: none; }
+/* dimensions stay invisible until the room is selected — minimal by default */
+.room .r-dims {
+  display: none; margin-top: 4px; width: max-content;
+  font-family: var(--mono); font-size: 9px;
+  color: var(--ink); background: rgba(18, 21, 26, 0.78);
+  border-radius: 4px; padding: 2px 5px; pointer-events: none;
+}
+.room.selected .r-dims { display: inline-block; }
+.room .rz {
+  display: none; position: absolute; right: -6px; bottom: -6px;
+  width: 12px; height: 12px; border-radius: 3px;
+  background: var(--accent-bright); border: 2px solid #12151a;
+  cursor: nwse-resize; z-index: 3;
+}
+.room.selected .rz { display: block; }
+.room.dragging { opacity: 0.92; }
+/* door markers — SVG over the plan: a real gap in the wall + swing arc */
+svg.doors { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; }
 .room.selected { border-color: var(--accent-bright) !important; box-shadow: 0 0 0 1.5px var(--accent-bright); }
 .reveal .room { animation: roomIn .5s cubic-bezier(.22,.9,.3,1) forwards; }
 @keyframes roomIn {
@@ -1194,7 +1212,7 @@ input[type=range].t3d-range { width: 100%; accent-color: var(--accent-bright); h
    LANDING — scroll-driven 3D story (brief → building → export)
    ============================================================ */
 #l3dStory { position: relative; }
-.l3d-sticky { position: sticky; top: 0; height: 100vh; overflow: hidden; background: #12151a; }
+.l3d-sticky { position: sticky; top: 0; height: 100vh; overflow: hidden; background: linear-gradient(180deg, #0f1318 0%, #141a22 52%, #1b222c 100%); }
 #l3dCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .l3d-sec {
   position: relative; z-index: 2; min-height: 100vh;
@@ -1281,7 +1299,7 @@ input[type=range].t3d-range { width: 100%; accent-color: var(--accent-bright); h
     <button data-jump="review">5 · Brief review</button>
     <button data-jump="threed">6 · 3D edit</button>
   </div>
-  <span class="note">Every control is clickable — or follow the flow: Hero → Generate → answer → Result → Open 3D edit</span>
+  <span class="note">Every control is live — drag rooms in 2D Edit, orbit the 3D, add rooms, pick the brand color</span>
 </div>
 
 <!-- ============ EDITOR FRAME ============ -->
@@ -1302,10 +1320,10 @@ input[type=range].t3d-range { width: 100%; accent-color: var(--accent-bright); h
 
   <!-- view tabs -->
   <div class="viewtabs" id="viewTabs">
-    <button class="active">3D Edit</button>
-    <button>Plan</button>
-    <button>Zoning</button>
-    <button>Room Graph</button>
+    <button class="active" data-view="3d">3D Edit</button>
+    <button data-view="2d">2D Edit</button>
+    <button data-view="zoning">Zoning</button>
+    <button data-view="graph">Room Graph</button>
   </div>
 
   <div class="main-row">
@@ -1494,17 +1512,12 @@ input[type=range].t3d-range { width: 100%; accent-color: var(--accent-bright); h
 
         <div class="t3d-rail">
           <div class="t3d-grp">
-            <span class="lbl">TEMPLATE</span>
-            <div class="t3d-tpl" id="tTpl">
-              <button class="on" data-tpl="cafe">Café</button>
-              <button data-tpl="coworking">Co-working</button>
-              <button data-tpl="boutique">Boutique</button>
-              <button data-tpl="restaurant">Restaurant</button>
-            </div>
-          </div>
-          <div class="t3d-grp">
             <span class="lbl">BRAND COLOR</span>
             <div class="t3d-swatches" id="tBrands"></div>
+          </div>
+          <div class="t3d-grp">
+            <span class="lbl">LAYOUT</span>
+            <div class="t3d-row"><button id="tAddRoom">+ Add room</button></div>
           </div>
           <div class="t3d-grp">
             <span class="lbl">CAPACITY PLANNER</span>
@@ -1532,9 +1545,6 @@ input[type=range].t3d-range { width: 100%; accent-color: var(--accent-bright); h
             <span class="lbl" style="margin-bottom:4px;">WALL HEIGHT</span>
             <input type="range" class="t3d-range" id="tWallH" min="4" max="100" value="100">
           </div>
-          <div class="t3d-grp">
-            <button class="t3d-costbtn" id="tCost">Cost estimator ▸</button>
-          </div>
         </div>
 
         <div class="t3d-info">
@@ -1542,20 +1552,6 @@ input[type=range].t3d-range { width: 100%; accent-color: var(--accent-bright); h
           <p class="sub" id="tiSub">Tap any floor slab to trace how it connects.</p>
           <div class="hd">CONNECTIONS</div>
           <div id="tiBody"><p class="empty">Doors are cut into the walls as real gaps, so you can read the circulation straight off the model.</p></div>
-        </div>
-
-        <div class="t3d-cost" id="costPanel">
-          <h2>Cost estimator <button id="costClose">✕</button></h2>
-          <table>
-            <tr><td>Counter run + espresso</td><td>₹1.60L</td></tr>
-            <tr><td>Pastry display case</td><td>₹34,000</td></tr>
-            <tr><td>Retail shelf + goods</td><td>₹12,000</td></tr>
-            <tr><td>Bench + plants</td><td>₹10,000</td></tr>
-            <tr><td>Tables × <span id="ctTables">4</span></td><td id="ctTablesV"></td></tr>
-            <tr><td>Chairs × <span id="ctChairs">8</span></td><td id="ctChairsV"></td></tr>
-            <tr><td>Stools × <span id="ctStools">3</span></td><td id="ctStoolsV"></td></tr>
-            <tr class="total"><td>Rough total</td><td id="ctTotal"></td></tr>
-          </table>
         </div>
       </div>
 
@@ -1645,7 +1641,6 @@ input[type=range].t3d-range { width: 100%; accent-color: var(--accent-bright); h
     <span class="seg">Quality <b id="bbQuality">—</b></span>
     <span class="seg">Spaces <b id="bbSpaces">0</b></span>
     <span class="seg">Seats <b id="bbSeats">—</b></span>
-    <span class="seg">Est. cost <b id="bbCost">—</b></span>
     <span class="seg">Units <b>Meters</b></span>
   </div>
 </div>
@@ -1676,9 +1671,9 @@ input[type=range].t3d-range { width: 100%; accent-color: var(--accent-bright); h
 
     <section class="l3d-sec">
       <div class="l3d-panel">
-        <span class="l-badge"><span class="pulse"></span>AI-powered architectural design</span>
+        <span class="l-badge"><span class="pulse"></span>Concept plans for real projects</span>
         <h1 class="l-h1">Watch a brief become a <span class="accent">building</span>.</h1>
-        <p class="l-p">This page is the actual journey. Below is a real 3D model — the same kind ArchiAI generates — building itself as you scroll. Drag anywhere to orbit it.</p>
+        <p class="l-p">For architects and first-time builders alike. This is a real 3D model, generated from a one-line brief — walls, doors and all. It builds as you scroll; drag anywhere to orbit.</p>
         <div class="l-ctas">
           <button class="l-btn-primary" data-cta="trial">Start Free Trial
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
@@ -1697,7 +1692,7 @@ input[type=range].t3d-range { width: 100%; accent-color: var(--accent-bright); h
         <span class="l3d-kicker">01 — DESCRIBE</span>
         <h2 class="l-h2">Say it in plain words.</h2>
         <p class="l-p">“A 16 × 9 m café — about 30 seats, the counter near the kitchen, a retail wall by the entrance, east entry.”</p>
-        <p class="l-p">No CAD to learn. No template hunting. The brief is the input — the empty plot on the right is the canvas.</p>
+        <p class="l-p">No CAD to learn. The brief is the input; the model behind this panel is the output.</p>
       </div>
     </section>
 
@@ -1719,7 +1714,7 @@ input[type=range].t3d-range { width: 100%; accent-color: var(--accent-bright); h
       <div class="l3d-panel">
         <span class="l3d-kicker">03 — EDIT IN 3D</span>
         <h2 class="l-h2">Then shape it yourself.</h2>
-        <p class="l-p">Furniture in, brand color applied. Drag rooms, resize with real dimensions, watch capacity and cost respond — with doors cut into the walls as real openings.</p>
+        <p class="l-p">Shape it in the 2D editor or in 3D — drag rooms, resize with live dimensions, add rooms, apply your brand color, watch capacity respond. Doors are real openings, not stickers.</p>
         <div class="l-ctas">
           <button class="l-btn-primary" id="open3dDemo">Open the interactive 3D demo →</button>
         </div>
@@ -1836,24 +1831,101 @@ input[type=range].t3d-range { width: 100%; accent-color: var(--accent-bright); h
 
 <div class="toast" id="toast"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="vendor/three.min.js"></script>
 <script>
 /* ============================================================
-   Room data — the generated apartment shown in Result/Docked
+   Room data — the generated apartment shown in Result/Docked.
+   Fully editable: drag to move, corner handle to resize, doors
+   render as real gaps in the walls with a swing arc.
    ============================================================ */
 const ROOMS = [
-  { name: 'Living Room', dims: '6.0 × 4.0 m', area: '24.0 m²', x: 2,  y: 8,  w: 34, h: 40, c: '#7A8CA8', key: 'living' },
-  { name: 'Kitchen',     dims: '4.6 × 2.5 m', area: '11.5 m²', x: 2,  y: 50, w: 34, h: 32, c: '#C9C39A', key: 'kitchen' },
-  { name: 'Hallway',     dims: '1.6 × 8.4 m', area: '6.2 m²',  x: 37, y: 8,  w: 9,  h: 74, c: '#6E6F72', key: 'hall' },
-  { name: 'Bedroom 1',   dims: '4.4 × 3.0 m', area: '13.2 m²', x: 47, y: 8,  w: 28, h: 42, c: '#8FAE94', key: 'bed1' },
-  { name: 'Bathroom',    dims: '2.4 × 2.0 m', area: '4.8 m²',  x: 76, y: 8,  w: 22, h: 19, c: '#7FA8A0', key: 'bath1' },
-  { name: 'Bedroom 2',   dims: '4.4 × 2.5 m', area: '11.0 m²', x: 47, y: 52, w: 28, h: 30, c: '#9A86B8', key: 'bed2' },
-  { name: 'Bathroom 2',  dims: '2.4 × 2.2 m', area: '5.3 m²',  x: 76, y: 29, w: 22, h: 21, c: '#7FA8A0', key: 'bath1' },
-  { name: 'Entry',       dims: '2.6 × 1.8 m', area: '3.4 m²',  x: 76, y: 52, w: 22, h: 12, c: '#B08D6E', key: 'entry' },
+  { name: 'Living Room', area: '24.0 m²', x: 2,  y: 8,  w: 34, h: 40, c: '#7A8CA8', key: 'living' },
+  { name: 'Kitchen',     area: '11.5 m²', x: 2,  y: 50, w: 34, h: 32, c: '#C9C39A', key: 'kitchen' },
+  { name: 'Hallway',     area: '6.2 m²',  x: 37, y: 8,  w: 9,  h: 74, c: '#6E6F72', key: 'hall' },
+  { name: 'Bedroom 1',   area: '13.2 m²', x: 47, y: 8,  w: 28, h: 42, c: '#8FAE94', key: 'bed1' },
+  { name: 'Bathroom',    area: '4.8 m²',  x: 76, y: 8,  w: 22, h: 19, c: '#7FA8A0', key: 'bath1' },
+  { name: 'Bedroom 2',   area: '11.0 m²', x: 47, y: 52, w: 28, h: 30, c: '#9A86B8', key: 'bed2' },
+  { name: 'Bathroom 2',  area: '5.3 m²',  x: 76, y: 29, w: 22, h: 21, c: '#7FA8A0', key: 'bath2' },
+  { name: 'Entry',       area: '3.4 m²',  x: 76, y: 52, w: 22, h: 12, c: '#B08D6E', key: 'entry' },
+];
+
+/* interior doors: anchored to a room edge (side + fraction along it) */
+const DOORS = [
+  { rk: 'living',  side: 'r', t: 0.55 },
+  { rk: 'kitchen', side: 'r', t: 0.50 },
+  { rk: 'hall',    side: 'r', t: 0.35 },
+  { rk: 'hall',    side: 'r', t: 0.72 },
+  { rk: 'bed1',    side: 'r', t: 0.20 },
+  { rk: 'bed1',    side: 'r', t: 0.75 },
+  { rk: 'bed2',    side: 'r', t: 0.40 },
 ];
 
 const sheet = document.getElementById('sheet');
-const SELECTABLE_KEYS = ['living', 'bed1'];
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const M_PER_PCT = 6.0 / 34;   // Living Room: 34% of sheet width = 6.0 m
+
+function roomByKey(key) { return ROOMS.find(r => r.key === key); }
+
+function dimsText(r) {
+  const wM = r.w * M_PER_PCT, hM = r.h * M_PER_PCT;
+  return wM.toFixed(1) + ' × ' + hM.toFixed(1) + ' m';
+}
+
+function restyleRoom(r) {
+  r.el.style.left = r.x + '%';
+  r.el.style.top = r.y + '%';
+  r.el.style.width = r.w + '%';
+  r.el.style.height = r.h + '%';
+}
+
+function refreshRoomLabels(r) {
+  r.el.querySelector('.r-dims').textContent = dimsText(r);
+  r.el.querySelector('.r-area').textContent = (r.w * M_PER_PCT * r.h * M_PER_PCT).toFixed(1) + ' m²';
+}
+
+function selectRoom(r) {
+  ROOMS.forEach(x => x.el.classList.remove('selected'));
+  if (r) {
+    r.el.classList.add('selected');
+    refreshRoomLabels(r);
+  }
+}
+
+function markUnsaved() {
+  if (current === 'result' || current === 'docked') setSave('unsaved');
+}
+
+function buildDoors() {
+  const svg = sheet.querySelector('svg.doors');
+  if (!svg) return;
+  svg.innerHTML = '';
+  DOORS.forEach(d => {
+    const r = roomByKey(d.rk);
+    if (!r) return;
+    const x = r.x + r.w, y = r.y + d.t * r.h;   // door centre on the room's right edge
+    const g = document.createElementNS(SVG_NS, 'g');
+    const gap = document.createElementNS(SVG_NS, 'line');
+    gap.setAttribute('x1', x); gap.setAttribute('y1', y - 2.1);
+    gap.setAttribute('x2', x); gap.setAttribute('y2', y + 2.1);
+    gap.setAttribute('stroke', '#242526');
+    gap.setAttribute('stroke-width', '6');
+    gap.setAttribute('vector-effect', 'non-scaling-stroke');
+    const leaf = document.createElementNS(SVG_NS, 'line');
+    leaf.setAttribute('x1', x); leaf.setAttribute('y1', y - 2.1);
+    leaf.setAttribute('x2', x + 4.2); leaf.setAttribute('y2', y - 2.1);
+    leaf.setAttribute('stroke', 'rgba(245,245,246,0.55)');
+    leaf.setAttribute('stroke-width', '1.5');
+    leaf.setAttribute('vector-effect', 'non-scaling-stroke');
+    const arc = document.createElementNS(SVG_NS, 'path');
+    arc.setAttribute('d', `M ${x + 4.2} ${y - 2.1} A 4.2 4.2 0 0 1 ${x} ${y + 2.1}`);
+    arc.setAttribute('fill', 'none');
+    arc.setAttribute('stroke', 'rgba(128,105,223,0.6)');
+    arc.setAttribute('stroke-width', '1.5');
+    arc.setAttribute('vector-effect', 'non-scaling-stroke');
+    g.append(gap, leaf, arc);
+    svg.appendChild(g);
+  });
+}
 
 function renderRooms() {
   sheet.innerHTML = '';
@@ -1863,22 +1935,71 @@ function renderRooms() {
     el.style.cssText = `left:${r.x}%;top:${r.y}%;width:${r.w}%;height:${r.h}%;` +
       `background:${r.c}2e;border-color:${r.c}73;animation-delay:${i * 55}ms;`;
     el.innerHTML = `<span class="r-name" style="color:${r.c}">${r.name}</span>` +
-      `<span class="r-dims" style="color:${r.c}">${r.dims}</span>` +
-      `<span class="r-area" style="color:${r.c}">${r.area}</span>`;
-    el.addEventListener('click', () => {
-      document.querySelectorAll('.room').forEach(m => m.classList.remove('selected'));
-      el.classList.add('selected');
-      document.querySelectorAll('.prog-row').forEach(p =>
-        p.style.background = p.dataset.room === r.key && SELECTABLE_KEYS.includes(r.key) ? 'rgba(118,99,215,0.14)' : '');
-      showToast(`${r.name} selected — Inspector would open`);
-    });
+      `<span class="r-area" style="color:${r.c}">${r.area}</span>` +
+      `<span class="r-dims"></span><span class="rz" title="Drag to resize"></span>`;
     sheet.appendChild(el);
+    r.el = el;
   });
+  const doors = document.createElementNS(SVG_NS, 'svg');
+  doors.setAttribute('class', 'doors');
+  doors.setAttribute('viewBox', '0 0 100 100');
+  doors.setAttribute('preserveAspectRatio', 'none');
+  sheet.appendChild(doors);
   const entry = document.createElement('div');
   entry.className = 'entry-mark';
   entry.style.cssText = 'left:83%;top:65.5%;';
   entry.innerHTML = '<span class="tick"></span><span class="lbl">ENTRY</span>';
   sheet.appendChild(entry);
+  wireRoomEditing();
+  buildDoors();
+}
+
+let dragCtx = null;
+function wireRoomEditing() {
+  ROOMS.forEach(r => {
+    r.el.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      dragCtx = e.target.classList.contains('rz')
+        ? { mode: 'resize', r, sx: e.clientX, sy: e.clientY, w0: r.w, h0: r.h }
+        : { mode: 'move', r, sx: e.clientX, sy: e.clientY, x0: r.x, y0: r.y, moved: false };
+      r.el.setPointerCapture(e.pointerId);
+    });
+    r.el.addEventListener('pointermove', (e) => {
+      if (!dragCtx || dragCtx.r !== r) return;
+      const sr = sheet.getBoundingClientRect();
+      const dx = (e.clientX - dragCtx.sx) / sr.width * 100;
+      const dy = (e.clientY - dragCtx.sy) / sr.height * 100;
+      if (dragCtx.mode === 'move') {
+        if (!dragCtx.moved && Math.abs(dx) + Math.abs(dy) < 0.4) return;
+        dragCtx.moved = true;
+        r.x = Math.min(100 - r.w, Math.max(0, dragCtx.x0 + dx));
+        r.y = Math.min(100 - r.h, Math.max(0, dragCtx.y0 + dy));
+        r.el.classList.add('dragging');
+      } else {
+        r.w = Math.min(100 - r.x, Math.max(7, dragCtx.w0 + dx));
+        r.h = Math.min(100 - r.y, Math.max(6, dragCtx.h0 + dy));
+      }
+      restyleRoom(r);
+      refreshRoomLabels(r);
+    });
+    r.el.addEventListener('pointerup', () => {
+      if (!dragCtx || dragCtx.r !== r) return;
+      const changed = dragCtx.mode === 'resize' || dragCtx.moved;
+      r.el.classList.remove('dragging');
+      dragCtx = null;
+      if (changed) {
+        buildDoors();
+        markUnsaved();
+        showToast(`${r.name} updated — layout marked unsaved`);
+      } else {
+        selectRoom(r);
+        showToast(`${r.name} selected — drag to move, corner handle to resize`);
+      }
+    });
+  });
+  sheet.addEventListener('pointerdown', (e) => {
+    if (e.target === sheet) selectRoom(null);
+  });
 }
 
 /* ============================================================
@@ -1947,7 +2068,7 @@ function show(state, opts = {}) {
   const is3d = state === 'threed';
   sheet.classList.toggle('hidden', is3d);
   $('threedHolder').classList.toggle('hidden', !is3d);
-  if (!is3d) { $('bbSeats').textContent = '—'; $('bbCost').textContent = '—'; }
+  if (!is3d) { $('bbSeats').textContent = '—'; }
   window.__mockState = state;
   if (window.__mock3d) window.__mock3d.enter(state);
 
@@ -2167,8 +2288,16 @@ $('skipBtn').addEventListener('click', () => {
 /* ---------- chrome helpers ---------- */
 document.querySelectorAll('.viewtabs button').forEach(btn => {
   btn.addEventListener('click', () => {
+    const v = btn.dataset.view;
+    if (v === 'zoning' || v === 'graph') {
+      showToast('Outside this mockup — unchanged in production');
+      return;
+    }
     document.querySelectorAll('.viewtabs button').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
+    if (v === '3d' && current !== 'threed') show('threed');
+    // '2d' inside the 3D state swings the camera to plan (handled by the 3D module);
+    // outside it, the sheet under Result/Docked IS the 2D editor.
   });
 });
 document.querySelectorAll('.out-of-scope').forEach(btn =>
@@ -2232,7 +2361,7 @@ show('hero');
   function toast(msg) { if (window.showToast) window.showToast(msg); }
 
   if (!window.THREE) {
-    var fb = '<div class="three-fallback">The 3D preview loads Three.js from the cdnjs CDN — open this mockup once while online.<br>The production app bundles it locally; this is only a mockup limitation.</div>';
+    var fb = '<div class="three-fallback">Three.js ships next to this file (vendor/three.min.js) — open the mockup from the repo folder and it will load, online or off.</div>';
     var h = $('threedHolder'); if (h) h.innerHTML = fb;
     var st = document.querySelector('.l3d-sticky'); if (st) st.innerHTML = fb;
     window.__mock3d = { enter: function () {} };
@@ -2277,8 +2406,22 @@ show('hero');
   ];
   var TABLE_SPOTS = [[3.2,2.2],[6.0,2.4],[3.4,5.3],[6.4,5.1],[8.4,4.7],[4.9,7.4]];
   var STOOL_SPOTS = [[8.2,2.5],[8.9,2.5],[9.6,2.5],[10.3,2.5]];
-  var COSTS = { table: 8500, chair: 2400, stool: 1900, counter: 62000, espresso: 98000, display: 34000, shelf: 12000, bench: 7000, plant: 1500 };
   var EGRESS_MAX = 42;
+
+  /* rooms that "+ Add room" reveals — each arrives with its own walls and a
+     real door opening into the café floor (cost estimator is deferred) */
+  var EXTRA_ROOMS = [
+    { rm: { n: 'Meeting Room', r: [0.24, 0.24, 2.8, 2.4], cat: 'back', d: '2.6 × 2.2 m' },
+      walls: [
+        { a: [0.24, 2.4], b: [2.8, 2.4], o: [{ at: [0.76, 1.66], t: 'door', link: ['Meeting Room', 'Café Floor'] }] },
+        { a: [2.8, 0.24], b: [2.8, 2.4] }
+      ] },
+    { rm: { n: 'Office', r: [5.4, 6.6, 8.0, 8.76], cat: 'back', d: '2.6 × 2.2 m' },
+      walls: [
+        { a: [5.4, 6.6], b: [5.4, 8.76], o: [{ at: [0.6, 1.5], t: 'door', link: ['Office', 'Café Floor'] }] },
+        { a: [5.4, 6.6], b: [8.0, 6.6] }
+      ] }
+  ];
 
   /* ---------- builders ---------- */
   function mat(hex, opts) { return new THREE.MeshLambertMaterial(Object.assign({ color: hex }, opts || {})); }
@@ -2301,6 +2444,15 @@ show('hero');
     var x = 0, z = 0;
     rm.poly.forEach(function (p) { x += p[0]; z += p[1]; });
     return [x/rm.poly.length, z/rm.poly.length];
+  }
+  function areaOf(rm) {
+    if (rm.r) return (rm.r[2]-rm.r[0]) * (rm.r[3]-rm.r[1]);
+    var a = 0;
+    for (var i = 0; i < rm.poly.length; i++) {
+      var p = rm.poly[i], q = rm.poly[(i+1) % rm.poly.length];
+      a += p[0]*q[1] - q[0]*p[1];
+    }
+    return Math.abs(a) / 2;
   }
   function labelSprite(text, sub) {
     var c = document.createElement('canvas'), g = c.getContext('2d');
@@ -2431,14 +2583,36 @@ show('hero');
     var scene = new THREE.Scene();
     scene.background = new THREE.Color(0x12151a);
     scene.fog = new THREE.Fog(0x12151a, 40, 130);
-    scene.add(new THREE.HemisphereLight(0xcfe0ee, 0x1b232c, 0.95));
-    var key = new THREE.DirectionalLight(0xfff2dd, 1.05); key.position.set(24, 34, 16); scene.add(key);
+    scene.add(new THREE.HemisphereLight(0xd8e6f2, 0x1b232c, 0.95));
+    var key = new THREE.DirectionalLight(0xffe8c8, 1.15); key.position.set(24, 34, 16); scene.add(key);
     var fill = new THREE.DirectionalLight(0x8fb4d4, 0.4); fill.position.set(-26, 18, -20); scene.add(fill);
 
     var gp = new THREE.Mesh(new THREE.PlaneGeometry(160, 160), mat(0x141920));
     gp.rotation.x = -Math.PI/2; gp.position.y = -0.12; scene.add(gp);
     var grid = new THREE.GridHelper(80, 80, 0x2c4a63, 0x1d2c3a);   // subtle blueprint tint
     grid.position.y = -0.1; scene.add(grid);
+
+    /* site realism: apron, entry path, soft contact shadow, trees */
+    var apron = new THREE.Mesh(new THREE.BoxGeometry(18.6, 0.06, 11.4), mat(0x22262d));
+    apron.position.set(0, -0.04, 0); scene.add(apron);
+    var pathM = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.04, 4.5), mat(0x1d2127));
+    pathM.position.set(9.7 - CX, -0.06, -6.9); scene.add(pathM);
+    var sc = document.createElement('canvas'); sc.width = sc.height = 256;
+    var sg = sc.getContext('2d');
+    var grd = sg.createRadialGradient(128, 128, 20, 128, 128, 128);
+    grd.addColorStop(0, 'rgba(0,0,0,0.5)'); grd.addColorStop(1, 'rgba(0,0,0,0)');
+    sg.fillStyle = grd; sg.fillRect(0, 0, 256, 256);
+    var shadow = new THREE.Mesh(new THREE.PlaneGeometry(30, 24),
+      new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(sc), transparent: true, depthWrite: false }));
+    shadow.rotation.x = -Math.PI/2; shadow.position.y = -0.02; scene.add(shadow);
+    [[-9.8, 2.5, 1.15], [10.4, -3.2, 0.95], [-6.5, 8.6, 1.3]].forEach(function (t) {
+      var trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.09 * t[2], 0.12 * t[2], 1.2 * t[2], 8), mat(0x6b5340));
+      trunk.position.set(t[0], 0.6 * t[2], t[1]); scene.add(trunk);
+      var fol = new THREE.Mesh(new THREE.SphereGeometry(0.85 * t[2], 10, 8), mat(0x4f6b52));
+      fol.position.set(t[0], 1.55 * t[2], t[1]); scene.add(fol);
+      var fol2 = new THREE.Mesh(new THREE.SphereGeometry(0.55 * t[2], 10, 8), mat(0x5b7a5e));
+      fol2.position.set(t[0] + 0.4 * t[2], 1.95 * t[2], t[1] - 0.2); scene.add(fol2);
+    });
 
     var walls = new THREE.Group();
     var meta = { links: [] };
@@ -2455,15 +2629,37 @@ show('hero');
         new THREE.LineBasicMaterial({ color: 0x2c3a45, transparent: true }));
       scene.add(ln); edges.push(ln);
       var cxy = centroid(rm);
-      var sp = labelSprite(rm.n, rm.d);
+      var sp = labelSprite(rm.n, areaOf(rm).toFixed(1) + ' m²');
       sp.position.set(cxy[0] - CX, 2.3, cxy[1] - CZ);
       scene.add(sp); labels.push(sp);
+    });
+
+    /* add-on rooms (hidden until "+ Add room") — walls, slab, label, and a
+       real door opening collected separately so the graph only gains the
+       connection when the room is actually added */
+    var extras = EXTRA_ROOMS.map(function (ex) {
+      var g = new THREE.Group();
+      var geo = slabRect(ex.rm.r);
+      var m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: CAT[ex.rm.cat].c }));
+      m.userData.room = ex.rm;
+      g.add(m); pickables.push(m);
+      g.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo),
+        new THREE.LineBasicMaterial({ color: 0x2c3a45 })));
+      var c = centroid(ex.rm);
+      var sp = labelSprite(ex.rm.n, areaOf(ex.rm).toFixed(1) + ' m²');
+      sp.position.set(c[0] - CX, 2.3, c[1] - CZ);
+      g.add(sp);
+      var wm = { links: [] };
+      ex.walls.forEach(function (w) { buildWall(w, g, wm); });
+      g.visible = false;
+      scene.add(g);
+      return { rm: ex.rm, group: g, links: wm.links };
     });
 
     var furn = buildFurniture();
     scene.add(furn.root);
 
-    return { scene: scene, walls: walls, slabMeshes: slabMeshes, edges: edges, labels: labels, pickables: pickables, furn: furn, meta: meta };
+    return { scene: scene, walls: walls, slabMeshes: slabMeshes, edges: edges, labels: labels, pickables: pickables, furn: furn, meta: meta, extras: extras };
   }
 
   function buildEgress(scene) {
@@ -2565,7 +2761,7 @@ show('hero');
     mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
     ray.setFromCamera(mouse, eCam);
-    var hits = ray.intersectObjects(M.pickables, false);
+    var hits = ray.intersectObjects(M.pickables.filter(function (p) { return p.visible; }), false);
     if (selected) selected.material.emissive.setHex(0x000000);
     if (!hits.length) { selected = null; infoEmpty(); return; }
     selected = hits[0].object;
@@ -2586,7 +2782,7 @@ show('hero');
       return '<li>' + c.to + '<em>' + OPEN_TYPE[c.t].label + '</em></li>';
     }).join('');
     var extra = rm.n === 'Café Floor'
-      ? '<li>Seats ' + seats() + ' of ' + EGRESS_MAX + '<em>egress limit</em></li><li>Est. ' + inr(costTotal()) + '<em>fixtures</em></li>'
+      ? '<li>Seats ' + seats() + ' of ' + EGRESS_MAX + '<em>egress limit</em></li>'
       : '';
     $('tiName').textContent = rm.n;
     $('tiSub').textContent = CAT[rm.cat].label + ' · ' + rm.d;
@@ -2600,28 +2796,15 @@ show('hero');
     $('tiBody').innerHTML = '<p class="empty">Doors are cut into the walls as real gaps, so you can read the circulation straight off the model.</p>';
   }
 
-  /* capacity + cost */
+  /* capacity */
   var nTables = 4, nStools = 3;
   function seats() { return nTables * 2 + nStools; }
-  function costTotal() {
-    return COSTS.counter + COSTS.espresso + COSTS.display + COSTS.shelf + COSTS.bench + COSTS.plant * 2
-      + nTables * COSTS.table + nTables * 2 * COSTS.chair + nStools * COSTS.stool;
-  }
-  function inr(v) { return '₹' + (v >= 100000 ? (v/100000).toFixed(2) + 'L' : v.toLocaleString('en-IN')); }
   function refreshBiz() {
     var s = seats();
     $('capVal').textContent = s + ' / ' + EGRESS_MAX;
     $('capFill').style.width = Math.min(100, s / EGRESS_MAX * 100) + '%';
     $('capPer').textContent = (96 / Math.max(1, s)).toFixed(1) + ' m²/seat';
     $('bbSeats').textContent = s;
-    $('bbCost').textContent = inr(costTotal());
-    $('ctTables').textContent = nTables;
-    $('ctTablesV').textContent = inr(nTables * COSTS.table);
-    $('ctChairs').textContent = nTables * 2;
-    $('ctChairsV').textContent = inr(nTables * 2 * COSTS.chair);
-    $('ctStools').textContent = nStools;
-    $('ctStoolsV').textContent = inr(nStools * COSTS.stool);
-    $('ctTotal').textContent = inr(costTotal());
     if (selected && selected.userData.room.n === 'Café Floor') showInfo(selected.userData.room);
   }
   function bindTap(id, fn) { $(id).addEventListener('click', fn); }
@@ -2641,8 +2824,6 @@ show('hero');
     if (nStools <= 0) { toast('No stools to remove'); return; }
     nStools--; M.furn.stools[nStools].visible = false; refreshBiz();
   });
-  bindTap('tCost', function () { $('costPanel').classList.toggle('open'); });
-  bindTap('costClose', function () { $('costPanel').classList.remove('open'); });
   bindTap('tFire', function () {
     var on = $('tFire').classList.toggle('on');
     EG.group.visible = on;
@@ -2652,6 +2833,17 @@ show('hero');
   bindTap('tReset', function () { swingTo(V3D); });
   $('tWallH').addEventListener('input', function () {
     M.walls.scale.y = Math.max(0.04, $('tWallH').value / 100);
+  });
+
+  /* + Add room — reveals a pre-planned room with walls, slab and a real door */
+  var extraIdx = 0;
+  bindTap('tAddRoom', function () {
+    if (extraIdx >= M.extras.length) { toast('No space left in this unit — generate a bigger programme'); return; }
+    var ex = M.extras[extraIdx++];
+    ex.group.visible = true;
+    ex.links.forEach(function (l) { M.meta.links.push(l); });
+    toast(ex.rm.n + ' added — walls, slab and its own door into the café floor');
+    if (extraIdx >= M.extras.length) $('tAddRoom').disabled = true;
   });
 
   /* brand color picker — recolors branded elements live */
@@ -2681,11 +2873,11 @@ show('hero');
     });
   });
 
-  /* the editor chrome's Plan / 3D Edit tabs swing the camera in this state */
+  /* the editor chrome's 2D Edit / 3D Edit tabs swing the camera in this state */
   document.getElementById('viewTabs').addEventListener('click', function (e) {
     if (window.__mockState !== 'threed') return;
     var t = e.target.textContent.trim();
-    if (t === 'Plan') swingTo(VPLAN);
+    if (t === '2D Edit') swingTo(VPLAN);
     if (t === '3D Edit') swingTo(V3D);
   });
 
@@ -2700,9 +2892,12 @@ show('hero');
      ===================================================================== */
   var L = { ready: false };
   var lCam = new THREE.PerspectiveCamera(42, 1, 0.1, 400);
-  var lRen = new THREE.WebGLRenderer({ antialias: true, canvas: $('l3dCanvas') });
+  var lRen = new THREE.WebGLRenderer({ antialias: true, canvas: $('l3dCanvas'), alpha: true });
   lRen.setPixelRatio(Math.min(devicePixelRatio, 2));
+  lRen.setClearColor(0x000000, 0);
   var LM = buildModel();
+  LM.scene.background = null;                                  // CSS sky gradient shows through
+  LM.scene.fog = new THREE.Fog(0x141a22, 40, 130);
   var lUserTheta = 0;
   var lView = makeOrbit(lRen.domElement, lCam, {
     theta: -0.3, phi: 0.35, r: 26, ty: 1.5, wheel: false,
