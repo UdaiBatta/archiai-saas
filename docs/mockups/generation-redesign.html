@@ -901,6 +901,175 @@ button:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+/* ============================================================
+   Landing page state — the marketing site in the same language
+   ============================================================ */
+.landing-view {
+  height: calc(100vh - 46px);
+  overflow-y: auto;
+  background: #121314;
+}
+.landing-view::-webkit-scrollbar { width: 8px; }
+.landing-view::-webkit-scrollbar-thumb { background: var(--graphite-700); border-radius: 4px; }
+
+.l-nav {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: 22px;
+  padding: 13px 28px;
+  background: rgba(18, 19, 20, 0.88);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.l-nav .links { display: flex; gap: 18px; margin-left: 10px; }
+.l-nav .links button { font-size: 13px; font-weight: 500; color: var(--muted); transition: color .15s; }
+.l-nav .links button:hover { color: var(--ink); }
+.l-nav .spacer { flex: 1; }
+.l-nav .signin { font-size: 13px; font-weight: 600; color: var(--muted); padding: 8px 12px; border-radius: 8px; transition: color .15s; }
+.l-nav .signin:hover { color: var(--ink); }
+.l-nav .cta {
+  font-size: 13px; font-weight: 700; color: #fff;
+  background: var(--accent);
+  padding: 9px 16px; border-radius: 9px;
+  box-shadow: 0 4px 18px -4px var(--accent-glow);
+  transition: background .15s;
+}
+.l-nav .cta:hover { background: var(--accent-bright); }
+
+.l-wrap { max-width: 1080px; margin: 0 auto; padding: 0 28px; }
+
+.l-hero { display: grid; grid-template-columns: 1.05fr 1fr; gap: 52px; align-items: center; padding: 68px 0 60px; }
+.l-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 12px; font-weight: 500; color: var(--muted);
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.04);
+  border-radius: 999px; padding: 6px 13px;
+}
+.l-badge .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+.l-h1 { margin-top: 18px; font-size: 46px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.07; }
+.l-h1 .accent { color: var(--accent-bright); }
+.l-p { margin-top: 16px; font-size: 15px; line-height: 1.62; color: var(--muted); max-width: 470px; }
+.l-ctas { margin-top: 28px; display: flex; flex-wrap: wrap; gap: 12px; }
+.l-btn-primary {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 14px; font-weight: 700; color: #fff;
+  background: var(--accent); padding: 12px 22px; border-radius: 11px;
+  box-shadow: 0 8px 26px -6px var(--accent-glow);
+  transition: background .15s, transform .12s;
+}
+.l-btn-primary:hover { background: var(--accent-bright); }
+.l-btn-primary:active { transform: scale(0.98); }
+.l-btn-ghost {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 14px; font-weight: 600; color: var(--ink);
+  border: 1px solid rgba(255,255,255,0.14);
+  padding: 12px 22px; border-radius: 11px;
+  transition: background .15s, border-color .15s;
+}
+.l-btn-ghost:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.24); }
+.l-micro { margin-top: 14px; font-size: 12px; color: var(--muted-light); }
+
+.l-preview-wrap { position: relative; }
+.l-glow {
+  position: absolute; inset: -36px; border-radius: 40px;
+  background: radial-gradient(closest-side, var(--accent-soft), transparent 72%);
+  filter: blur(16px);
+}
+.l-preview {
+  position: relative;
+  height: 330px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background:
+    linear-gradient(rgba(255,255,255,0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.045) 1px, transparent 1px),
+    var(--paper);
+  background-size: 26px 26px, 26px 26px, auto;
+  box-shadow: 0 30px 70px rgba(0,0,0,0.45);
+  overflow: hidden;
+}
+.l-room { position: absolute; border-radius: 6px; border: 1px solid; padding: 6px 8px; }
+.l-room .n { font-size: 10.5px; font-weight: 600; display: block; }
+.l-room .d { font-family: var(--mono); font-size: 8.5px; opacity: 0.7; display: block; }
+.l-float {
+  position: absolute;
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; font-weight: 600; color: var(--ink);
+  background: rgba(35, 36, 37, 0.96);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 10px;
+  padding: 8px 12px;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.4);
+}
+.l-float .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+.l-float .score { font-family: var(--mono); }
+.l-float .opts { color: var(--accent-bright); }
+
+.l-trust { border-top: 1px solid rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02); }
+.l-trust .l-wrap { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding-top: 18px; padding-bottom: 18px; }
+.l-trust .t-item { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--muted); }
+.l-trust .t-item svg { color: rgba(245,245,246,0.45); }
+
+.l-features { padding: 60px 0; }
+.l-features + .l-features { border-top: 1px solid rgba(255,255,255,0.06); }
+.l-h2 { font-size: 26px; font-weight: 800; letter-spacing: -0.01em; }
+.l-secsub { margin-top: 10px; font-size: 13.5px; line-height: 1.6; color: var(--muted); max-width: 560px; }
+.l-grid4 { margin-top: 28px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.l-grid3 { margin-top: 28px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.l-card {
+  border: 1px solid rgba(255,255,255,0.08);
+  background: var(--graphite-850);
+  border-radius: 14px;
+  padding: 18px;
+  transition: border-color .18s, transform .18s;
+}
+.l-card:hover { border-color: rgba(118, 99, 215, 0.55); transform: translateY(-2px); }
+.l-card .ico {
+  width: 34px; height: 34px; border-radius: 9px;
+  background: var(--accent-soft);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--accent-bright);
+  margin-bottom: 12px;
+}
+.l-card h3 { font-size: 14px; font-weight: 700; }
+.l-card p { margin-top: 6px; font-size: 12.5px; line-height: 1.55; color: var(--muted); }
+
+.l-plan {
+  position: relative;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: var(--graphite-850);
+  border-radius: 14px;
+  padding: 18px;
+}
+.l-plan.hot { border-color: var(--accent); box-shadow: 0 14px 44px -14px var(--accent-glow); }
+.l-plan .pop {
+  position: absolute; top: -9px; right: 14px;
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em;
+  color: #fff; background: var(--accent);
+  border-radius: 999px; padding: 3px 9px;
+}
+.l-plan h3 { font-size: 14px; font-weight: 700; }
+.l-plan .tag { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.l-plan .blurb { font-size: 12px; line-height: 1.55; color: var(--muted); margin-top: 10px; }
+.l-plan button { margin-top: 14px; width: 100%; padding: 9px; border-radius: 9px; font-size: 12.5px; font-weight: 700; }
+.l-plan .p-acc { background: var(--accent); color: #fff; }
+.l-plan .p-acc:hover { background: var(--accent-bright); }
+.l-plan .p-ghost { border: 1px solid rgba(255,255,255,0.12); color: var(--muted); }
+.l-plan .p-ghost:hover { color: var(--ink); }
+
+.l-final { border-top: 1px solid rgba(255,255,255,0.06); text-align: center; padding: 58px 0 66px; background: rgba(255,255,255,0.02); }
+.l-final .l-p { margin-left: auto; margin-right: auto; }
+.l-final .l-ctas { justify-content: center; }
+.l-footer {
+  border-top: 1px solid rgba(255,255,255,0.06);
+  padding: 18px 28px;
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 12px; color: var(--muted-light);
+}
+.l-footer .links { display: flex; gap: 16px; }
+.l-footer .links button { font-size: 12px; color: var(--muted-light); }
+.l-footer .links button:hover { color: var(--ink); }
+
 /* shared motion keyframes */
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(12px); }
@@ -924,6 +1093,7 @@ button:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 
   <span class="tag">MOCKUP</span>
   <span class="hint">Generation redesign — jump to a state:</span>
   <div class="states">
+    <button data-jump="landing">⌂ Landing</button>
     <button data-jump="hero" class="active">1 · Hero</button>
     <button data-jump="generating">2 · Generating</button>
     <button data-jump="result">3 · Result</button>
@@ -1187,8 +1357,7 @@ button:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 
         </div>
       </div>
 
-      <!-- toast -->
-      <div class="toast" id="toast"></div>
+      <!-- toast lives at body level so it survives view switches -->
     </div>
 
     <!-- right panel -->
@@ -1224,6 +1393,151 @@ button:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 
     <span class="seg">Units <b>Meters</b></span>
   </div>
 </div>
+
+<!-- ============ LANDING PAGE STATE ============ -->
+<div class="landing-view hidden" id="landingView">
+  <nav class="l-nav">
+    <span class="wordmark">ARCHI<span>·</span>AI</span>
+    <div class="links">
+      <button data-target="l-product">Product</button>
+      <button data-target="l-solutions">Solutions</button>
+      <button data-target="l-pricing">Pricing</button>
+    </div>
+    <span class="spacer"></span>
+    <button class="signin" data-cta="signin">Sign in</button>
+    <button class="cta" data-cta="trial">Start free</button>
+  </nav>
+
+  <div class="l-wrap">
+    <section class="l-hero">
+      <div>
+        <span class="l-badge"><span class="pulse"></span>AI-powered architectural design</span>
+        <h1 class="l-h1">Design better spaces, <span class="accent">faster</span>.</h1>
+        <p class="l-p">Describe the building in plain language. ArchiAI extracts the program, generates an editable floor plan in seconds, and hands you a real 2D + 3D editor — with compliance checked before you ever see it.</p>
+        <div class="l-ctas">
+          <button class="l-btn-primary" data-cta="trial">Start Free Trial
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </button>
+          <button class="l-btn-ghost" data-cta="demo">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            Watch Demo
+          </button>
+        </div>
+        <p class="l-micro">Free plan available · No credit card required</p>
+      </div>
+
+      <div class="l-preview-wrap">
+        <div class="l-glow"></div>
+        <div class="l-preview">
+          <div class="l-room" style="left:4%;top:7%;width:44%;height:42%;background:#7A8CA82e;border-color:#7A8CA873;"><span class="n" style="color:#7A8CA8">Living Room</span><span class="d" style="color:#7A8CA8">6.0 × 4.0 m</span></div>
+          <div class="l-room" style="left:4%;top:53%;width:44%;height:40%;background:#C9C39A2e;border-color:#C9C39A73;"><span class="n" style="color:#C9C39A">Kitchen</span><span class="d" style="color:#C9C39A">4.6 × 2.5 m</span></div>
+          <div class="l-room" style="left:52%;top:7%;width:44%;height:30%;background:#8FAE942e;border-color:#8FAE9473;"><span class="n" style="color:#8FAE94">Bedroom 1</span><span class="d" style="color:#8FAE94">4.4 × 3.0 m</span></div>
+          <div class="l-room" style="left:52%;top:41%;width:20%;height:24%;background:#7FA8A02e;border-color:#7FA8A073;"><span class="n" style="color:#7FA8A0">Bath</span></div>
+          <div class="l-room" style="left:76%;top:41%;width:20%;height:24%;background:#B08D6E2e;border-color:#B08D6E73;"><span class="n" style="color:#B08D6E">Entry</span></div>
+          <div class="l-room" style="left:52%;top:69%;width:44%;height:24%;background:#9A86B82e;border-color:#9A86B873;"><span class="n" style="color:#9A86B8">Bedroom 2</span><span class="d" style="color:#9A86B8">4.4 × 2.5 m</span></div>
+          <div class="l-float" style="left:14px;bottom:14px;"><span class="dot"></span><span class="score">87/100</span><span style="color:var(--muted);font-weight:500;">concept quality</span></div>
+          <div class="l-float" style="right:14px;top:14px;"><span class="opts">4 options ▸</span></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="l-trust">
+    <div class="l-wrap">
+      <span class="t-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6L9 17l-5-5"/></svg>AI-assisted design</span>
+      <span class="t-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6L9 17l-5-5"/></svg>Smart constraints</span>
+      <span class="t-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6L9 17l-5-5"/></svg>Built for teams</span>
+      <span class="t-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6L9 17l-5-5"/></svg>Cloud-native</span>
+    </div>
+  </div>
+
+  <section class="l-features" id="l-product">
+    <div class="l-wrap">
+      <h2 class="l-h2">Everything from brief to building</h2>
+      <p class="l-secsub">One workspace covering the whole early-design loop: generate, edit in 2D and 3D, reason about zoning and adjacency, then export and share.</p>
+      <div class="l-grid4">
+        <div class="l-card">
+          <div class="ico"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15.5l-1.9-4.6L5.5 9l4.6-1.4z"/></svg></div>
+          <h3>AI-Powered Design</h3>
+          <p>Describe the building in plain language — the program is extracted and an editable, deterministic layout is generated in seconds.</p>
+        </div>
+        <div class="l-card">
+          <div class="ico"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg></div>
+          <h3>Built-in Compliance</h3>
+          <p>Hard geometric validation on every plan: no overlaps, minimum room sizes, and a walkable door graph.</p>
+        </div>
+        <div class="l-card">
+          <div class="ico"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17.5" cy="9.5" r="2.5"/><path d="M21 19c0-2.5-1.6-4.6-3.8-5.4"/></svg></div>
+          <h3>Team Collaboration</h3>
+          <p>Shared workspaces with roles, version history, and a full activity trail on every project.</p>
+        </div>
+        <div class="l-card">
+          <div class="ico"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 18a4.5 4.5 0 1 1 .6-8.96 6 6 0 0 1 11.4 1.7A4 4 0 0 1 18 18z"/></svg></div>
+          <h3>Cloud-Native</h3>
+          <p>Projects, versions, drafts, and share links live in the cloud — pick up where you left off.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="l-features" id="l-solutions">
+    <div class="l-wrap">
+      <h2 class="l-h2">Made for teams that plan space</h2>
+      <div class="l-grid3">
+        <div class="l-card"><h3>Architecture studios</h3><p>Concept massing and space programs before committing CAD hours.</p></div>
+        <div class="l-card"><h3>Interior & space planners</h3><p>Zoning, adjacency, and circulation reasoning on real footprints.</p></div>
+        <div class="l-card"><h3>Real-estate & developers</h3><p>Fast, presentable layout options for plots and briefs that change daily.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="l-features" id="l-pricing">
+    <div class="l-wrap">
+      <h2 class="l-h2">Simple pricing</h2>
+      <p class="l-secsub">Start free, upgrade when the work gets real.</p>
+      <div class="l-grid3">
+        <div class="l-plan">
+          <h3>Free</h3><span class="tag">For trying the loop</span>
+          <p class="blurb">A few generations a month, full editor access, share links.</p>
+          <button class="p-ghost" data-cta="trial">Start Free</button>
+        </div>
+        <div class="l-plan hot">
+          <span class="pop">MOST POPULAR</span>
+          <h3>Studio</h3><span class="tag">For working architects</span>
+          <p class="blurb">Generous generations, version history, exports, team workspace.</p>
+          <button class="p-acc" data-cta="trial">Start Free Trial</button>
+        </div>
+        <div class="l-plan">
+          <h3>Firm</h3><span class="tag">For teams at scale</span>
+          <p class="blurb">Everything in Studio with firm-wide workspaces and priority support.</p>
+          <button class="p-ghost" data-cta="trial">Talk to us</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="l-final">
+    <div class="l-wrap">
+      <h2 class="l-h2">Start designing in minutes</h2>
+      <p class="l-p">Type a brief, get a plan, and shape it in the editor — 2D, 3D, zoning, and room graph on one canvas.</p>
+      <div class="l-ctas">
+        <button class="l-btn-primary" data-cta="trial">Start Free Trial</button>
+        <button class="l-btn-ghost" data-cta="book">Book a Demo</button>
+      </div>
+    </div>
+  </section>
+
+  <footer class="l-footer">
+    <span>© 2026 ArchiAI</span>
+    <div class="links">
+      <button data-cta="out">Privacy</button>
+      <button data-cta="out">Terms</button>
+      <button data-cta="out">Contact</button>
+    </div>
+  </footer>
+</div>
+
+<div class="toast" id="toast"></div>
 
 <script>
 /* ============================================================
@@ -1283,6 +1597,18 @@ function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
 function show(state, opts = {}) {
   clearTimers();
   current = state;
+
+  // the landing page replaces the whole editor frame
+  if (state === 'landing') {
+    $('landingView').classList.remove('hidden');
+    document.querySelector('.editor-frame').classList.add('hidden');
+    document.querySelectorAll('.mockup-bar .states button').forEach(b =>
+      b.classList.toggle('active', b.dataset.jump === 'landing'));
+    return;
+  }
+  $('landingView').classList.add('hidden');
+  document.querySelector('.editor-frame').classList.remove('hidden');
+
   states.forEach(s => $('state-' + s).classList.toggle('hidden', s !== state));
   document.querySelectorAll('.mockup-bar .states button').forEach(b =>
     b.classList.toggle('active', b.dataset.jump === state));
@@ -1557,6 +1883,24 @@ document.addEventListener('keydown', e => {
   if (!$('gallery').classList.contains('hidden')) { $('gallery').classList.add('hidden'); return; }
   if (current === 'review') show('hero');
 });
+
+/* landing wiring */
+document.querySelectorAll('.l-nav .links button').forEach(btn =>
+  btn.addEventListener('click', () => {
+    const target = document.getElementById(btn.dataset.target);
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }));
+document.querySelectorAll('[data-cta]').forEach(btn =>
+  btn.addEventListener('click', () => {
+    const cta = btn.dataset.cta;
+    if (cta === 'trial') {
+      showToast('Real app → Register. Here: jumping into the editor ↓');
+      show('hero');
+    } else if (cta === 'demo') showToast('Demo video — outside this mockup');
+    else if (cta === 'book') showToast('Booking flow — outside this mockup');
+    else if (cta === 'signin') showToast('Sign-in — outside this mockup');
+    else showToast('Footer link — outside this mockup');
+  }));
 
 /* boot */
 show('hero');
