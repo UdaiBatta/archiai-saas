@@ -473,7 +473,7 @@ export default function ProjectPage() {
           prompt: sourcePrompt,
         })
         loadLayout(generateResponseToCanvas(result, sourcePrompt))
-        setAlternatives([])
+        setAlternatives((result.alternatives ?? []) as LayoutOption[])
         setGenerationNotice(
           result.defaults_applied.length > 0
             ? `Assumed: ${result.defaults_applied.join(', ')}`

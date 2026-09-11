@@ -25,8 +25,11 @@ from app.services.entitlement_service import (
     enforce_and_increment_usage,
 )
 from app.services.extraction import ExtractionFailed, extract_requirements
+from app.services.layout_adapter import layout_plan_to_canvas
 from app.services.layout_engine import DoesNotFitError
-from app.services.layout_engine.search import best_candidate
+from app.services.layout_engine.engine import generate_plan
+from app.services.layout_engine.search import generate_candidates
+from app.services.quality.scorer import score as score_layout
 from app.services.llm_client import (
     LLMError,
     LLMInvalidOutput,
@@ -70,6 +73,50 @@ async def _workspace_id(db: AsyncSession, project_id: str | None) -> str | None:
 
 def _clarification_error(result) -> HTTPException:
     return HTTPException(status_code=422, detail=result.model_dump(mode="json"))
+
+
+_MAX_ALTERNATIVES = 3
+
+
+def _geometry_signature(plan) -> tuple:
+    """Rounded room rectangles. Two candidates with identical geometry are the
+    same layout for the options gallery, however different their room order
+    was inside the search."""
+    return tuple(
+        sorted(
+            (room.type, round(room.x, 2), round(room.y, 2), round(room.w, 2), round(room.h, 2))
+            for room in plan.rooms
+        )
+    )
+
+
+def _generate_with_alternatives(requirements):
+    """Best-of-64 winner plus up to three geometrically distinct runners-up,
+    each already in the legacy canvas layout shape (+ a `score`) so the
+    options gallery can swap them in directly. Polygon-boundary and
+    multi-floor programmes have a single-layout search space — no
+    alternatives there."""
+    if requirements.plot.boundary is not None or requirements.floors > 1:
+        return generate_plan(requirements), []
+    candidates = generate_candidates(requirements)
+    if not candidates:
+        raise DoesNotFitError("no candidate could be generated")
+    winner = candidates[0].plan
+    alternatives: list[dict] = []
+    seen = {_geometry_signature(winner)}
+    for candidate in candidates[1:]:
+        if len(alternatives) >= _MAX_ALTERNATIVES:
+            break
+        signature = _geometry_signature(candidate.plan)
+        if signature in seen:
+            continue
+        seen.add(signature)
+        canvas = layout_plan_to_canvas(candidate.plan)
+        canvas["score"] = round(
+            score_layout(candidate.plan, requirements, include_vastu=False).score, 1
+        )
+        alternatives.append(canvas)
+    return winner, alternatives
 
 
 @router.post(
@@ -161,7 +208,7 @@ async def generate_mvp_layout(
         "max_generations_per_period",
     )
     try:
-        layout = best_candidate(requirements)
+        layout, alternatives = _generate_with_alternatives(requirements)
     except DoesNotFitError as exc:
         raise _clarification_error(assess(requirements, fit_error=exc)) from exc
 
@@ -200,6 +247,7 @@ async def generate_mvp_layout(
         defaults_applied=defaults_applied,
         designId=design_id,
         designVersionId=version_id,
+        alternatives=alternatives,
     )
 
 

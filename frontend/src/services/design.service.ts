@@ -22,6 +22,8 @@ export interface LayoutOption {
   floors?: CanvasFloor[]
   rooms: Room[]
   insights?: GenerationInsights
+  /** Top-level score carried by MVP best-of-64 alternatives. */
+  score?: number
 }
 
 export interface GenerateResponse {
