@@ -40,7 +40,7 @@ function GuidanceList({
             <span
               aria-hidden="true"
               className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${
-                warning.severity === 'warn' ? 'bg-warn' : 'bg-[#8069df]'
+                warning.severity === 'warn' ? 'bg-warn' : 'bg-accent-bright'
               }`}
             />
             <span>{warning.message}</span>
@@ -73,7 +73,7 @@ export function QualityPanel({ quality }: { quality: MvpQualitySnapshot }) {
         </div>
         {quality.valid ? (
           <div
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#8069df]/45 bg-[#8069df]/10 font-mono text-xs font-semibold tabular-nums text-ink"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-accent-bright/45 bg-accent-soft font-mono text-xs font-semibold tabular-nums text-ink"
             aria-label={`Quality score ${quality.score} out of 100`}
           >
             {quality.score}

@@ -330,17 +330,21 @@ describe('ProjectPage refine flow', () => {
     await user.click(screen.getByRole('button', { name: 'Generate layout' }))
 
     await waitFor(() =>
-      expect(api.post).toHaveBeenCalledWith('/api/generate', {
-        requirements: {
-          ...extracted.requirements,
-          floors: 2,
-          plot: { width_m: 10, depth_m: null },
-          facing: 'north',
+      expect(api.post).toHaveBeenCalledWith(
+        '/api/generate',
+        {
+          requirements: {
+            ...extracted.requirements,
+            floors: 2,
+            plot: { width_m: 10, depth_m: null },
+            facing: 'north',
+          },
+          useDefaults: false,
+          prompt: 'studio apartment',
+          projectId: 'p1',
         },
-        useDefaults: false,
-        prompt: 'studio apartment',
-        projectId: 'p1',
-      }),
+        { signal: undefined },
+      ),
     )
   })
 
@@ -503,12 +507,16 @@ describe('ProjectPage refine flow', () => {
     await user.click(screen.getByRole('button', { name: 'Generate with defaults' }))
 
     await waitFor(() =>
-      expect(api.post).toHaveBeenCalledWith('/api/generate', {
-        requirements,
-        useDefaults: true,
-        projectId: 'p1',
-        prompt: 'one bedroom house',
-      }),
+      expect(api.post).toHaveBeenCalledWith(
+        '/api/generate',
+        {
+          requirements,
+          useDefaults: true,
+          projectId: 'p1',
+          prompt: 'one bedroom house',
+        },
+        { signal: undefined },
+      ),
     )
     expect(useCanvasStore.getState().rooms[0]).toMatchObject({
       id: 'mvp-room-1',

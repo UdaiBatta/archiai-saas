@@ -129,7 +129,7 @@ function ToolButton({
           labeled ? 'h-10 w-12 flex-col gap-0.5' : 'h-9 w-9'
         } ${
           tool.active
-            ? 'bg-[#7663d7]/20 text-[#a18ef0] ring-1 ring-[#8069df]/45'
+            ? 'bg-accent-soft text-accent-bright ring-1 ring-accent-bright/45'
             : tool.disabled
               ? 'text-graphite-500'
               : 'text-muted-light hover:bg-ink/10 hover:text-ink'

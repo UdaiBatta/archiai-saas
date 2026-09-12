@@ -31,7 +31,7 @@ export function ViewModeSwitcher() {
           onClick={() => setViewMode(mode.value)}
           className={`rounded-md px-3 py-1.5 text-[11px] font-semibold transition-colors ${
             viewMode === mode.value
-              ? 'bg-[#7663d7] text-white shadow-[0_2px_10px_rgba(118,99,215,0.28)]'
+              ? 'bg-accent text-white shadow-[0_2px_10px_rgba(118,99,215,0.28)]'
               : 'text-muted hover:bg-ink/10 hover:text-ink'
           }`}
         >

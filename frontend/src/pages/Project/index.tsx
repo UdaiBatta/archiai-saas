@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import axios from 'axios'
 import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import projectService, { Project } from '../../services/project.service'
@@ -173,12 +174,14 @@ function hasRecoverableDraft(
   return layoutSnapshotKey(savedLayout) !== layoutSnapshotKey(draftLayout)
 }
 
-function waitForRefinementMoment(durationMs: number) {
+function waitForRefinementMoment(durationMs: number, skip: boolean) {
   const reduceMotion =
     typeof window !== 'undefined' &&
     typeof window.matchMedia === 'function' &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  return new Promise<void>((resolve) => window.setTimeout(resolve, reduceMotion ? 0 : durationMs))
+  return new Promise<void>((resolve) =>
+    window.setTimeout(resolve, skip || reduceMotion ? 0 : durationMs),
+  )
 }
 
 // URL <-> store mapping for the editor view switcher, so 2D/3D/Zoning/Graph
@@ -280,6 +283,8 @@ export default function ProjectPage() {
     completedCount: number
   } | null>(null)
   const refinementRunRef = useRef(0)
+  const generateAbortRef = useRef<AbortController | null>(null)
+  const playbackSkipRef = useRef(false)
   const [draftToRecover, setDraftToRecover] = useState<DesignDraftResponse | null>(null)
   const userPickedModeRef = useRef(false)
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -339,7 +344,7 @@ export default function ProjectPage() {
       if (beforeState.rooms.some((room) => room.id === frame.change.objectId)) {
         beforeState.selectRoom(frame.change.objectId)
       }
-      await waitForRefinementMoment(420)
+      await waitForRefinementMoment(420, playbackSkipRef.current)
       if (runId !== refinementRunRef.current) return
 
       loadLayout(frame.layout)
@@ -354,7 +359,7 @@ export default function ProjectPage() {
         activeIndex: index,
         completedCount: index + 1,
       })
-      await waitForRefinementMoment(260)
+      await waitForRefinementMoment(260, playbackSkipRef.current)
     }
 
     if (runId !== refinementRunRef.current) return
@@ -398,22 +403,28 @@ export default function ProjectPage() {
   })
 
   const requestBriefReview = async (sourcePrompt: string) => {
+    const controller = new AbortController()
+    generateAbortRef.current = controller
     setGenerating(true)
     setGenerationStage('extracting')
     setGenerateError(null)
     setLayoutSaveError(null)
     try {
-      const result = await extractBrief(sourcePrompt)
+      const result = await extractBrief(sourcePrompt, controller.signal)
       setBriefReview(reviewWithOverrides(result, currentGenerationOverrides()))
       setReviewPrompt(sourcePrompt)
     } catch (err) {
-      setGenerateError(
-        getApiErrorMessage(
-          err,
-          'I could not understand that brief. Check the AI provider configuration, then try again.',
-        ),
-      )
+      // A user cancel is not an error — the brief review just never opens.
+      if (!axios.isCancel(err)) {
+        setGenerateError(
+          getApiErrorMessage(
+            err,
+            'I could not understand that brief. Check the AI provider configuration, then try again.',
+          ),
+        )
+      }
     } finally {
+      if (generateAbortRef.current === controller) generateAbortRef.current = null
       setGenerating(false)
       setGenerationStage('idle')
     }
@@ -448,6 +459,7 @@ export default function ProjectPage() {
         getApiErrorMessage(err, 'Refinement failed. Try a more specific change.'),
       )
     } finally {
+      playbackSkipRef.current = false
       if (refinementRun === refinementRunRef.current) {
         setRefinementPlayback(null)
       }
@@ -550,6 +562,14 @@ export default function ProjectPage() {
     setRefinementSummary(null)
     setGenerationNotice(null)
     setBriefReview(null)
+  }
+
+  const cancelGeneration = () => {
+    generateAbortRef.current?.abort()
+  }
+
+  const handleSkipPlayback = () => {
+    playbackSkipRef.current = true
   }
 
   const handlePickOption = (option: LayoutOption) => {
@@ -879,6 +899,7 @@ export default function ProjectPage() {
               onShare={() => setShareOpen(true)}
               avatarName={user?.name ?? user?.email ?? ''}
               designId={designId}
+              hasLayout={roomCount > 0}
               layoutSaving={layoutSaving}
               layoutSaveError={layoutSaveError}
               versionName={versionName}
@@ -945,7 +966,7 @@ export default function ProjectPage() {
             )}
 
             {refinementPlayback && (
-              <RefinementPlaybackPanel {...refinementPlayback} />
+              <RefinementPlaybackPanel {...refinementPlayback} onSkip={handleSkipPlayback} />
             )}
 
             {refinementSummary && (
@@ -1000,6 +1021,8 @@ export default function ProjectPage() {
               prompt={prompt}
               setPrompt={handlePromptChange}
               generating={generating}
+              generationStage={generationStage}
+              onCancel={cancelGeneration}
               busyLabel={
                 generationStage === 'extracting'
                   ? 'Understanding...'

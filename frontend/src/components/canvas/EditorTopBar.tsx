@@ -22,6 +22,7 @@ interface EditorTopBarProps {
   avatarName: string
 
   designId: string | null
+  hasLayout: boolean
   layoutSaving: boolean
   layoutSaveError: string | null
   versionName: string
@@ -63,6 +64,7 @@ export function EditorTopBar({
   onShare,
   avatarName,
   designId,
+  hasLayout = true,
   layoutSaving,
   layoutSaveError,
   versionName,
@@ -187,6 +189,7 @@ export function EditorTopBar({
 
         <SavePopover
           designId={designId}
+          hasLayout={hasLayout}
           saving={layoutSaving}
           saveError={layoutSaveError}
           versionName={versionName}

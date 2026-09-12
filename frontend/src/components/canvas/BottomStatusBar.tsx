@@ -81,7 +81,7 @@ export function BottomStatusBar() {
             className="flex items-center gap-1.5 hover:text-ink"
             title="Toggle snap to grid"
           >
-            <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${snapToGrid ? 'bg-[#8069df]' : 'bg-muted-light'}`} />
+            <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${snapToGrid ? 'bg-accent-bright' : 'bg-muted-light'}`} />
             Snap: <span className="text-ink">{snapToGrid ? 'On' : 'Off'}</span>
           </button>
         </Segment>

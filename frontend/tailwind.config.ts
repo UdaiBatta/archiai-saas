@@ -31,6 +31,15 @@ const config: Config = {
         ink: '#F5F5F6',
         muted: { DEFAULT: '#A8A8AC', light: '#7C7C80' },
         surface: '#212121',
+        // The single interactive/primary accent (selection, active tabs,
+        // primary buttons, focus rings). Previously hardcoded as #7663d7 /
+        // #8069df across ~9 components — now every consumer draws from here.
+        accent: {
+          DEFAULT: '#7663D7',
+          bright: '#8069DF',
+          soft: 'rgba(118, 99, 215, 0.16)',
+          dim: '#5B4CB0',
+        },
         // Status colors, deliberately muted per the approved direction.
         ok: '#8FAE94',
         warn: '#C9A96E',
@@ -39,6 +48,26 @@ const config: Config = {
       fontFamily: {
         sans: ['Archivo', ...defaultTheme.fontFamily.sans],
         mono: ['"IBM Plex Mono"', ...defaultTheme.fontFamily.mono],
+      },
+      keyframes: {
+        'fade-up': {
+          '0%': { opacity: '0', transform: 'translateY(10px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        'fade-in': {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        'slide-down': {
+          '0%': { opacity: '0', transform: 'translateY(-10px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+      },
+      animation: {
+        // Use behind motion-safe: so reduced-motion users get none of it.
+        'fade-up': 'fade-up 0.4s cubic-bezier(0.22, 0.9, 0.3, 1) both',
+        'fade-in': 'fade-in 0.25s ease both',
+        'slide-down': 'slide-down 0.4s cubic-bezier(0.22, 0.9, 0.3, 1) both',
       },
     },
   },

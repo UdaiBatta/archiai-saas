@@ -4,6 +4,8 @@ interface RefinementPlaybackPanelProps {
   changes: RefinementChange[]
   activeIndex: number
   completedCount: number
+  /** Jumps the playback straight to the final refined layout. */
+  onSkip?: () => void
 }
 
 const ACTION_STYLES: Record<RefinementChange['action'], string> = {
@@ -16,13 +18,15 @@ export function RefinementPlaybackPanel({
   changes,
   activeIndex,
   completedCount,
+  onSkip,
 }: RefinementPlaybackPanelProps) {
+  const finished = completedCount >= changes.length
   return (
     <aside
       role="status"
       aria-live="polite"
       aria-label="Refinement progress"
-      className="absolute right-4 top-20 z-30 w-72 rounded-2xl border border-ink/10 bg-graphite-800/95 p-3.5 shadow-[0_16px_45px_rgba(0,0,0,0.22)] backdrop-blur"
+      className="absolute right-4 top-20 z-30 w-72 rounded-2xl border border-ink/10 bg-graphite-800/95 p-3.5 shadow-[0_16px_45px_rgba(0,0,0,0.22)] backdrop-blur motion-safe:animate-fade-in"
     >
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
@@ -66,6 +70,19 @@ export function RefinementPlaybackPanel({
           )
         })}
       </ol>
+
+      {onSkip && !finished && (
+        <button
+          type="button"
+          onClick={onSkip}
+          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-ink/10 bg-graphite-800 px-2 py-1.5 text-[11px] font-semibold text-muted hover:border-accent/60 hover:text-ink"
+        >
+          Skip — jump to final layout
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+            <path d="M5 12h14M13 6l6 6-6 6" />
+          </svg>
+        </button>
+      )}
     </aside>
   )
 }
