@@ -107,6 +107,8 @@ export function RightPanel() {
   const selectedId = useCanvasStore((s) => s.selectedId)
   const selectRoom = useCanvasStore((s) => s.selectRoom)
   const setViewMode = useCanvasStore((s) => s.setViewMode)
+  const placementMode = useCanvasStore((s) => s.placementMode)
+  const setPlacementMode = useCanvasStore((s) => s.setPlacementMode)
   const activityLog = useCanvasStore((s) => s.activityLog)
   const [tab, setTab] = useState<PanelTab>('properties')
   const layoutMetadata = useCanvasStore((s) => s.layoutMetadata)
@@ -670,6 +672,35 @@ export function RightPanel() {
         )}
         {body}
       </div>
+      {rooms.length > 0 && (
+        <div className="flex-shrink-0 border-t border-ink/10 p-3">
+          <button
+            type="button"
+            data-testid="create-3d-model"
+            onClick={() => {
+              if (viewMode !== '3d') {
+                setViewMode('3d')
+                return
+              }
+              setPlacementMode(placementMode === 'furniture' ? null : 'furniture')
+            }}
+            className="w-full rounded-lg bg-accent px-3 py-2 text-sm font-bold text-white shadow-[0_4px_16px_-4px_rgba(118,99,215,0.45)] hover:bg-accent-bright"
+          >
+            {viewMode !== '3d'
+              ? 'Create 3D Model →'
+              : placementMode === 'furniture'
+                ? 'Cancel furniture placement'
+                : 'Add furniture'}
+          </button>
+          <p className="mt-1.5 text-center text-[10px] text-muted-light">
+            {viewMode !== '3d'
+              ? 'Switch to 3D, then place furniture and fittings'
+              : placementMode === 'furniture'
+                ? 'Click inside a room to place a piece'
+                : 'Arm furniture placement from here or the tool rail'}
+          </p>
+        </div>
+      )}
     </aside>
   )
 }

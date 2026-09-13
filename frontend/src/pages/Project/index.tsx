@@ -295,6 +295,7 @@ export default function ProjectPage() {
   const [exportError, setExportError] = useState<string | null>(null)
   const designId = useCanvasStore((s) => s.designId)
   const roomCount = useCanvasStore((s) => s.rooms.length)
+  const activityCount = useCanvasStore((s) => s.activityLog.length)
   const viewMode = useCanvasStore((s) => s.viewMode)
   const selectedId = useCanvasStore((s) => s.selectedId)
   const loadLayout = useCanvasStore((s) => s.loadLayout)
@@ -468,8 +469,18 @@ export default function ProjectPage() {
     }
   }
 
-  const handleGenerateReviewed = async (useDefaults: boolean) => {
+  const handleGenerateReviewed = async (useDefaults: boolean, extraNotes?: string) => {
     if (!briefReview) return
+    // Extra rooms/constraints re-run extraction so the reviewed requirements
+    // genuinely pick them up, then the (updated) review is shown again.
+    if (extraNotes?.trim()) {
+      const merged =
+        (reviewPrompt || prompt.trim()) + '\n\nAdditional requirements: ' + extraNotes.trim()
+      setPrompt(merged)
+      setBriefReview(null)
+      await requestBriefReview(merged)
+      return
+    }
     const activeReview = briefReview
     const sourcePrompt = reviewPrompt || prompt.trim()
     setGenerating(true)
@@ -538,13 +549,14 @@ export default function ProjectPage() {
     }
   }
 
-  const handleClarifyBrief = async (answers: string[]) => {
+  const handleClarifyBrief = async (answers: string[], extraNotes?: string) => {
     if (!briefReview) return
     const additions = briefReview.questions.map(
       (question, index) => `${question}\nAnswer: ${answers[index]}`,
     )
     const clarifiedPrompt =
       `${reviewPrompt || prompt.trim()}\n\nAdditional details:\n${additions.join('\n')}`
+    if (extraNotes?.trim()) additions.push('Additional requirements: ' + extraNotes.trim())
     setPrompt(clarifiedPrompt)
     setBriefReview(null)
     await requestBriefReview(clarifiedPrompt)
@@ -985,6 +997,18 @@ export default function ProjectPage() {
                   ✕
                 </button>
               </div>
+            )}
+
+            {activityCount > 0 && !refinementSummary && !generationNotice && !activityOpen && (
+              <button
+                type="button"
+                onClick={() => setActivityOpen(true)}
+                className="absolute left-1/2 top-16 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-ink/15 bg-graphite-800/95 px-4 py-2 text-xs font-medium text-muted shadow-sm backdrop-blur hover:border-accent/60 hover:text-ink"
+              >
+                <span className="font-mono tabular-nums text-accent-bright">{activityCount}</span>
+                {activityCount === 1 ? 'change made this session' : 'changes made this session'}
+                <span className="font-semibold text-ink">— Review</span>
+              </button>
             )}
 
             {generationNotice && (

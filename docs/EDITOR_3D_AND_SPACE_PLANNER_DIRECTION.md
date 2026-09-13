@@ -6,7 +6,34 @@ one consistent design language; the clickable mockup at
 [`docs/mockups/generation-redesign.html`](../mockups/generation-redesign.html)
 is the reference implementation of this direction.
 
-## Source ideas
+## The staged product workflow (owner-defined, 2026-09-13)
+
+> Supersedes the earlier café-only reference framing. The product is
+> **general-purpose architecture** — any building type, for architects and
+> non-architects alike. Work proceeds in explicit stages; each one is usable
+> on its own before the next begins.
+
+1. **Hero / brief** — user describes the building in the prompt bar.
+2. **Generation** — extract → staged progress; the engine drafts the layout.
+3. **Brief review with additions** — the review modal shows what was
+   understood and includes a free-text **"Add anything else?"** box (e.g.
+   "one more bedroom, a study") that re-runs extraction so added rooms are
+   genuinely in the program before generating.
+4. **2D Plan result** — the navbar tab reads **"2D Plan"**; room blocks are
+   movable/resizable to map the design (drag, handles, snap, undo).
+5. **3D Edit parity** — the same editing model in 3D, plus a
+   **"Create 3D Model"** CTA in the right panel that switches to the 3D view
+   and arms furniture placement (furniture/FF&E stage lives here — the
+   capacity/brand-color tooling from the space-planner brief applies).
+6. **Review changes → refine loop** — a session-changes pill surfaces what
+   the user changed and opens the activity log; the refine bar keeps working
+   on the saved design.
+
+Not stage-specific but standing rules: honest empty/disabled states, one
+accent, minimal on-canvas dimensions (full dims only on selection), and no
+dead controls.
+
+## Source ideas (historical references — direction only, not templates)
 
 1. **Shared 3D floor-plan document** (`gill-road-office-3d-floor-plan.html`,
    user-provided): a real, orbitable Three.js model — walls are built as runs

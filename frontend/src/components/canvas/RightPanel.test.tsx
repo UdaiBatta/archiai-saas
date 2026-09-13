@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { DEFAULT_FLOOR, useCanvasStore, type Room } from '../../store/canvasStore'
@@ -85,6 +86,7 @@ beforeEach(() => {
     selectedId: null,
     layoutMetadata: EAST_ORIENTATION,
     activityLog: [],
+    placementMode: null,
   })
 })
 
@@ -189,5 +191,33 @@ describe('RightPanel site & orientation', () => {
     expect(screen.getByTestId('quality-panel')).toHaveTextContent('88')
     expect(screen.getByTestId('quality-panel')).toHaveTextContent('Concept quality')
     expect(screen.getByTestId('program-check')).toHaveTextContent('Program Check')
+  })
+})
+
+describe('RightPanel create-3d-model CTA', () => {
+  it('switches to the 3D view on first click, then arms furniture placement', async () => {
+    const user = userEvent.setup()
+    useCanvasStore.setState({
+      rooms: [room({ id: 'r1', label: 'Living Room' })],
+    })
+    render(<RightPanel />)
+
+    const cta = screen.getByTestId('create-3d-model')
+    expect(cta).toHaveTextContent('Create 3D Model')
+
+    await user.click(cta)
+    expect(useCanvasStore.getState().viewMode).toBe('3d')
+
+    await user.click(cta)
+    expect(useCanvasStore.getState().placementMode).toBe('furniture')
+    expect(cta).toHaveTextContent('Cancel furniture placement')
+
+    await user.click(cta)
+    expect(useCanvasStore.getState().placementMode).toBeNull()
+  })
+
+  it('is hidden while the canvas is empty', () => {
+    render(<RightPanel />)
+    expect(screen.queryByTestId('create-3d-model')).not.toBeInTheDocument()
   })
 })

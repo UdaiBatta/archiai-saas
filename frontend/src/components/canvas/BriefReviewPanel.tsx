@@ -8,8 +8,8 @@ interface BriefReviewPanelProps {
   engine: GenerationEngine
   busy: boolean
   error?: string | null
-  onGenerate: (useDefaults: boolean) => void
-  onClarify: (answers: string[]) => void
+  onGenerate: (useDefaults: boolean, extraNotes?: string) => void
+  onClarify: (answers: string[], extraNotes?: string) => void
   onCancel: () => void
 }
 
@@ -26,6 +26,9 @@ export function BriefReviewPanel({
   const [answers, setAnswers] = useState<string[]>(() =>
     review.questions.map(() => ''),
   )
+  // Free-text additions ('one more bedroom, a study...') re-run extraction so
+  // the reviewed requirements actually pick the added rooms up.
+  const [extraNotes, setExtraNotes] = useState('')
 
   useEffect(() => {
     setAnswers(review.questions.map(() => ''))
@@ -122,6 +125,22 @@ export function BriefReviewPanel({
           )
         )}
 
+        <label className="mt-4 block text-sm font-medium text-ink">
+          Add anything else?
+          <textarea
+            aria-label="Additional requirements"
+            rows={2}
+            value={extraNotes}
+            placeholder="e.g. one more bedroom, a study, a garage..."
+            onChange={(event) => setExtraNotes(event.target.value)}
+            className="mt-1.5 w-full resize-none rounded-lg border border-ink/15 bg-graphite-700 px-3 py-2 text-sm font-normal text-ink placeholder:text-muted-light focus:outline-none focus:ring-2 focus:ring-ink/30"
+            disabled={busy}
+          />
+          <span className="mt-1 block text-xs font-normal text-muted-light">
+            Optional - adds rooms or constraints on top of the brief.
+          </span>
+        </label>
+
         {error && (
           <p role="alert" className="mt-3 text-sm text-danger">{error}</p>
         )}
@@ -139,7 +158,7 @@ export function BriefReviewPanel({
             <button
               type="button"
               className="rounded-lg bg-ink px-4 py-2 text-sm font-semibold text-graphite-900 hover:bg-graphite-100 disabled:bg-graphite-500"
-              onClick={() => onClarify(answers)}
+              onClick={() => onClarify(answers, extraNotes)}
               disabled={busy || !allAnswered}
             >
               {busy ? 'Checking...' : 'Re-check brief'}
@@ -148,7 +167,7 @@ export function BriefReviewPanel({
             <button
               type="button"
               className="rounded-lg bg-ink px-4 py-2 text-sm font-semibold text-graphite-900 hover:bg-graphite-100 disabled:bg-graphite-500"
-              onClick={() => onGenerate(review.optional_missing.length > 0)}
+              onClick={() => onGenerate(review.optional_missing.length > 0, extraNotes)}
               disabled={busy}
             >
               {busy

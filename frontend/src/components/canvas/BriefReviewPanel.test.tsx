@@ -40,7 +40,7 @@ describe('BriefReviewPanel', () => {
     expect(screen.getByText('2 bedrooms')).toBeInTheDocument()
     expect(screen.getByText('What plot size should I use?')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Generate with defaults' }))
-    expect(onGenerate).toHaveBeenCalledWith(true)
+    expect(onGenerate).toHaveBeenCalledWith(true, '')
   })
 
   it('collects every blocking clarification before re-checking', async () => {
@@ -67,7 +67,7 @@ describe('BriefReviewPanel', () => {
     await user.type(screen.getByLabelText('Answer 1'), 'three')
     await user.type(screen.getByLabelText('Answer 2'), 'two')
     await user.click(submit)
-    expect(onClarify).toHaveBeenCalledWith(['three', 'two'])
+    expect(onClarify).toHaveBeenCalledWith(['three', 'two'], '')
   })
 
   it('explains when capability-safe fallback selection is active', () => {
@@ -83,5 +83,26 @@ describe('BriefReviewPanel', () => {
     )
 
     expect(screen.getByText(/established deterministic engine/)).toBeInTheDocument()
+  })
+  it('passes free-text additional requirements through generation', async () => {
+    const onGenerate = vi.fn()
+    const user = userEvent.setup()
+    render(
+      <BriefReviewPanel
+        review={review}
+        engine="mvp"
+        busy={false}
+        onGenerate={onGenerate}
+        onClarify={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    await user.type(
+      screen.getByLabelText('Additional requirements'),
+      'one more study and a garage',
+    )
+    await user.click(screen.getByRole('button', { name: 'Generate with defaults' }))
+    expect(onGenerate).toHaveBeenCalledWith(true, 'one more study and a garage')
   })
 })
