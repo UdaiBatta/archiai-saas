@@ -59,6 +59,16 @@ const layout: LayoutPlan = {
 }
 
 describe('canonical MVP layout adapter', () => {
+  it('round-trips odd-millimetre widths without shifting shared edges', () => {
+    const plan: LayoutPlan = {
+      plot: { width_m: 12, depth_m: 15, facing: 'east' },
+      rooms: [{ id: 'corridor', type: 'corridor', label: 'Corridor', x: 5.212, y: 0, w: 1.553, h: 15, rotation: 0, floor: 0 }],
+      walls: [], doors: [],
+    }
+    const canvas = layoutPlanToCanvas(plan)
+    const result = canvasObjectsToLayoutPlan(canvas.rooms, { x: 0, z: 0, w: 12, d: 15 }, 'east')
+    expect(result.rooms).toEqual(plan.rooms)
+  })
   it('converts NW room boxes into bounded canvas centers', () => {
     const result = layoutPlanToCanvas(layout, { requirements })
     const floor = result.floors?.[0]

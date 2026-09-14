@@ -1,4 +1,5 @@
-import { type RefObject } from 'react'
+import { useEffect, type RefObject } from 'react'
+import { useThree } from '@react-three/fiber'
 import { OrbitControls, Grid, Html, Line } from '@react-three/drei'
 import * as THREE from 'three'
 import { CanvasViewMode, useCanvasStore } from '../../store/canvasStore'
@@ -7,15 +8,20 @@ import { edgeCardinals, parseOrientation, type ScreenEdge } from './orientationM
 
 interface OrbitHandle {
   enabled: boolean
+  target?: THREE.Vector3
+  update?: () => void
 }
 
 interface SceneProps {
   orbitRef: RefObject<OrbitHandle>
   readOnly?: boolean
   viewMode?: CanvasViewMode
+  modelStage?: boolean
 }
 
-export function Scene({ orbitRef, readOnly = false, viewMode = '3d' }: SceneProps) {
+export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage = false }: SceneProps) {
+  const camera = useThree((s) => s.camera)
+  const viewportSize = useThree((s) => s.size)
   const floors = useCanvasStore((s) => s.floors)
   const selectedFloor = useCanvasStore((s) => s.selectedFloor)
   const measurePoints = useCanvasStore((s) => s.measurePoints)
@@ -32,9 +38,23 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d' }: SceneProp
   // Floor slab: thin in plan view, thicker in 3D so multi-floor separation is visible
   const slabHeight = isPlanView ? 0.06 : 0.45
   const isMultiFloor = floors.length > 1
+  // Frame the active level on entry; editing a room must not reset the camera.
+  const footprint = visibleFloors[0]?.footprint
+  const framingKey = `${selectedFloor}:${viewMode}:${modelStage}:${footprint?.w ?? 0}:${footprint?.d ?? 0}`
+  useEffect(() => {
+    if (!footprint) return
+    const target = new THREE.Vector3(footprint.x + footprint.w / 2, visibleFloors[0]?.elevation ?? 0, footprint.z + footprint.d / 2)
+    const portraitScale = Math.max(1, 0.95 * viewportSize.height / Math.max(viewportSize.width, 1))
+    const distance = Math.max(footprint.w, footprint.d, 8) * 1.15 * portraitScale
+    camera.position.copy(target).add(isPlanView ? new THREE.Vector3(0, distance * 1.7, 0.01) : new THREE.Vector3(distance * 0.8, distance, distance * 0.8))
+    camera.lookAt(target)
+    orbitRef.current?.target?.copy(target)
+    orbitRef.current?.update?.()
+  }, [framingKey, camera, viewportSize.width, viewportSize.height])
 
   // Distinct floor slab colours so stacked floors are visually separable
   const floorSlabColor = (level: number) => {
+    if (modelStage) return '#e8e5dc'
     if (isPlanView) return '#26282D'
     const palette = ['#2E2E2F', '#343435', '#3A3A3B', '#404041']
     return palette[level % palette.length]

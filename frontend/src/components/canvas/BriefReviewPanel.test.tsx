@@ -70,7 +70,7 @@ describe('BriefReviewPanel', () => {
     expect(onClarify).toHaveBeenCalledWith(['three', 'two'], '')
   })
 
-  it('explains when capability-safe fallback selection is active', () => {
+  it('keeps implementation details out of the brief review', () => {
     render(
       <BriefReviewPanel
         review={{ ...review, optional_missing: [] }}
@@ -82,7 +82,8 @@ describe('BriefReviewPanel', () => {
       />,
     )
 
-    expect(screen.getByText(/established deterministic engine/)).toBeInTheDocument()
+    expect(screen.getByText(/You can add rooms or change requirements/)).toBeInTheDocument()
+    expect(screen.queryByText(/deterministic engine/)).not.toBeInTheDocument()
   })
   it('passes free-text additional requirements through generation', async () => {
     const onGenerate = vi.fn()
@@ -102,7 +103,7 @@ describe('BriefReviewPanel', () => {
       screen.getByLabelText('Additional requirements'),
       'one more study and a garage',
     )
-    await user.click(screen.getByRole('button', { name: 'Generate with defaults' }))
+    await user.click(screen.getByRole('button', { name: 'Update brief & review' }))
     expect(onGenerate).toHaveBeenCalledWith(true, 'one more study and a garage')
   })
 })

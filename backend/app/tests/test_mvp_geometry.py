@@ -25,6 +25,12 @@ def test_real_overlap_detected():
     assert a.overlaps(b)
 
 
+def test_shared_edge_honours_one_millimetre_inclusive_tolerance():
+    a = Rect(0, 0, 5.212, 3)
+    assert a.shared_edge(Rect(5.213, 0, 2, 3)) is not None
+    assert a.shared_edge(Rect(5.214, 0, 2, 3)) is None
+
+
 def test_corner_contact_is_not_a_shared_edge():
     a = Rect(0, 0, 3, 3)
     b = Rect(3, 3, 3, 3)  # touches only at the corner point (3,3)

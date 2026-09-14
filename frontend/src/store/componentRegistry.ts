@@ -345,7 +345,11 @@ export function clampComponentSize(
   size: ComponentSize,
   fallback: ComponentSize = COMPONENT_REGISTRY[type].defaultSize,
 ): ComponentSize {
-  const min = COMPONENT_REGISTRY[type].minSize
+  const baseMin = COMPONENT_REGISTRY[type].minSize
+  // Generated walls/openings can encode their long axis as depth instead of
+  // width. Keep their thin axis thin when loading or editing those records.
+  const vertical = ['wall', 'door', 'window'].includes(type) && size.w > 0 && size.d > size.w
+  const min = vertical ? { w: baseMin.d, h: baseMin.h, d: baseMin.w } : baseMin
   const finite = (value: number, fallbackValue: number, minValue: number) => {
     if (!Number.isFinite(value)) return Math.max(minValue, fallbackValue)
     return Math.max(minValue, value)

@@ -70,7 +70,7 @@ export function BottomStatusBar() {
   return (
     <div className="absolute inset-x-0 bottom-0 z-30 flex h-10 items-center justify-between overflow-hidden border-t border-ink/10 bg-[#18191a]/97 font-mono text-[9px] text-muted backdrop-blur">
       <div className="flex h-full min-w-0 items-center">
-        <Segment>
+        <Segment className="hidden sm:flex">
           <span className="mr-1.5 text-muted-light">Scale</span>
           <span className="text-ink">1:100</span>
         </Segment>

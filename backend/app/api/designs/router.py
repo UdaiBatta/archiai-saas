@@ -271,7 +271,9 @@ async def refine(
             ),
         )
 
-    new_layout, summary, changes = apply_refinement_with_changes(design.layout_json, ops)
+    source_layout = request.current_layout if request.current_layout is not None else design.layout_json
+    source_layout = {k: v for k, v in source_layout.items() if k not in ("designId", "designVersionId")}
+    new_layout, summary, changes = apply_refinement_with_changes(source_layout, ops)
     if not summary:
         raise HTTPException(
             status_code=422, detail="No matching rooms found for that change."

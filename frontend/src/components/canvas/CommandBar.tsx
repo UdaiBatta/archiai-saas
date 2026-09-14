@@ -149,7 +149,7 @@ export function CommandBar({
   )
 
   const paramsRow = mode === 'generate' && showParams && (
-    <div className="flex gap-3 items-end text-xs text-muted">
+    <div className="flex flex-wrap gap-3 items-end text-xs text-muted">
       <label className="flex flex-col gap-1">
         Plot width (m)
         <input
@@ -244,14 +244,14 @@ export function CommandBar({
             <path d="M12 3l2.2 5.3L20 9l-4 3.7L17 18l-5-2.8L7 18l1-5.3L4 9l5.8-.7z" />
           </svg>
           <h1 className="text-2xl font-extrabold tracking-tight text-ink">
-            What should we build?
+            Let's shape your <span className="text-accent-bright">space.</span>
           </h1>
           <p className="max-w-md text-sm leading-relaxed text-muted">
-            Describe your building — the engine drafts an editable 2D plan and 3D model, then you refine it.
+            Start with an idea. Review the brief, shape your rooms, then bring the layout into 3D.
           </p>
         </div>
         <div className="rounded-2xl border border-ink/10 bg-graphite-800/95 p-4 shadow-[0_22px_60px_rgba(0,0,0,0.22)] backdrop-blur motion-safe:animate-fade-up">
-          <div className="mb-2 flex justify-center">{tablist}</div>
+          <div className="mb-3 flex items-center justify-between"><span className="text-[10px] uppercase tracking-[0.18em] text-muted-light">01 · Design brief</span><button type="button" onClick={() => setShowParams(!showParams)} className="text-xs text-muted">{showParams ? 'Hide plot settings' : 'Plot settings'}</button></div>
           {paramsRow && <div className="mb-2 flex justify-center">{paramsRow}</div>}
           <textarea
             aria-label="Layout prompt"
@@ -274,7 +274,7 @@ export function CommandBar({
                   <circle cx="12" cy="12" r="9" />
                   <path d="M12 8v4M12 16h.01" />
                 </svg>
-                AI drafts a starting point — refine it after.
+                Your brief stays editable.
               </div>
               <button
                 aria-busy={generating}
@@ -306,12 +306,12 @@ export function CommandBar({
   }
 
   return (
-    <div className="absolute bottom-14 left-1/2 z-20 flex w-[min(46rem,calc(100%-8rem))] -translate-x-1/2 flex-col gap-2 rounded-xl border border-ink/10 bg-graphite-850/96 p-2 shadow-[0_18px_50px_rgba(0,0,0,0.26)] backdrop-blur">
-      <div className="flex items-center gap-2">
+    <div className="absolute bottom-10 left-1/2 z-20 flex w-[calc(100%-1.5rem)] max-w-2xl -translate-x-1/2 flex-col gap-2 rounded-xl border border-ink/10 bg-graphite-850/95 p-2 shadow-[0_18px_50px_rgba(0,0,0,0.26)] backdrop-blur">
+      <div className="flex flex-wrap items-center gap-2">
         {tablist}
         <textarea
           aria-label="Layout prompt"
-          className="min-w-0 flex-1 resize-none rounded-md border border-ink/10 bg-graphite-800 px-3 py-2 text-xs text-ink placeholder:text-muted-light focus:outline-none focus:ring-1 focus:ring-accent-bright"
+          className="min-w-[10rem] flex-1 resize-none rounded-md border border-ink/10 bg-graphite-800 px-3 py-2 text-xs text-ink placeholder:text-muted-light focus:outline-none focus:ring-1 focus:ring-accent-bright"
           rows={1}
           placeholder={
             mode === 'refine'

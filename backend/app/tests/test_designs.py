@@ -262,6 +262,9 @@ async def test_all_supported_component_types_survive_save_latest_version_and_sha
             "rooms": layout["rooms"],
         }
     ]
+    for room in layout["rooms"]:
+        if room["objectType"] in ("door", "window"):
+            room["hostWallId"] = "wall-1"
 
     saved = await client.put(
         f"/api/design/{layout['designId']}",
@@ -293,6 +296,20 @@ async def test_all_supported_component_types_survive_save_latest_version_and_sha
     shared = await client.get(f"/api/share/{share.json()['token']}")
     assert shared.status_code == 200
     assert [room["objectType"] for room in shared.json()["layout"]["rooms"]] == supported_types
+
+    for response_layout in (saved.json(), latest.json(), version.json(), shared.json()["layout"]):
+        for objects in (response_layout["rooms"], response_layout["floors"][0]["rooms"]):
+            openings = [room for room in objects if room["objectType"] in ("door", "window")]
+            assert len(openings) == 2
+            assert all(room["hostWallId"] == "wall-1" for room in openings)
+
+    refined = await client.post(
+        "/api/design/refine",
+        json={"designId": layout["designId"], "prompt": "add a study", "currentLayout": latest.json()},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert refined.status_code == 200, refined.text
+    assert all(room["hostWallId"] == "wall-1" for room in refined.json()["rooms"] if room["objectType"] in ("door", "window"))
 
 
 async def test_refine_creates_new_version_and_logs_activity(client: AsyncClient):
@@ -347,6 +364,36 @@ async def test_refine_creates_new_version_and_logs_activity(client: AsyncClient)
 
         activity_actions = await session.scalars(select(ActivityLog.action))
         assert "design.refined" in activity_actions.all()
+
+
+async def test_refine_uses_current_unsaved_geometry(client: AsyncClient):
+    token = await _register_and_token(client, "refine-current@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    project = await client.post("/api/projects", json={"title": "Current geometry"}, headers=headers)
+    generated = await client.post("/api/design/generate", json={"projectId": project.json()["id"], "prompt": "2 bedroom apartment with kitchen"}, headers=headers)
+    current = generated.json()
+    design_id = current["designId"]
+    moved = next(room for room in current["rooms"] if room["roomType"] == "bedroom")
+    moved["position"]["x"] += 0.5
+    moved_id = moved["id"]
+    for floor in current.get("floors", []):
+        for room in floor.get("rooms", []):
+            if room["id"] == moved_id:
+                room["position"] = moved["position"].copy()
+
+    response = await client.post("/api/design/refine", json={"designId": design_id, "prompt": "add a study", "currentLayout": current}, headers=headers)
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert next(room for room in result["rooms"] if room["id"] == moved_id)["position"] == moved["position"]
+    assert result["designId"] == design_id
+    latest = await client.get(f"/api/design/project/{project.json()['id']}/latest", headers=headers)
+    assert next(room for room in latest.json()["rooms"] if room["id"] == moved_id)["position"] == moved["position"]
+
+
+async def test_refine_rejects_malformed_current_geometry(client: AsyncClient):
+    token = await _register_and_token(client, "refine-malformed@example.com")
+    response = await client.post("/api/design/refine", json={"designId": "missing", "prompt": "add a study", "currentLayout": {"rooms": "invalid"}}, headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 422
 
 
 async def test_refine_unparsable_prompt_returns_422(client: AsyncClient):

@@ -65,8 +65,19 @@ class DesignDraftSaveRequest(BaseModel):
 class RefineRequest(BaseModel):
     design_id: str = Field(..., alias="designId")
     prompt: str = Field(..., min_length=3, max_length=MAX_PROMPT_LENGTH)
+    current_layout: dict[str, Any] | None = Field(default=None, alias="currentLayout")
 
     model_config = {"populate_by_name": True}
+
+    @field_validator("current_layout")
+    @classmethod
+    def check_current_layout(cls, value):
+        if value is not None:
+            _validate_layout_size(value)
+            # Use the same canvas contract as generation/save responses. Do not
+            # let malformed client snapshots reach the refinement engine.
+            GenerateResponse.model_validate(value)
+        return value
 
 
 class RoomPosition(BaseModel):
@@ -95,6 +106,9 @@ class RoomResponse(BaseModel):
     floorId: str | None = None
     floorLevel: int | None = None
     zone: str | None = None
+    # Hosted openings must retain their wall relationship through save/load,
+    # version restore, refinement and share responses.
+    hostWallId: str | None = None
     position: RoomPosition
     size: RoomSize
     rotation: RoomRotation | None = None

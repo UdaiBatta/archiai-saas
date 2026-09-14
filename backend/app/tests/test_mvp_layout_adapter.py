@@ -6,6 +6,8 @@ from app.schemas.layout_plan import LayoutPlan
 from app.schemas.requirements import RequirementsSpec
 from app.services.layout_adapter import layout_plan_to_canvas
 from app.services.layout_engine import generate_plan
+from app.services.layout_engine.engine import rebuild_derived_geometry
+from app.services.quality.hard_constraints import validate
 
 
 def test_canvas_footprint_uses_min_corner_and_contains_converted_rooms():
@@ -93,6 +95,36 @@ def test_canvas_metadata_preserves_explicit_vastu_opt_in_only():
 
     assert default_canvas["metadata"]["mvpVastuEnabled"] is False
     assert vastu_canvas["metadata"]["mvpVastuEnabled"] is True
+
+
+def test_odd_millimetre_room_width_preserves_its_origin_after_conversion():
+    plan = LayoutPlan.model_validate({
+        "plot": {"width_m": 12, "depth_m": 15, "facing": "east"},
+        "rooms": [{"id": "r1", "type": "corridor", "label": "Corridor", "x": 5.212, "y": 0, "w": 1.553, "h": 15, "rotation": 0}],
+        "walls": [], "doors": [],
+    })
+    room = layout_plan_to_canvas(plan)["rooms"][0]
+    assert round(room["position"]["x"] - room["size"]["w"] / 2, 3) == 5.212
+
+
+def test_saved_millimetre_boundary_drift_does_not_disconnect_the_corridor():
+    # Former independently rounded centres produced 5.213 + 1.553 = 6.766
+    # beside the public band's 6.765 edge. That is within the existing 1 mm
+    # policy; binary float noise must not turn it into a disconnected plan.
+    spec = RequirementsSpec.model_validate({"plot": {"width_m": 12, "depth_m": 15}, "facing": "east", "rooms": [{"type": "bedroom", "count": 2}, {"type": "bathroom", "count": 2}, {"type": "kitchen", "count": 1}, {"type": "living_room", "count": 1}]})
+    rectangles = [
+        ("kitchen", 6.765, 0, 5.235, 4.821), ("living_room", 6.765, 4.821, 5.235, 8.572),
+        ("entry", 6.765, 13.393, 5.235, 1.607), ("corridor", 5.213, 0, 1.553, 15),
+        ("bedroom", 0, 0, 5.212, 5.25), ("bathroom", 0, 5.25, 5.212, 2.25),
+        ("bathroom", 0, 7.5, 5.212, 2.25), ("bedroom", 0, 9.75, 5.212, 5.25),
+    ]
+    plan = LayoutPlan.model_validate({
+        "plot": {"width_m": 12, "depth_m": 15, "facing": "east"},
+        "rooms": [{"id": f"r{i}", "type": kind, "label": kind, "x": x, "y": y, "w": w, "h": h, "rotation": 0} for i, (kind, x, y, w, h) in enumerate(rectangles)],
+        "walls": [], "doors": [],
+    })
+    rebuilt = rebuild_derived_geometry(plan, spec)
+    assert not [issue for issue in validate(rebuilt) if issue.code == "unreachable"]
 
 
 def test_multi_floor_plan_maps_objects_to_existing_canvas_levels():

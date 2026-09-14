@@ -31,11 +31,11 @@ export function roomVisualTreatment(
           : definition.renderingTreatment === 'slab'
             ? 0.58
             : selected
-              ? 0.96
+              ? 0.55
               : planView && definition.category === 'space'
                 ? 0.68
                 : definition.category === 'space'
-                  ? 0.84
+                  ? 0.3
                   : 0.78
   const opacity = invalid ? Math.max(baseOpacity, 0.9) : baseOpacity
 

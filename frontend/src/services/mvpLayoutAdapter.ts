@@ -40,8 +40,9 @@ function round3(value: number) {
 
 function boundedCenter(origin: number, span: number, plotSpan: number) {
   const half = span / 2
-  const rounded = round3(origin + half)
-  return Math.min(plotSpan - half, Math.max(half, rounded))
+  // Edges are millimetre-aligned; odd-millimetre widths need a half-mm
+  // centre. Rounding that centre independently shifts shared room edges.
+  return Math.min(plotSpan - half, Math.max(half, origin + half))
 }
 
 function isPlanRoomType(value: unknown): value is string {

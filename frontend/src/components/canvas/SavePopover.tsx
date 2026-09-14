@@ -56,13 +56,14 @@ export function SavePopover({
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
+        aria-label={notGenerated ? 'Not generated yet' : statusLabel(saveStatus, lastSavedAt)}
         className="flex items-center gap-2 rounded-lg border border-ink/10 bg-graphite-800/70 px-3 py-1.5 text-xs font-semibold text-ink hover:bg-graphite-800/90"
       >
         <span
           aria-hidden="true"
           className={`h-2 w-2 rounded-full ${notGenerated ? 'border border-muted-light bg-transparent' : STATUS_DOT[saveStatus]}`}
         />
-        {notGenerated ? 'Not generated yet' : statusLabel(saveStatus, lastSavedAt)}
+        <span className="max-w-12 truncate sm:max-w-none">{notGenerated ? 'Not generated yet' : statusLabel(saveStatus, lastSavedAt)}</span>
       </button>
 
       {open && (

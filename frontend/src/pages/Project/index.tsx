@@ -11,12 +11,10 @@ import { RightPanel } from '../../components/canvas/RightPanel'
 import { EditorTopBar } from '../../components/canvas/EditorTopBar'
 import { ViewModeSwitcher } from '../../components/canvas/ViewModeSwitcher'
 import { BottomStatusBar } from '../../components/canvas/BottomStatusBar'
-import { ThreeDContextCard } from '../../components/canvas/ThreeDContextCard'
 import { ToolRail } from '../../components/canvas/ToolRail'
 import { MeasurePanel } from '../../components/canvas/MeasurePanel'
 import { SelectionGizmo } from '../../components/canvas/SelectionGizmo'
-import { ProgramPanel } from '../../components/canvas/ProgramPanel'
-import { InsightsStrip } from '../../components/canvas/InsightsStrip'
+import { WorkspacePanel } from '../../components/canvas/WorkspacePanel'
 import { CommandBar } from '../../components/canvas/CommandBar'
 import { BriefReviewPanel } from '../../components/canvas/BriefReviewPanel'
 import { DraftToast } from '../../components/canvas/DraftToast'
@@ -261,6 +259,10 @@ export default function ProjectPage() {
   const [floorsOverride, setFloorsOverride] = useState('')
   const [orientation, setOrientation] = useState<'' | 'N' | 'S' | 'E' | 'W'>('')
   const [alternatives, setAlternatives] = useState<LayoutOption[]>([])
+  const [activeOption, setActiveOption] = useState(0)
+  const [reviewChanges, setReviewChanges] = useState(false)
+  const [panelOpen, setPanelOpen] = useState(false)
+  const modelStage = searchParams.get('stage') === 'model'
   const [generating, setGenerating] = useState(false)
   const [generationStage, setGenerationStage] = useState<
     'idle' | 'extracting' | 'generating'
@@ -295,9 +297,9 @@ export default function ProjectPage() {
   const [exportError, setExportError] = useState<string | null>(null)
   const designId = useCanvasStore((s) => s.designId)
   const roomCount = useCanvasStore((s) => s.rooms.length)
+  const selectedId = useCanvasStore((s) => s.selectedId)
   const activityCount = useCanvasStore((s) => s.activityLog.length)
   const viewMode = useCanvasStore((s) => s.viewMode)
-  const selectedId = useCanvasStore((s) => s.selectedId)
   const loadLayout = useCanvasStore((s) => s.loadLayout)
   const clearLayout = useCanvasStore((s) => s.clearLayout)
   const serializeLayout = useCanvasStore((s) => s.serializeLayout)
@@ -308,6 +310,7 @@ export default function ProjectPage() {
   useEffect(
     () => () => {
       refinementRunRef.current += 1
+      generateAbortRef.current?.abort()
     },
     [],
   )
@@ -412,6 +415,7 @@ export default function ProjectPage() {
     setLayoutSaveError(null)
     try {
       const result = await extractBrief(sourcePrompt, controller.signal)
+      if (controller.signal.aborted) return
       setBriefReview(reviewWithOverrides(result, currentGenerationOverrides()))
       setReviewPrompt(sourcePrompt)
     } catch (err) {
@@ -425,9 +429,11 @@ export default function ProjectPage() {
         )
       }
     } finally {
-      if (generateAbortRef.current === controller) generateAbortRef.current = null
-      setGenerating(false)
-      setGenerationStage('idle')
+      if (generateAbortRef.current === controller) {
+        generateAbortRef.current = null
+        setGenerating(false)
+        setGenerationStage('idle')
+      }
     }
   }
 
@@ -446,12 +452,14 @@ export default function ProjectPage() {
     const currentLayout = serializeLayout()
     const refinementRun = ++refinementRunRef.current
     try {
-      const result = await refineLayout(designId, sourcePrompt)
+      const result = await refineLayout(designId, sourcePrompt, currentLayout)
+      if (refinementRun !== refinementRunRef.current) return
       await playRefinement(currentLayout, result, refinementRun)
       setDraftToRecover(null)
       setRecoveredDraftAvailable(false)
       setRefinementSummary(result.refinementSummary)
       setAlternatives([])
+      setReviewChanges(true)
       setPrompt('')
       setGenerationNotice(null)
       refreshThumbnailAfterGenerate()
@@ -483,6 +491,8 @@ export default function ProjectPage() {
     }
     const activeReview = briefReview
     const sourcePrompt = reviewPrompt || prompt.trim()
+    const controller = new AbortController()
+    generateAbortRef.current = controller
     setGenerating(true)
     setGenerationStage('generating')
     setGenerateError(null)
@@ -494,9 +504,11 @@ export default function ProjectPage() {
           useDefaults,
           projectId: id,
           prompt: sourcePrompt,
-        })
-        loadLayout(generateResponseToCanvas(result, sourcePrompt))
-        setAlternatives((result.alternatives ?? []) as LayoutOption[])
+        }, controller.signal)
+        if (controller.signal.aborted) return
+        const initialLayout = generateResponseToCanvas(result, sourcePrompt)
+        loadLayout(initialLayout)
+        setAlternatives([initialLayout as LayoutOption, ...((result.alternatives ?? []) as LayoutOption[])])
         setGenerationNotice(
           result.defaults_applied.length > 0
             ? `Assumed: ${result.defaults_applied.join(', ')}`
@@ -516,11 +528,17 @@ export default function ProjectPage() {
           sourcePrompt,
           id,
           hasParams ? designParams : undefined,
+          controller.signal,
         )
+        if (controller.signal.aborted) return
         loadLayout(result)
-        setAlternatives(result.alternatives ?? [])
+        setAlternatives([result, ...(result.alternatives ?? [])])
         setGenerationNotice(null)
       }
+      setActiveOption(0)
+      setReviewChanges(false)
+      useCanvasStore.getState().setViewMode('floor_plan')
+      setSearchParams((current) => { const next = new URLSearchParams(current); next.delete('stage'); next.set('view', '2d'); return next }, { replace: true })
       refreshThumbnailAfterGenerate()
       setDraftToRecover(null)
       setRecoveredDraftAvailable(false)
@@ -529,6 +547,7 @@ export default function ProjectPage() {
       setReviewPrompt('')
       setPrompt('')
     } catch (err) {
+      if (axios.isCancel(err) || controller.signal.aborted) return
       const clarification = clarificationFromError(err)
       if (clarification) {
         setBriefReview({
@@ -544,8 +563,11 @@ export default function ProjectPage() {
         )
       }
     } finally {
-      setGenerating(false)
-      setGenerationStage('idle')
+      if (generateAbortRef.current === controller) {
+        generateAbortRef.current = null
+        setGenerating(false)
+        setGenerationStage('idle')
+      }
     }
   }
 
@@ -554,9 +576,9 @@ export default function ProjectPage() {
     const additions = briefReview.questions.map(
       (question, index) => `${question}\nAnswer: ${answers[index]}`,
     )
+    if (extraNotes?.trim()) additions.push('Additional requirements: ' + extraNotes.trim())
     const clarifiedPrompt =
       `${reviewPrompt || prompt.trim()}\n\nAdditional details:\n${additions.join('\n')}`
-    if (extraNotes?.trim()) additions.push('Additional requirements: ' + extraNotes.trim())
     setPrompt(clarifiedPrompt)
     setBriefReview(null)
     await requestBriefReview(clarifiedPrompt)
@@ -585,13 +607,42 @@ export default function ProjectPage() {
   }
 
   const handlePickOption = (option: LayoutOption) => {
-    const { designId: currentDesignId, designVersionId: currentDesignVersionId } = useCanvasStore.getState()
+    const { designId: currentDesignId, designVersionId: currentDesignVersionId, viewMode: currentView, hasUnsavedChanges } = useCanvasStore.getState()
+    if (hasUnsavedChanges && !window.confirm('Switch options and replace your unsaved layout edits? Save first if you want to keep them.')) return
     loadLayout({
       ...option,
       designId: currentDesignId ?? undefined,
       designVersionId: currentDesignVersionId ?? undefined,
     })
     useCanvasStore.getState().markDirty()
+    useCanvasStore.getState().setViewMode(currentView)
+    setActiveOption(alternatives.indexOf(option))
+  }
+
+  const enterModelStage = () => {
+    useCanvasStore.getState().resetInteraction()
+    useCanvasStore.getState().setPlacementMode(null)
+    useCanvasStore.getState().setViewMode('3d')
+    setReviewChanges(false)
+    setSearchParams((current) => { const next = new URLSearchParams(current); next.set('stage', 'model'); next.set('view', '3d'); return next }, { replace: true })
+  }
+
+  const leaveModelStage = () => {
+    useCanvasStore.getState().setPlacementMode(null)
+    useCanvasStore.getState().setViewMode('floor_plan')
+    setSearchParams((current) => { const next = new URLSearchParams(current); next.delete('stage'); next.set('view', '2d'); return next }, { replace: true })
+  }
+
+  const openReview = (value: boolean) => {
+    setReviewChanges(value)
+    setPanelOpen(true)
+  }
+
+  const focusRefinement = () => {
+    if (modelStage) leaveModelStage()
+    handleModeChange('refine')
+    setPanelOpen(false)
+    requestAnimationFrame(() => document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Layout prompt"]')?.focus())
   }
 
   const handleSaveLayout = async () => {
@@ -696,7 +747,7 @@ export default function ProjectPage() {
 
   // Adopt ?view= from the URL (initial load, back/forward navigation).
   useEffect(() => {
-    const mode = VIEW_PARAM_TO_MODE[searchParams.get('view') ?? '']
+    const mode = searchParams.get('stage') === 'model' ? '3d' : VIEW_PARAM_TO_MODE[searchParams.get('view') ?? '']
     if (mode && mode !== useCanvasStore.getState().viewMode) {
       useCanvasStore.getState().setViewMode(mode)
     }
@@ -874,9 +925,10 @@ export default function ProjectPage() {
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Canvas + Inspector row */}
         <div className="flex-1 flex overflow-hidden">
-          <div className="relative flex-1 h-full">
-            {viewMode === '3d' ? (
-              <Canvas3D className="h-full" readOnly={Boolean(refinementPlayback)} />
+          <div className="relative h-full min-w-0 flex-1">
+            {roomCount === 0 ? <><Canvas3D className="h-full" readOnly briefBackground /><div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_45%,rgba(25,27,32,0.75)_0%,rgba(25,27,32,0.1)_70%)]" /></> :
+            viewMode === '3d' ? (
+              <Canvas3D className="h-full" readOnly={generating} modelStage={modelStage} />
             ) : (
               <>
                 {/* Hidden WebGL canvas keeps the thumbnail/PNG/PDF capture
@@ -886,8 +938,8 @@ export default function ProjectPage() {
                 </div>
                 {viewMode === 'floor_plan' && (
                   <Plan2D
-                    className="h-full pb-10 pt-16"
-                    readOnly={Boolean(refinementPlayback)}
+                    className="h-full pb-48 pt-28"
+                    readOnly={generating}
                   />
                 )}
                 {viewMode === 'zoning' && <ZoningView className="h-full" />}
@@ -955,27 +1007,22 @@ export default function ProjectPage() {
                   setBriefReview(null)
                   setGenerateError(null)
                 }}
+                onStop={cancelGeneration}
               />
             )}
 
-            <div className="absolute left-1/2 top-2 z-30 -translate-x-1/2">
-              <ViewModeSwitcher />
-            </div>
-
-            <ToolRail />
-            {(viewMode === 'floor_plan' || viewMode === '3d') && <MeasurePanel />}
-            {(viewMode === 'floor_plan' || viewMode === '3d') && <SelectionGizmo />}
-            {viewMode !== '3d' && (
-              <div className="absolute right-4 top-16 z-10">
-                <ThreeDContextCard />
+            {roomCount > 0 && <>
+              <div className="absolute inset-x-3 top-16 z-30 flex flex-wrap items-center justify-between gap-2">
+                {modelStage ? <div className="flex items-center gap-3"><button type="button" onClick={leaveModelStage} disabled={generating} className="rounded-lg border border-ink/15 bg-graphite-800/95 px-3 py-2 text-xs text-ink">← Back to layout</button><span className="text-xs font-semibold text-ink">3D model</span></div> : <ViewModeSwitcher disabled={generating} />}
+                <div className="flex items-center gap-2">
+                  {!modelStage && alternatives.length > 0 && <select aria-label="Layout option" disabled={generating} value={activeOption} onChange={(event) => handlePickOption(alternatives[Number(event.target.value)])} className="max-w-36 rounded-lg border border-ink/10 bg-graphite-800 px-2 py-2 text-xs text-ink">{alternatives.map((_, index) => <option key={index} value={index}>Option {index + 1}{index === 0 ? ' · recommended' : ''}</option>)}</select>}
+                  <button type="button" aria-expanded={panelOpen} onClick={() => setPanelOpen(!panelOpen)} className="rounded-lg border border-ink/15 bg-graphite-800 px-3 py-2 text-xs text-ink lg:hidden">Rooms & details</button>
+                </div>
               </div>
-            )}
-            {!selectedId && viewMode === '3d' && (
-              <ProgramPanel alternatives={alternatives} onPickAlternative={handlePickOption} />
-            )}
-            {viewMode === '3d' && (
-              <InsightsStrip alternatives={alternatives} onPickAlternative={handlePickOption} />
-            )}
+              {!generating && <ToolRail modelStage={modelStage} />}
+              {!generating && (viewMode === 'floor_plan' || viewMode === '3d') && <MeasurePanel />}
+              {!generating && (viewMode === 'floor_plan' || viewMode === '3d') && <SelectionGizmo />}
+            </>}
 
             {refinementPlayback && (
               <RefinementPlaybackPanel {...refinementPlayback} onSkip={handleSkipPlayback} />
@@ -985,7 +1032,7 @@ export default function ProjectPage() {
               <div
                 role="status"
                 aria-live="polite"
-                className="absolute left-1/2 top-16 z-20 flex -translate-x-1/2 items-center gap-3 rounded-full border border-ok/30 bg-graphite-800/95 backdrop-blur px-4 py-2 shadow-sm"
+                className="absolute left-1/2 top-28 z-20 flex w-max max-w-[90%] -translate-x-1/2 items-center gap-3 rounded-xl border border-ok/30 bg-graphite-800/95 backdrop-blur px-4 py-2 shadow-sm"
               >
                 <span className="text-xs font-medium text-ok">{refinementSummary}</span>
                 <button
@@ -999,11 +1046,11 @@ export default function ProjectPage() {
               </div>
             )}
 
-            {activityCount > 0 && !refinementSummary && !generationNotice && !activityOpen && (
+            {activityCount > 0 && !selectedId && !refinementSummary && !generationNotice && !activityOpen && (
               <button
                 type="button"
-                onClick={() => setActivityOpen(true)}
-                className="absolute left-1/2 top-16 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-ink/15 bg-graphite-800/95 px-4 py-2 text-xs font-medium text-muted shadow-sm backdrop-blur hover:border-accent/60 hover:text-ink"
+                onClick={() => openReview(true)}
+                className="absolute left-1/2 top-28 z-20 flex w-max max-w-[90%] -translate-x-1/2 items-center gap-2 rounded-full border border-ink/15 bg-graphite-800/95 px-4 py-2 text-xs font-medium text-muted shadow-sm backdrop-blur hover:border-accent/60 hover:text-ink"
               >
                 <span className="font-mono tabular-nums text-accent-bright">{activityCount}</span>
                 {activityCount === 1 ? 'change made this session' : 'changes made this session'}
@@ -1015,7 +1062,7 @@ export default function ProjectPage() {
               <div
                 role="status"
                 aria-live="polite"
-                className="absolute left-1/2 top-16 z-20 flex -translate-x-1/2 items-center gap-3 rounded-full border border-warn/30 bg-graphite-800/95 px-4 py-2 shadow-sm backdrop-blur"
+                className="absolute left-1/2 top-28 z-20 flex w-max max-w-[90%] -translate-x-1/2 items-center gap-3 rounded-xl border border-warn/30 bg-graphite-800/95 px-4 py-2 shadow-sm backdrop-blur"
               >
                 <span className="text-xs font-medium text-warn">{generationNotice}</span>
                 <button
@@ -1029,7 +1076,7 @@ export default function ProjectPage() {
               </div>
             )}
 
-            <CommandBar
+            {(!modelStage || roomCount === 0) && <CommandBar
               roomCount={roomCount}
               mode={mode}
               onModeChange={handleModeChange}
@@ -1046,7 +1093,7 @@ export default function ProjectPage() {
               setPrompt={handlePromptChange}
               generating={generating}
               generationStage={generationStage}
-              onCancel={cancelGeneration}
+              onCancel={mode === 'refine' ? undefined : cancelGeneration}
               busyLabel={
                 generationStage === 'extracting'
                   ? 'Understanding...'
@@ -1058,11 +1105,11 @@ export default function ProjectPage() {
               }
               generateError={generateError}
               onSubmit={handleSubmit}
-            />
+            />}
 
-            <BottomStatusBar />
+            {roomCount > 0 && <BottomStatusBar />}
           </div>
-          <RightPanel />
+          {roomCount > 0 && (viewMode === 'zoning' || viewMode === 'graph' ? <RightPanel onCreateModel={enterModelStage} open={panelOpen} onClose={() => setPanelOpen(false)} /> : <WorkspacePanel modelStage={modelStage} reviewChanges={reviewChanges} onReviewChanges={openReview} onCreateModel={enterModelStage} onRefine={focusRefinement} open={panelOpen} onClose={() => setPanelOpen(false)} busy={generating} />)}
         </div>
       </main>
 

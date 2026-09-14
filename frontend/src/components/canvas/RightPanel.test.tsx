@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { DEFAULT_FLOOR, useCanvasStore, type Room } from '../../store/canvasStore'
 import { RightPanel } from './RightPanel'
@@ -195,24 +195,15 @@ describe('RightPanel site & orientation', () => {
 })
 
 describe('RightPanel create-3d-model CTA', () => {
-  it('switches to the 3D view on first click, then arms furniture placement', async () => {
+  it('enters the model stage through the project callback without arming furniture', async () => {
     const user = userEvent.setup()
     useCanvasStore.setState({
       rooms: [room({ id: 'r1', label: 'Living Room' })],
     })
-    render(<RightPanel />)
-
-    const cta = screen.getByTestId('create-3d-model')
-    expect(cta).toHaveTextContent('Create 3D Model')
-
-    await user.click(cta)
-    expect(useCanvasStore.getState().viewMode).toBe('3d')
-
-    await user.click(cta)
-    expect(useCanvasStore.getState().placementMode).toBe('furniture')
-    expect(cta).toHaveTextContent('Cancel furniture placement')
-
-    await user.click(cta)
+    const onCreateModel = vi.fn()
+    render(<RightPanel onCreateModel={onCreateModel} />)
+    await user.click(screen.getByTestId('create-3d-model'))
+    expect(onCreateModel).toHaveBeenCalledOnce()
     expect(useCanvasStore.getState().placementMode).toBeNull()
   })
 

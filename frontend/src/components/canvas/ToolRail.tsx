@@ -180,7 +180,7 @@ function componentTool(
   }
 }
 
-export function ToolRail() {
+export function ToolRail({ modelStage = false }: { modelStage?: boolean }) {
   const [hovered, setHovered] = useState<string | null>(null)
   const [moreOpen, setMoreOpen] = useState(false)
   const placementMode = useCanvasStore((s) => s.placementMode)
@@ -218,7 +218,7 @@ export function ToolRail() {
         setMoreOpen(false)
       },
     },
-    ...BEGINNER_COMPONENTS.map((definition) =>
+    ...BEGINNER_COMPONENTS.filter((definition) => modelStage ? definition.type === 'furniture' : definition.type === 'room').map((definition) =>
       componentTool(definition, placementMode, armPlacement),
     ),
     {
@@ -265,13 +265,9 @@ export function ToolRail() {
   return (
     <div
       aria-label="Editor tools"
-      className={
-        labeled
-          ? 'absolute bottom-12 left-2 top-14 z-20 flex w-14 flex-col items-center rounded-lg border border-ink/10 bg-[#1b1c1d]/95 px-1 py-1.5 shadow-xl backdrop-blur'
-          : 'absolute left-4 top-1/2 z-10 flex -translate-y-1/2 flex-col gap-0.5'
-      }
+      className={`absolute ${modelStage ? 'bottom-12' : 'bottom-36 sm:bottom-28'} left-1/2 z-20 flex max-w-[calc(100%-1.5rem)] -translate-x-1/2 items-center rounded-xl border border-ink/10 bg-[#1b1c1d]/95 px-1 py-1.5 shadow-xl backdrop-blur`}
     >
-      <div className={`flex flex-col items-center ${labeled ? 'gap-0.5 overflow-y-auto' : 'gap-0.5'}`}>
+      <div className="flex items-center gap-0.5">
         {primaryTools.map((tool) => (
           <ToolButton
             key={tool.key}
@@ -282,7 +278,7 @@ export function ToolRail() {
           />
         ))}
       </div>
-      <div className={`flex flex-col items-center gap-0.5 ${labeled ? 'mt-auto border-t border-ink/10 pt-1' : ''}`}>
+      <div className="ml-1 flex items-center gap-0.5 border-l border-ink/10 pl-1">
         {historyTools.map((tool) => (
           <ToolButton
             key={tool.key}
@@ -295,8 +291,8 @@ export function ToolRail() {
       </div>
 
       {moreOpen && (
-        <div className="absolute bottom-0 left-16 z-30 w-44 rounded-xl border border-ink/10 bg-graphite-800 p-1.5 shadow-2xl">
-          {PROFESSIONAL_COMPONENTS.map((definition) => (
+        <div className="absolute bottom-16 left-0 z-30 max-h-[50vh] w-48 overflow-y-auto rounded-xl border border-ink/10 bg-graphite-800 p-1.5 shadow-2xl">
+          {[...BEGINNER_COMPONENTS, ...PROFESSIONAL_COMPONENTS].filter((definition) => modelStage ? definition.type !== 'furniture' : definition.type !== 'room').map((definition) => (
             <button
               key={definition.type}
               type="button"

@@ -12,13 +12,16 @@ import { hardViolationRoomIds, parseMvpQuality } from './qualityModel'
 interface Canvas3DProps {
   className?: string
   readOnly?: boolean
+  modelStage?: boolean
+  briefBackground?: boolean
 }
 
-export function Canvas3D({ className, readOnly = false }: Canvas3DProps) {
+export function Canvas3D({ className, readOnly = false, modelStage = false, briefBackground = false }: Canvas3DProps) {
   const orbitRef = useRef<{ enabled: boolean }>(null)
   const rooms = useCanvasStore((s) => s.rooms)
   const selectedFloor = useCanvasStore((s) => s.selectedFloor)
-  const viewMode = useCanvasStore((s) => s.viewMode)
+  const storedViewMode = useCanvasStore((s) => s.viewMode)
+  const viewMode = briefBackground ? '3d' : storedViewMode
   const layoutMetadata = useCanvasStore((s) => s.layoutMetadata)
   const clipboardMessage = useCanvasStore((s) => s.clipboardMessage)
   const clearClipboardMessage = useCanvasStore((s) => s.clearClipboardMessage)
@@ -55,7 +58,8 @@ export function Canvas3D({ className, readOnly = false }: Canvas3DProps) {
       onContextMenu={readOnly ? undefined : (event) => event.preventDefault()}
     >
       <Canvas
-        key={viewMode}
+        key={`${viewMode}:${modelStage}`}
+        frameloop="demand"
         shadows={viewMode === '3d'}
         dpr={[1, 2]}
         camera={camera}
@@ -81,7 +85,7 @@ export function Canvas3D({ className, readOnly = false }: Canvas3DProps) {
               }
         }
       >
-        <Scene orbitRef={orbitRef} readOnly={readOnly} viewMode={viewMode} />
+        <Scene orbitRef={orbitRef} readOnly={readOnly} viewMode={viewMode} modelStage={modelStage} />
         {visibleRooms.map((r) => (
           <RoomMesh
             key={r.id}
@@ -90,14 +94,13 @@ export function Canvas3D({ className, readOnly = false }: Canvas3DProps) {
             readOnly={readOnly}
             viewMode={viewMode}
             invalid={invalidRoomIds.has(r.id)}
+            modelStage={modelStage}
           />
         ))}
       </Canvas>
       {viewMode === '3d' && !readOnly && (
-        <div className="pointer-events-none absolute bottom-36 left-4 max-w-xs rounded-lg border border-ink/10 bg-graphite-800/90 px-3 py-2 text-[11px] font-medium text-muted shadow-lg backdrop-blur">
-          Left click selects · drag selected moves · right drag pans · middle drag
-          orbits. Room blocks can be molded to fit irregular footprints — use the
-          purple corner handles in 3D Edit or the W/D/H fields in the panel.
+        <div className="pointer-events-none absolute bottom-64 left-4 hidden max-w-[12rem] text-[10px] leading-relaxed text-muted-light xl:block">
+          Click to select · drag selected to move<br />Right drag to pan · middle drag to orbit
         </div>
       )}
       {clipboardMessage && (

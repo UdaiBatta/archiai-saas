@@ -185,6 +185,70 @@ beforeEach(() => {
 })
 
 describe('ProjectPage canvas views', () => {
+  beforeEach(() => {
+    vi.mocked(api.get).mockImplementation(async (url: string) => {
+      if (url === '/api/design/project/p1/latest') return { data: SAVED_DESIGN_FIXTURE }
+      throw Object.assign(new Error('not found'), { response: { status: 404 } })
+    })
+  })
+  it('enters the model stage and returns without losing geometry or undo history', async () => {
+    renderProjectPage()
+    const user = userEvent.setup()
+    await screen.findByRole('tab', { name: '2D Plan' })
+    act(() => useCanvasStore.getState().updateRoom(INITIAL_ROOMS[0].id, { label: 'Revised living room' }))
+    const before = useCanvasStore.getState().serializeLayout()
+    const history = useCanvasStore.getState().past
+    await user.click(screen.getByRole('button', { name: 'Create a 3D model →' }))
+    expect(screen.getByText('Model & furniture')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Layout prompt')).not.toBeInTheDocument()
+    expect(useCanvasStore.getState().serializeLayout()).toEqual(before)
+    await user.click(screen.getByRole('button', { name: '+ Add furniture' }))
+    expect(useCanvasStore.getState().placementMode).toBe('furniture')
+    await user.click(screen.getByRole('button', { name: '← Back to layout' }))
+    expect(useCanvasStore.getState().viewMode).toBe('floor_plan')
+    expect(useCanvasStore.getState().placementMode).toBeNull()
+    expect(useCanvasStore.getState().serializeLayout()).toEqual(before)
+    expect(useCanvasStore.getState().past).toEqual(history)
+    expect(useCanvasStore.getState().hasUnsavedChanges).toBe(true)
+  })
+
+  it('reviews actual session edits rather than only server activity', async () => {
+    renderProjectPage()
+    const user = userEvent.setup()
+    await screen.findByRole('tab', { name: '2D Plan' })
+    act(() => useCanvasStore.getState().updateRoom(INITIAL_ROOMS[0].id, { label: 'Lounge' }))
+    await user.click(screen.getByRole('button', { name: /Review & refine/ }))
+    expect(screen.getByRole('list', { name: 'Session changes' })).toHaveTextContent('Lounge')
+    expect(projectService.activity).not.toHaveBeenCalled()
+  })
+
+  it('returns from model review to the editable refinement prompt', async () => {
+    renderProjectPage()
+    const user = userEvent.setup()
+    await screen.findByRole('tab', { name: '2D Plan' })
+    act(() => useCanvasStore.getState().updateRoom(INITIAL_ROOMS[0].id, { label: 'Lounge' }))
+    await user.click(screen.getByRole('button', { name: 'Create a 3D model →' }))
+    await user.click(screen.getByRole('button', { name: /change made this session/ }))
+    await user.click(screen.getByRole('button', { name: 'Describe a refinement' }))
+    expect(screen.getByLabelText('Layout prompt')).toBeInTheDocument()
+    expect(useCanvasStore.getState().viewMode).toBe('floor_plan')
+    expect(useCanvasStore.getState().rooms[0].label).toBe('Lounge')
+  })
+
+  it('submits current edits and preserves them when refinement fails', async () => {
+    vi.mocked(api.post).mockRejectedValue(new Error('network down'))
+    renderProjectPage()
+    const user = userEvent.setup()
+    await screen.findByRole('tab', { name: 'Refine' })
+    act(() => useCanvasStore.getState().updateRoom(INITIAL_ROOMS[0].id, { position: { ...INITIAL_ROOMS[0].position, x: 2.25 } }))
+    const current = useCanvasStore.getState().serializeLayout()
+    await user.type(screen.getByLabelText('Layout prompt'), 'add a study')
+    await user.click(screen.getByRole('button', { name: 'Refine' }))
+    await screen.findByRole('alert')
+    expect(api.post).toHaveBeenCalledWith('/api/design/refine', { designId: 'd1', prompt: 'add a study', currentLayout: current })
+    expect(useCanvasStore.getState().serializeLayout()).toEqual(current)
+    expect(useCanvasStore.getState().hasUnsavedChanges).toBe(true)
+  })
   it('switches the 2D Plan tab to the shared-state SVG floor plan', async () => {
     renderProjectPage()
     const user = userEvent.setup()
@@ -194,6 +258,7 @@ describe('ProjectPage canvas views', () => {
     expect(screen.getByRole('application', { name: 'Editable floor plan' })).toBeInTheDocument()
     expect(useCanvasStore.getState().viewMode).toBe('floor_plan')
     expect(screen.getByRole('tab', { name: '3D Edit' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'More views' }))
     expect(screen.getByRole('tab', { name: 'Zoning' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Room Graph' })).toBeInTheDocument()
   })
@@ -202,7 +267,8 @@ describe('ProjectPage canvas views', () => {
     renderProjectPage()
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('tab', { name: 'Zoning' }))
+    await user.click(await screen.findByRole('button', { name: 'More views' }))
+    await user.click(screen.getByRole('tab', { name: 'Zoning' }))
     expect(useCanvasStore.getState().viewMode).toBe('zoning')
     expect(screen.getByRole('application', { name: 'Zoning view' })).toBeInTheDocument()
     expect(screen.getByTestId('zone-legend')).toBeInTheDocument()
@@ -238,6 +304,7 @@ describe('ProjectPage canvas views', () => {
     })
     useCanvasStore.getState().selectRoom(roomId)
 
+    await user.click(screen.getByRole('button', { name: 'More views' }))
     await user.click(screen.getByRole('tab', { name: 'Zoning' }))
     expect(useCanvasStore.getState().selectedId).toBe(roomId)
 
@@ -259,21 +326,56 @@ describe('ProjectPage canvas views', () => {
     useCanvasStore.setState({ viewMode: 'floor_plan', selectedId: null })
     renderProjectPage()
 
-    expect(await screen.findByTestId('program-summary')).toBeInTheDocument()
+    expect(await screen.findByRole('complementary', { name: 'Workspace details' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Search rooms')).toBeInTheDocument()
     expect(screen.queryByText('Space program')).not.toBeInTheDocument()
     act(() => useCanvasStore.getState().selectRoom(INITIAL_ROOMS[0].id))
 
-    expect(screen.getByTestId('selected-room-card')).toBeInTheDocument()
-    expect(screen.getByTestId('program-summary')).toBeInTheDocument()
+    expect(screen.getByTestId('inspector-properties')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /All rooms/ })).toBeInTheDocument()
   })
 })
 
 describe('ProjectPage refine flow', () => {
-  it('disables the Refine toggle until a design exists', async () => {
+  const reviewFixture = {
+    requirements: { building_type: 'school', floors: 1, rooms: [{ type: 'study', count: 4 }], adjacency: [], avoid_adjacency: [], plot: { width_m: 20, depth_m: 20 }, facing: 'east', missing_info: [] },
+    route: 'generate', questions: [], optional_missing: [], understood_summary: ['4 studies'],
+  }
+
+  it('keeps extra room requirements with every clarification answer', async () => {
+    vi.mocked(api.post).mockResolvedValueOnce({ data: { ...reviewFixture, route: 'vague', questions: ['How many rooms?'] } }).mockResolvedValueOnce({ data: reviewFixture })
+    renderProjectPage()
+    const user = userEvent.setup()
+    await user.type(await screen.findByLabelText('Layout prompt'), 'a small school')
+    await user.click(screen.getByRole('button', { name: 'Generate' }))
+    await user.type(await screen.findByLabelText('Answer 1'), 'five')
+    await user.type(screen.getByLabelText('Additional requirements'), 'and a library')
+    await user.click(screen.getByRole('button', { name: 'Re-check brief' }))
+    await waitFor(() => expect(api.post).toHaveBeenCalledTimes(2))
+    expect(vi.mocked(api.post).mock.calls[1]).toEqual(['/api/extract', { prompt: 'a small school\n\nAdditional details:\nHow many rooms?\nAnswer: five\nAdditional requirements: and a library' }, { signal: expect.any(AbortSignal) }])
+  })
+
+  it('cancels generation and ignores a late response without loading its rooms', async () => {
+    let finish!: (value: unknown) => void
+    vi.mocked(api.post).mockResolvedValueOnce({ data: reviewFixture }).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
+    renderProjectPage()
+    const user = userEvent.setup()
+    await user.type(await screen.findByLabelText('Layout prompt'), 'a school with four classrooms')
+    await user.click(screen.getByRole('button', { name: 'Generate' }))
+    await user.click(await screen.findByRole('button', { name: 'Generate layout' }))
+    const signal = vi.mocked(api.post).mock.calls[1][2]?.signal as AbortSignal
+    await user.click(screen.getByRole('button', { name: 'Cancel generation' }))
+    expect(signal.aborted).toBe(true)
+    await act(async () => finish({ data: SAVED_DESIGN_FIXTURE }))
+    expect(useCanvasStore.getState().rooms).toEqual([])
+    expect(screen.getByRole('dialog', { name: 'Review design brief' })).toBeInTheDocument()
+  })
+  it('shows only the brief stage until a layout exists', async () => {
     renderProjectPage()
 
-    const refineButton = await screen.findByRole('tab', { name: 'Refine' })
-    expect(refineButton).toBeDisabled()
+    await screen.findByLabelText('Layout prompt')
+    expect(screen.queryByRole('tab', { name: 'Refine' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: '2D Plan' })).not.toBeInTheDocument()
   })
 
   it('sends reviewed overrides to canonical multi-floor generation', async () => {
@@ -320,7 +422,7 @@ describe('ProjectPage refine flow', () => {
     renderProjectPage()
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('button', { name: 'Plot params' }))
+    await user.click(await screen.findByRole('button', { name: 'Plot settings' }))
     await user.type(screen.getByLabelText(/Plot width/), '10')
     await user.type(screen.getByLabelText(/Floors/), '2')
     await user.selectOptions(screen.getByLabelText('Entry faces'), 'N')
@@ -343,7 +445,7 @@ describe('ProjectPage refine flow', () => {
           prompt: 'studio apartment',
           projectId: 'p1',
         },
-        { signal: undefined },
+        { signal: expect.any(AbortSignal) },
       ),
     )
   })
@@ -371,8 +473,8 @@ describe('ProjectPage refine flow', () => {
       designVersionId: 'v1',
       metadata: { prompt: 'apartment', building_type: 'apartment', room_count: 1, placementEngine: 'tile' },
       building: { floorHeight: 3.2 },
-      floors: [{ id: 'floor_0', name: 'Ground', level: 0, elevation: 0, rooms: [] }],
-      rooms: [],
+      floors: SAVED_DESIGN_FIXTURE.floors,
+      rooms: SAVED_DESIGN_FIXTURE.rooms,
       insights: { score: 90, reasons: [], warnings: [], appliedRules: [] },
       alternatives: [
         {
@@ -426,11 +528,9 @@ describe('ProjectPage refine flow', () => {
     await user.click(screen.getByRole('button', { name: 'Generate' }))
     await user.click(await screen.findByRole('button', { name: 'Generate layout' }))
 
-    const altChip = await screen.findByRole('button', { name: /1 alternative/ })
-    await user.click(altChip)
-    expect(screen.getByText('BSP partition')).toBeInTheDocument()
-
-    await user.click(screen.getByText('BSP partition'))
+    const options = await screen.findByRole('combobox', { name: 'Layout option' })
+    expect(useCanvasStore.getState().viewMode).toBe('floor_plan')
+    await user.selectOptions(options, '1')
 
     expect(useCanvasStore.getState().rooms.map((room) => room.label)).toEqual(['Bedroom'])
     expect(useCanvasStore.getState().saveStatus).toBe('unsaved')
@@ -503,7 +603,7 @@ describe('ProjectPage refine flow', () => {
     const user = userEvent.setup()
     await user.type(await screen.findByLabelText('Layout prompt'), 'one bedroom house')
     await user.click(screen.getByRole('button', { name: 'Generate' }))
-    expect(await screen.findByText('AI understood')).toBeInTheDocument()
+    expect(await screen.findByText('Your brief, understood.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Generate with defaults' }))
 
     await waitFor(() =>
@@ -515,7 +615,7 @@ describe('ProjectPage refine flow', () => {
           projectId: 'p1',
           prompt: 'one bedroom house',
         },
-        { signal: undefined },
+        { signal: expect.any(AbortSignal) },
       ),
     )
     expect(useCanvasStore.getState().rooms[0]).toMatchObject({
@@ -529,13 +629,14 @@ describe('ProjectPage refine flow', () => {
 
   it('posts to /api/design/refine when Refine mode is active', async () => {
     const designFixture = {
+      ...SAVED_DESIGN_FIXTURE,
       version: '1.0',
       designId: 'd1',
       designVersionId: 'v1',
       metadata: { prompt: 'starter', building_type: 'apartment', room_count: 1 },
       building: { floorHeight: 3.2 },
-      floors: [{ id: 'floor_0', name: 'Ground', level: 0, elevation: 0, rooms: [] }],
-      rooms: [],
+      floors: SAVED_DESIGN_FIXTURE.floors,
+      rooms: SAVED_DESIGN_FIXTURE.rooms,
     }
     vi.mocked(api.get).mockImplementation(async (url: string) => {
       if (url === '/api/design/project/p1/latest') return { data: designFixture }
@@ -574,6 +675,7 @@ describe('ProjectPage refine flow', () => {
       expect(api.post).toHaveBeenCalledWith('/api/design/refine', {
         designId: 'd1',
         prompt: 'add a bedroom',
+        currentLayout: expect.objectContaining({ rooms: expect.any(Array) }),
       }),
     )
   })
@@ -585,8 +687,8 @@ describe('ProjectPage refine flow', () => {
       designVersionId: 'v1',
       metadata: { prompt: 'starter', building_type: 'apartment', room_count: 1 },
       building: { floorHeight: 3.2 },
-      floors: [{ id: 'floor_0', name: 'Ground', level: 0, elevation: 0, rooms: [] }],
-      rooms: [],
+      floors: SAVED_DESIGN_FIXTURE.floors,
+      rooms: SAVED_DESIGN_FIXTURE.rooms,
     }
     vi.mocked(api.get).mockImplementation(async (url: string) => {
       if (url === '/api/design/project/p1/latest') return { data: designFixture }

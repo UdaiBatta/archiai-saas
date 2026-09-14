@@ -39,7 +39,7 @@ export function LevelMenu() {
           <rect x="3" y="4" width="18" height="6" rx="1" />
           <rect x="3" y="14" width="18" height="6" rx="1" />
         </svg>
-        <span className="text-xs font-semibold">{activeName}</span>
+        <span className="max-w-12 truncate text-xs font-semibold sm:max-w-32">{activeName}</span>
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted-light">
           <path d="M6 9l6 6 6-6" />
         </svg>

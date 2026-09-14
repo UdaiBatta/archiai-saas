@@ -9,7 +9,8 @@ describe('roomVisualTreatment', () => {
     const idle = roomVisualTreatment(COMPONENT_REGISTRY.room, 'room', false, false)
     const selected = roomVisualTreatment(COMPONENT_REGISTRY.room, 'room', true, false)
 
-    expect(idle.opacity).toBeGreaterThanOrEqual(0.8)
+    expect(idle.opacity).toBeLessThan(0.5)
+    expect(idle.depthWrite).toBe(false)
     expect(selected.opacity).toBeGreaterThan(idle.opacity)
     expect(selected.emissive).toBe('#ffffff')
     expect(selected.edgeColor).toBe('#ffffff')
