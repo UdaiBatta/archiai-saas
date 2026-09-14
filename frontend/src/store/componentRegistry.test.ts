@@ -32,4 +32,10 @@ describe('component registry', () => {
       d: COMPONENT_REGISTRY.door.minSize.d,
     })
   })
+
+  it('preserves thin walls and openings whose long axis is depth', () => {
+    expect(clampComponentSize('wall', { w: 0.115, h: 3, d: 5 })).toEqual({ w: 0.115, h: 3, d: 5 })
+    expect(clampComponentSize('door', { w: 0.16, h: 2.1, d: 0.9 })).toEqual({ w: 0.16, h: 2.1, d: 0.9 })
+    expect(clampComponentSize('window', { w: 0.15, h: 1.2, d: 1.5 })).toEqual({ w: 0.15, h: 1.2, d: 1.5 })
+  })
 })

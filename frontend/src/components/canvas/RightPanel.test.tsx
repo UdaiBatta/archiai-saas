@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
-import { beforeEach, describe, expect, it } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { DEFAULT_FLOOR, useCanvasStore, type Room } from '../../store/canvasStore'
 import { RightPanel } from './RightPanel'
@@ -85,6 +86,7 @@ beforeEach(() => {
     selectedId: null,
     layoutMetadata: EAST_ORIENTATION,
     activityLog: [],
+    placementMode: null,
   })
 })
 
@@ -189,5 +191,24 @@ describe('RightPanel site & orientation', () => {
     expect(screen.getByTestId('quality-panel')).toHaveTextContent('88')
     expect(screen.getByTestId('quality-panel')).toHaveTextContent('Concept quality')
     expect(screen.getByTestId('program-check')).toHaveTextContent('Program Check')
+  })
+})
+
+describe('RightPanel create-3d-model CTA', () => {
+  it('enters the model stage through the project callback without arming furniture', async () => {
+    const user = userEvent.setup()
+    useCanvasStore.setState({
+      rooms: [room({ id: 'r1', label: 'Living Room' })],
+    })
+    const onCreateModel = vi.fn()
+    render(<RightPanel onCreateModel={onCreateModel} />)
+    await user.click(screen.getByTestId('create-3d-model'))
+    expect(onCreateModel).toHaveBeenCalledOnce()
+    expect(useCanvasStore.getState().placementMode).toBeNull()
+  })
+
+  it('is hidden while the canvas is empty', () => {
+    render(<RightPanel />)
+    expect(screen.queryByTestId('create-3d-model')).not.toBeInTheDocument()
   })
 })

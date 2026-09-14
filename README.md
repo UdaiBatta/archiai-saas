@@ -2,7 +2,7 @@
 
 ArchiAI is an MVP architectural concept-layout tool. A user describes a space in plain language, receives a deterministic rule-guided 3D layout, edits it in the browser, saves versions, collaborates through workspaces, exports PNG/PDF handoffs, and shares a revocable read-only link.
 
-The current MVP does not call paid AI APIs. Prompt extraction, pattern-informed sizing, zoning, adjacency, and layout generation use deterministic services with built-in fallback rules.
+The current MVP does not call paid AI APIs for generation. Brief extraction (plain language to structured requirements) runs through any OpenAI-compatible provider: by default a local model via LM Studio, or a hosted provider such as AWS Bedrock, Groq, Gemini, or OpenRouter by setting `LLM_API_KEY` in `.env`. Layout geometry, validation, sizing, zoning, and adjacency remain deterministic and retain built-in fallback rules.
 
 ## Current MVP
 
@@ -33,7 +33,10 @@ Exports are concept handoffs, not CAD/BIM or construction documents.
 
 - Python 3.11+
 - Node.js 20+
-- PostgreSQL 16, or Docker Desktop with Docker Compose
+- PostgreSQL 16, or Docker Desktop with Docker Compose and the WSL 2 backend
+- For brief extraction, one of:
+  - a hosted provider API key (AWS Bedrock / Groq / Gemini / OpenRouter) — see the provider table below; or
+  - LM Studio with `qwen/qwen3.5-9b` loaded locally (the app also works without either, using deterministic parser fallbacks)
 - Git
 
 ## Environment Setup
@@ -52,6 +55,10 @@ POSTGRES_PASSWORD=your_postgres_password
 POSTGRES_DB=your_database_name
 DATABASE_URL=postgresql+asyncpg://your_postgres_user:your_postgres_password@db:5432/your_database_name
 SECRET_KEY=replace-with-a-long-random-secret
+LLM_BASE_URL=http://localhost:1234/v1
+LLM_TIMEOUT_S=30
+LLM_MODEL=
+LLM_API_KEY=
 VITE_API_URL=http://localhost:8000
 VITE_SHOW_DEV_TOOLS=false
 ```
@@ -108,21 +115,76 @@ npm run dev
 
 Open http://localhost:5173.
 
+## AI Extraction Provider
+
+Brief extraction runs through any OpenAI-compatible chat-completions endpoint. Pick one by editing `.env` — no code changes:
+
+| Provider | LLM_BASE_URL | LLM_MODEL example | Cost |
+|---|---|---|---|
+| LM Studio (default, local) | `http://localhost:1234/v1` | *(blank — auto-detected)* | Free, uses your GPU |
+| AWS Bedrock | `https://bedrock-runtime.<region>.amazonaws.com/openai/v1` | `amazon.nova-micro-v1:0` | Pay per token (fractions of a cent per extraction) |
+| Groq | `https://api.groq.com/openai/v1` | `llama-3.3-70b-versatile` | Free tier (~1k requests/day) |
+| Google Gemini | `https://generativelanguage.googleapis.com/v1beta/openai` | `gemini-2.5-flash` | Free tier |
+| OpenRouter | `https://openrouter.ai/api/v1` | `meta-llama/llama-3.3-70b-instruct` | Free models / pay per token |
+
+Set `LLM_API_KEY` to the provider's bearer key and restart the backend. With a key set, the backend skips local-model discovery when `LLM_MODEL` is explicit and allows concurrent requests. Bedrock API keys come from the AWS Bedrock console (short- or long-term bearer keys — no SigV4 signing needed). Generation geometry never calls the provider; only brief extraction does.
+
 ## Run Everything With Docker Compose
 
+### Windows startup checklist
+
+Docker Compose starts ArchiAI's database, backend, and frontend. By default LM Studio runs separately on the Windows host so it can use the GPU directly; if you configured a hosted provider with `LLM_API_KEY`, skip the LM Studio steps.
+
+1. Start **Docker Desktop** from the Windows Start menu. Keep the WSL 2 engine enabled and wait until Docker Desktop reports that the engine is running.
+
+2. Confirm that the Docker daemon and Compose are available:
+
 ```powershell
-Copy-Item .env.example .env
-docker compose up --build
+docker version
+docker info
+docker compose version
 ```
 
-Compose starts PostgreSQL, runs Alembic migrations, starts Uvicorn on port `8000`, and starts Vite on port `5173`.
+`docker compose ps` only reports container status; it does not start the application.
+
+3. Start **LM Studio**, download and load `qwen/qwen3.5-9b` (the Q4_K_M quantization is suitable for an 8 GB RTX 4060), set context length to `4096`, and use maximum GPU offload. In LM Studio's Developer/Local Server screen:
+
+   - use port `1234`;
+   - enable **Serve on Local Network** so Docker can reach the host;
+   - start the local server and keep LM Studio open.
+
+4. Verify the model server from PowerShell. The response should list `qwen/qwen3.5-9b`:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:1234/v1/models | ConvertTo-Json -Depth 4
+```
+
+5. From the repository root, create `.env` once and replace its placeholder database credentials and `SECRET_KEY`:
+
+```powershell
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+docker compose config
+docker compose up -d --build
+```
+
+Compose starts PostgreSQL, runs Alembic migrations, starts Uvicorn on port `8000`, and starts Vite on port `5173`. The first build can take several minutes.
+
+6. Check container and application health:
+
+```powershell
+docker compose ps
+Invoke-RestMethod http://localhost:8000/api/health
+```
+
+The health response should contain `"db": "ok"` and `"llm": "ok"`. The app is then available at http://localhost:5173 and the API documentation at http://localhost:8000/docs.
 
 Useful commands:
 
 ```powershell
 docker compose ps
-docker compose logs -f backend
+docker compose logs -f backend frontend
 docker compose exec backend alembic current
+docker compose restart backend frontend
 docker compose down
 ```
 
@@ -233,6 +295,20 @@ Authenticated errors use:
 ```
 
 ## Common Troubleshooting
+
+**Docker reports `dockerDesktopLinuxEngine` or cannot connect to the Docker API**
+
+- Docker Desktop is not running, or its WSL 2 engine did not start. Open Docker Desktop and wait for the engine-running status before retrying Compose.
+- Run `docker info`. If it cannot connect, Compose cannot start any ArchiAI container.
+- If Docker Desktop is open but the named-pipe error remains, run `wsl --shutdown`, fully quit Docker Desktop, reopen it, and wait for the engine to start.
+- Then retry `docker compose up -d --build` followed by `docker compose ps`.
+
+**Backend health reports `"llm": "unreachable"`**
+
+- Local mode: confirm LM Studio is open and `qwen/qwen3.5-9b` is loaded. Hosted mode: confirm `LLM_API_KEY` (and `LLM_BASE_URL`/`LLM_MODEL`) are set correctly in `.env`.
+- Confirm the local server is running on port `1234` with **Serve on Local Network** enabled.
+- Confirm `Invoke-RestMethod http://127.0.0.1:1234/v1/models` works on the host.
+- Compose uses `http://host.docker.internal:1234/v1` for the backend automatically; do not change that container address to `localhost`.
 
 **Frontend says the server is unavailable**
 

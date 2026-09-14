@@ -30,11 +30,10 @@ def _room_color(room_type: str) -> str:
 
 
 def _bounded_center(origin: float, span: float, plot_span: float) -> float:
-    """Round a canvas centre without letting independent rounding cross bounds."""
+    """Keep half-millimetre centres so converting back preserves shared edges."""
 
     half = span / 2
-    rounded = round(origin + half, 3)
-    return min(plot_span - half, max(half, rounded))
+    return min(plot_span - half, max(half, origin + half))
 
 
 def _box_size(room: PlanRoom) -> dict[str, float]:

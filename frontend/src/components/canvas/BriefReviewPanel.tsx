@@ -8,24 +8,28 @@ interface BriefReviewPanelProps {
   engine: GenerationEngine
   busy: boolean
   error?: string | null
-  onGenerate: (useDefaults: boolean) => void
-  onClarify: (answers: string[]) => void
+  onGenerate: (useDefaults: boolean, extraNotes?: string) => void
+  onClarify: (answers: string[], extraNotes?: string) => void
   onCancel: () => void
+  onStop?: () => void
 }
 
 export function BriefReviewPanel({
   review,
-  engine,
   busy,
   error,
   onGenerate,
   onClarify,
   onCancel,
+  onStop,
 }: BriefReviewPanelProps) {
   const questionKey = review.questions.join('\n')
   const [answers, setAnswers] = useState<string[]>(() =>
     review.questions.map(() => ''),
   )
+  // Free-text additions ('one more bedroom, a study...') re-run extraction so
+  // the reviewed requirements actually pick the added rooms up.
+  const [extraNotes, setExtraNotes] = useState('')
 
   useEffect(() => {
     setAnswers(review.questions.map(() => ''))
@@ -41,7 +45,7 @@ export function BriefReviewPanel({
       ? 'Resolve the brief'
       : review.route === 'vague'
         ? 'A few details are needed'
-        : 'AI understood'
+        : 'Your brief, understood.'
 
   return (
     <div className="absolute inset-0 z-40 flex items-center justify-center bg-graphite-950/60 p-4 backdrop-blur-[1px]">
@@ -54,7 +58,7 @@ export function BriefReviewPanel({
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink">
-              Review before generation
+              Step 2 · Review your brief
             </p>
             <h2 className="mt-1 text-lg font-semibold text-ink">{heading}</h2>
           </div>
@@ -80,11 +84,7 @@ export function BriefReviewPanel({
           </ul>
         )}
 
-        <p className="mt-3 rounded-lg border border-ink/15 bg-ink/10 px-3 py-2 text-xs text-ink">
-          {engine === 'mvp'
-            ? 'This brief will use the local deterministic layout engine.'
-            : "Multi-floor and commercial briefs use ArchiAI's established deterministic engine to preserve current capabilities."}
-        </p>
+        <p className="mt-3 text-xs leading-relaxed text-muted">Check the room program below. You can add rooms or change requirements before we design your plan.</p>
 
         {blocking ? (
           <div className="mt-4 space-y-3">
@@ -122,11 +122,31 @@ export function BriefReviewPanel({
           )
         )}
 
+        <label className="mt-4 block text-sm font-medium text-ink">
+          Add anything else?
+          <textarea
+            aria-label="Additional requirements"
+            rows={2}
+            value={extraNotes}
+            placeholder="e.g. one more bedroom, a study, a garage..."
+            onChange={(event) => setExtraNotes(event.target.value)}
+            className="mt-1.5 w-full resize-none rounded-lg border border-ink/15 bg-graphite-700 px-3 py-2 text-sm font-normal text-ink placeholder:text-muted-light focus:outline-none focus:ring-2 focus:ring-ink/30"
+            disabled={busy}
+          />
+          <span className="mt-1 block text-xs font-normal text-muted-light">
+            Optional - adds rooms or constraints on top of the brief.
+          </span>
+        </label>
+        <div className="mt-2 flex flex-wrap gap-2" aria-label="Quick room additions">
+          {['bedroom', 'bathroom', 'study'].map((type) => <button key={type} type="button" disabled={busy} onClick={() => setExtraNotes((current) => `${current.trim()}${current.trim() ? '\n' : ''}Add one more ${type}.`)} className="rounded-full border border-ink/15 px-3 py-1.5 text-xs text-muted hover:border-accent hover:text-ink">+ {type}</button>)}
+        </div>
+
         {error && (
           <p role="alert" className="mt-3 text-sm text-danger">{error}</p>
         )}
 
         <div className="mt-5 flex flex-wrap justify-end gap-2">
+          {busy && onStop && <button type="button" onClick={onStop} className="rounded-lg border border-ink/15 px-4 py-2 text-sm text-muted">Cancel generation</button>}
           <button
             type="button"
             className="rounded-lg border border-ink/15 px-4 py-2 text-sm font-medium text-muted hover:bg-graphite-750 hover:text-ink"
@@ -139,7 +159,7 @@ export function BriefReviewPanel({
             <button
               type="button"
               className="rounded-lg bg-ink px-4 py-2 text-sm font-semibold text-graphite-900 hover:bg-graphite-100 disabled:bg-graphite-500"
-              onClick={() => onClarify(answers)}
+              onClick={() => onClarify(answers, extraNotes)}
               disabled={busy || !allAnswered}
             >
               {busy ? 'Checking...' : 'Re-check brief'}
@@ -148,11 +168,13 @@ export function BriefReviewPanel({
             <button
               type="button"
               className="rounded-lg bg-ink px-4 py-2 text-sm font-semibold text-graphite-900 hover:bg-graphite-100 disabled:bg-graphite-500"
-              onClick={() => onGenerate(review.optional_missing.length > 0)}
+              onClick={() => onGenerate(review.optional_missing.length > 0, extraNotes)}
               disabled={busy}
             >
               {busy
                 ? 'Generating...'
+                : extraNotes.trim()
+                  ? 'Update brief & review'
                 : review.optional_missing.length > 0
                   ? 'Generate with defaults'
                   : 'Generate layout'}

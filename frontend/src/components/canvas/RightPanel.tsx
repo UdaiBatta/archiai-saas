@@ -99,7 +99,7 @@ function ProgramSummaryCard({
  * - Zoning: zone legend with coverage, plus the selected room's zone
  * - Room Graph: relationships for the selected node + open-in-2D/3D
  */
-export function RightPanel() {
+export function RightPanel({ onCreateModel, open = true, onClose }: { onCreateModel?: () => void; open?: boolean; onClose?: () => void }) {
   const viewMode = useCanvasStore((s) => s.viewMode)
   const rooms = useCanvasStore((s) => s.rooms)
   const floors = useCanvasStore((s) => s.floors)
@@ -645,10 +645,11 @@ export function RightPanel() {
   return (
     <aside
       aria-label="Details panel"
-      className="flex w-[19rem] flex-shrink-0 flex-col border-l border-ink/10 bg-[#1c1d1e]/96 backdrop-blur"
+      className={`${open ? 'flex' : 'hidden lg:flex'} absolute bottom-36 right-3 top-28 z-30 w-[min(19rem,calc(100%-1.5rem))] flex-col overflow-hidden rounded-xl border border-ink/10 bg-[#1c1d1e]/95 backdrop-blur lg:static lg:w-[19rem] lg:shrink-0 lg:rounded-none`}
     >
-      <div aria-hidden="true" className="h-12 flex-shrink-0 border-b border-ink/10" />
+      <div aria-hidden="true" className="hidden h-12 flex-shrink-0 border-b border-ink/10 lg:block" />
       <div className="flex items-baseline justify-between gap-2 border-b border-ink/10 px-3 py-2.5">
+        {onClose && <button type="button" aria-label="Close details" onClick={onClose} className="rounded p-1 text-muted lg:hidden">✕</button>}
         <span className="truncate text-[11px] font-semibold text-ink">
           {room && viewMode === 'floor_plan'
             ? 'Selected Room'
@@ -670,6 +671,21 @@ export function RightPanel() {
         )}
         {body}
       </div>
+      {rooms.length > 0 && onCreateModel && (
+        <div className="flex-shrink-0 border-t border-ink/10 p-3">
+          <button
+            type="button"
+            data-testid="create-3d-model"
+            onClick={onCreateModel}
+            className="w-full rounded-lg bg-accent px-3 py-2 text-sm font-bold text-white shadow-[0_4px_16px_-4px_rgba(118,99,215,0.45)] hover:bg-accent-bright"
+          >
+            Create a 3D model →
+          </button>
+          <p className="mt-1.5 text-center text-[10px] text-muted-light">
+            Continue with walls, openings and furniture.
+          </p>
+        </div>
+      )}
     </aside>
   )
 }

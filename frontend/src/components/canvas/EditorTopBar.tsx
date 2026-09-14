@@ -22,6 +22,7 @@ interface EditorTopBarProps {
   avatarName: string
 
   designId: string | null
+  hasLayout: boolean
   layoutSaving: boolean
   layoutSaveError: string | null
   versionName: string
@@ -63,6 +64,7 @@ export function EditorTopBar({
   onShare,
   avatarName,
   designId,
+  hasLayout = true,
   layoutSaving,
   layoutSaveError,
   versionName,
@@ -87,18 +89,20 @@ export function EditorTopBar({
   deleteError,
 }: EditorTopBarProps) {
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex h-12 items-center justify-between gap-3 border-b border-ink/10 bg-[#191a1b]/92 px-4 backdrop-blur-md">
-      <div className="flex flex-wrap items-center gap-2.5 pointer-events-auto">
+    <div className="pointer-events-none absolute inset-x-0 top-0 z-40 flex h-12 items-center justify-between gap-1 border-b border-ink/10 bg-[#191a1b]/92 px-2 backdrop-blur-md sm:gap-3 sm:px-4">
+      <div className="pointer-events-auto flex min-w-0 items-center gap-1 sm:gap-2.5">
         <button
           type="button"
           onClick={onBackToDashboard}
           className="flex items-baseline gap-px text-ink"
           title="Back to projects"
+          aria-label="Back to projects"
         >
-          <span className="text-sm font-extrabold tracking-wide">ARCHI</span>
-          <span className="text-sm font-extrabold tracking-wide text-ink">·AI</span>
+          <span className="text-sm font-extrabold sm:hidden">A·</span>
+          <span className="hidden text-sm font-extrabold tracking-wide sm:inline">ARCHI</span>
+          <span className="hidden text-sm font-extrabold tracking-wide text-ink sm:inline">·AI</span>
         </button>
-        <span className="h-3.5 w-px bg-ink/15" />
+        <span className="hidden h-3.5 w-px bg-ink/15 sm:block" />
 
         {editing ? (
           <div className="flex flex-col gap-1 rounded-xl border border-ink/10 bg-graphite-800/95 p-2 shadow-[0_8px_28px_rgba(0,0,0,0.16)] backdrop-blur">
@@ -139,20 +143,20 @@ export function EditorTopBar({
           <button
             type="button"
             onClick={onEnterEdit}
-            className="flex items-center gap-1.5 text-sm font-medium text-muted hover:text-ink"
+            className="flex min-w-0 items-center gap-1 text-sm font-medium text-muted hover:text-ink"
           >
-            <span className="max-w-[16rem] truncate">{projectTitle}</span>
+            <span className="max-w-[4rem] truncate sm:max-w-[16rem]">{projectTitle}</span>
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M6 9l6 6 6-6" />
             </svg>
           </button>
         )}
-        <span className="h-3.5 w-px bg-ink/15" />
+        <span className="hidden h-3.5 w-px bg-ink/15 sm:block" />
 
-        <LevelMenu />
+        {hasLayout && <LevelMenu />}
       </div>
 
-      <div className="pointer-events-auto flex flex-wrap items-center justify-end gap-2">
+      <div className="pointer-events-auto flex shrink-0 items-center justify-end gap-1 sm:gap-2">
         <OverflowMenu
           onHistory={onHistory}
           onActivity={onActivity}
@@ -187,6 +191,7 @@ export function EditorTopBar({
 
         <SavePopover
           designId={designId}
+          hasLayout={hasLayout}
           saving={layoutSaving}
           saveError={layoutSaveError}
           versionName={versionName}
@@ -196,7 +201,7 @@ export function EditorTopBar({
           onSave={onSaveLayout}
         />
 
-        <Avatar name={avatarName} size={7.5} />
+        <span className="hidden md:block"><Avatar name={avatarName} size={7.5} /></span>
       </div>
     </div>
   )

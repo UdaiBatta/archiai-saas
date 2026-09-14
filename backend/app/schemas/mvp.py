@@ -1,7 +1,7 @@
 """API contracts for the additive local-LLM MVP pipeline (Phase 4)."""
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -69,6 +69,12 @@ class GenerateMvpResponse(BaseModel):
     defaults_applied: list[str] = Field(default_factory=list)
     design_id: str | None = Field(default=None, alias="designId")
     design_version_id: str | None = Field(default=None, alias="designVersionId")
+    # Geometrically distinct runners-up from the best-of-64 candidate search,
+    # each already converted to the legacy canvas layout JSON (plus a `score`
+    # field) so the options gallery can load them directly. Empty for
+    # polygon-boundary and multi-floor programmes — those have a
+    # single-layout search space, and the UI says so honestly.
+    alternatives: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ValidateMvpRequest(BaseModel):

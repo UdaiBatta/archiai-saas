@@ -112,22 +112,23 @@ async def test_extract_returns_deterministic_route_summary_and_optional_fields(
     ("failure", "expected_status", "expected_code", "expected_message"),
     [
         (
-            LLMUnavailable("LM Studio is down"),
+            LLMUnavailable("provider is down"),
             503,
             "SERVICE_UNAVAILABLE",
-            "Local AI is unavailable. Start LM Studio, load qwen/qwen3.5-9b, and try again.",
+            "The AI provider is unavailable. Check the LLM provider "
+            "configuration (LLM_BASE_URL / LLM_API_KEY) and try again.",
         ),
         (
-            LLMTimeout("LM Studio exceeded the timeout"),
+            LLMTimeout("provider exceeded the timeout"),
             504,
             "GATEWAY_TIMEOUT",
-            "Local AI took too long to respond. Keep LM Studio open and try again.",
+            "The AI provider took too long to respond. Please try again.",
         ),
         (
-            LLMInvalidOutput("LM Studio returned malformed JSON"),
+            LLMInvalidOutput("provider returned malformed JSON"),
             502,
             "BAD_GATEWAY",
-            "Local AI returned an invalid structured response. Try again or simplify the brief.",
+            "The AI provider returned an invalid structured response. Try again or simplify the brief.",
         ),
     ],
 )
@@ -161,6 +162,68 @@ async def test_extract_maps_local_model_failures_to_actionable_errors(
         "code": expected_code,
         "status": expected_status,
     }
+
+
+async def test_generate_returns_ordered_geometric_alternatives(
+    client: AsyncClient,
+):
+    """The options gallery consumes best-of-64 runners-up: rectangular
+    programmes return up to 3 geometrically distinct alternatives ordered by
+    score; the winner itself is the separate `layout` field, never repeated."""
+    token = await _register(client, "mvp-alternatives@example.com")
+
+    response = await client.post(
+        "/api/generate",
+        json={"requirements": _spec(), "useDefaults": False},
+        headers=_auth(token),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    alternatives = body["alternatives"]
+    assert 1 <= len(alternatives) <= 3
+    scores = [alternative["score"] for alternative in alternatives]
+    assert scores == sorted(scores, reverse=True)
+    # winner is never repeated among the alternatives (canvas rooms are
+    # center-based; convert back to the plan's NW-origin frame to compare)
+    winner_rooms = {
+        (room["type"], room["x"], room["y"], room["w"], room["h"])
+        for room in body["layout"]["rooms"]
+    }
+    signatures = []
+    for alternative in alternatives:
+        assert alternative["version"] == "1.0"
+        assert alternative["rooms"]
+        alternative_rooms = {
+            (
+                room["roomType"],
+                round(room["position"]["x"] - room["size"]["w"] / 2, 2),
+                round(room["position"]["z"] - room["size"]["d"] / 2, 2),
+                room["size"]["w"],
+                room["size"]["d"],
+            )
+            for room in alternative["rooms"]
+        }
+        assert alternative_rooms != winner_rooms
+        signatures.append(frozenset(alternative_rooms))
+    # geometrically distinct from each other as well
+    assert len(set(signatures)) == len(signatures)
+
+
+async def test_generate_multi_floor_returns_no_alternatives(client: AsyncClient):
+    """Polygon/multi-floor programmes have a single-layout search space — the
+    empty list is the honest signal the UI renders as 'one optimal layout'."""
+    token = await _register(client, "mvp-alt-multifloor@example.com")
+    spec = RequirementsSpec.model_validate(_spec()).model_copy(update={"floors": 2})
+
+    response = await client.post(
+        "/api/generate",
+        json={"requirements": spec.model_dump(mode="json"), "useDefaults": False},
+        headers=_auth(token),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["alternatives"] == []
 
 
 async def test_generate_persists_all_canonical_artifacts_and_legacy_canvas_layout(

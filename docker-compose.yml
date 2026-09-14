@@ -22,11 +22,15 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       SECRET_KEY: ${SECRET_KEY}
-      # LM Studio runs on the HOST (desktop app, direct GPU access) — reach it
-      # through the host gateway. Requires "Serve on Local Network" in LM Studio.
-      LLM_BASE_URL: http://host.docker.internal:1234/v1
+      # AI extraction provider. Default (no API key): LM Studio runs on the
+      # HOST (desktop app, direct GPU access) — reach it through the host
+      # gateway, requires "Serve on Local Network" in LM Studio. Set
+      # LLM_API_KEY (+ optional LLM_BASE_URL / LLM_MODEL) to use a hosted
+      # provider such as AWS Bedrock, Groq, Gemini, or OpenRouter instead.
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:1234/v1}
       LLM_MODEL: ${LLM_MODEL:-}
       LLM_TIMEOUT_S: ${LLM_TIMEOUT_S:-60}
+      LLM_API_KEY: ${LLM_API_KEY:-}
     extra_hosts:
       # host.docker.internal does not resolve on Linux without this mapping.
       - "host.docker.internal:host-gateway"

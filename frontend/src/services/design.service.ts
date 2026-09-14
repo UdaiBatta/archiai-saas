@@ -22,6 +22,8 @@ export interface LayoutOption {
   floors?: CanvasFloor[]
   rooms: Room[]
   insights?: GenerationInsights
+  /** Top-level score carried by MVP best-of-64 alternatives. */
+  score?: number
 }
 
 export interface GenerateResponse {
@@ -61,12 +63,13 @@ export async function generateLayout(
   prompt: string,
   projectId?: string,
   designParams?: DesignParams,
+  signal?: AbortSignal,
 ): Promise<GenerateResponse> {
   const { data } = await api.post<GenerateResponse>('/api/design/generate', {
     prompt,
     projectId,
     designParams,
-  })
+  }, { signal })
   return data
 }
 
@@ -132,10 +135,12 @@ export interface RefinementChange {
 export async function refineLayout(
   designId: string,
   prompt: string,
+  currentLayout?: CanvasLayout,
 ): Promise<RefineResponse> {
   const { data } = await api.post<RefineResponse>('/api/design/refine', {
     designId,
     prompt,
+    currentLayout,
   })
   return data
 }

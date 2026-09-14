@@ -665,6 +665,26 @@ Deferred (Phase 4 remainder): richer graph-driven placement honouring `preferred
 - [x] **Verification:** frontend tests 153 passed, frontend TypeScript check passed, frontend production build passed, backend tests 558 passed. Focused session-expiry simulations cover concurrent 401s, refresh success/failure, retry limits, non-refresh status codes, autosave, manual save, and local input preservation.
 - [ ] **Live browser acceptance:** deterministic automated tests cover the Sprint 20 session-expiry scenario; full live browser acceptance with a running app session was not performed in this Codex environment.
 
+### Sprint 25 — Hosted LLM Swap & Generation Experience Redesign 🚧 Steps 1–2 complete, Step 3 core landed (2026-09)
+
+> Branch: `sprint-25/hosted-llm-and-generation-ui` (off `main`). Design direction:
+> [`docs/EDITOR_3D_AND_SPACE_PLANNER_DIRECTION.md`](docs/EDITOR_3D_AND_SPACE_PLANNER_DIRECTION.md).
+> Reference mockup: `docs/mockups/generation-redesign.html` (self-contained; three.js vendored at `docs/mockups/vendor/`).
+
+- [x] Step 1 — Clickable redesign mockup approved by the owner, then hardened per a 12-point review: genuinely editable 2D plan (drag/resize/select, door markers as real gaps with swing arcs, dimensions only on selection), **2D Edit** tab in the editor navbar, real Three.js **3D edit state** (walls with door openings cut in, room inspector with connections, brand color picker, capacity planner, animated egress arrows, +Add room, plan↔3D camera swing), templates row and cost estimator removed (cost deferred by product decision), scroll-driven 3D landing story ending in Revit/AutoCAD export messaging, three.js vendored locally so the landing loads offline.
+- [x] Step 2 — Provider-agnostic extraction LLM: `LLM_API_KEY` switches `llm_client.py` to hosted mode (bearer token, no LM-Studio-specific `reasoning_effort`, `/models` discovery skipped when `LLM_MODEL` is explicit, semaphore 1→4); local LM Studio mode unchanged when no key is set. `.env.example` presets for **AWS Bedrock** (OpenAI-compatible `bedrock-runtime` endpoint + console API key), Groq, Gemini, OpenRouter; compose passes key + overridable base URL; provider-neutral error strings; README provider table. Motivation: the owner's local model slowed their whole PC.
+- [x] Step 3 (core) — `POST /api/generate` now returns up to 3 geometrically distinct best-of-64 runners-up as `alternatives` (canvas-shaped + `score`; empty for polygon/multi-floor), making the **options gallery and Re-layout work on the main MVP engine path** for the first time; InsightsStrip shows an honest "1 optimal layout" chip when the search space is single-layout. Frontend: `accent` token replaces the ~9 hardcoded purple sites; staged generation tracker (Reading brief → Designing layout) driven by `generationStage`; **Cancel** aborts in-flight extract/generate (AbortController through the mvp service); refinement playback gains **Skip** (jumps to the final layout); save button states are honest ("Not generated yet" before the first generation); refine-locked shows an inline hint on click; hero prompt bar upgraded (headline hierarchy, animated entrance); hero submit uses the accent.
+- [x] Doors/connections display verified in production: the MVP adapter already emits walls + hosted doors as first-class canvas objects (`layoutPlanDerivedObjects`), rendered in 2D and 3D.
+- [x] Owner's initial staged workflow (2026-09-13): brief-review additions and 2D Plan entry. The initial model CTA/activity behavior is superseded by the September 14 implementation below.
+- [x] September 14 staged experience: real editor grid behind the brief; quick room additions and free-text review; cancellation guards for both generation routes; 2D-first results and explicit option selection; minimal room/details panel; separate URL-backed model stage (`stage=model`) with back-to-layout, hosted wall openings and editable furniture proxies. New screenshots supersede earlier shared resources. Spec: `docs/superpowers/specs/2026-09-14-staged-project-experience.md`.
+- [x] Refinement submits the current canvas (including unsaved edits) and preserves it on failure. Session review displays local edits instead of opening server activity. Furniture remains in the shared layout and existing persistence flow.
+- [x] Save/load fidelity fixes discovered during browser QA: response schemas retain opening `hostWallId`; wall/opening minimum sizes respect either long axis; adapters retain half-millimetre room centres; shared-edge comparisons honour the existing inclusive 1 mm tolerance despite binary float noise.
+- [x] Responsive controls: compact header, collapsible details/analysis drawer, non-overlapping selection controls and portrait-aware model framing. No new dependencies.
+- [x] September 14 checkpoint verification: 302 frontend tests across 55 files; 71 targeted backend tests for design/refinement, adapters, geometry and quality. Production build/typecheck pass. Earlier full backend pass: 1,062 passed / 3 expected live-model skips; the final precision changes were rechecked with the targeted suite. Browser QA exercised direct 2D/3D movement, undo, model entry/return, furniture placement/movement/save/reload, real refinement and narrow-window controls.
+- [ ] Live AI extraction acceptance remains pending: the configured provider was unavailable during September 14 QA. A separate, clearly named demo uses explicit requirements through the real generation service; no fake extraction result is presented.
+- [x] Gates: backend 1,060 passed / 3 expected live-model skips / 0 failed; frontend 291 passed across 54 files; `tsc --noEmit` clean; production build clean.
+- [ ] Deferred within Step 3: cost estimator (product decision — revisit later), BriefReviewPanel answer chips (needs the backend to emit per-question options), quick-start chip icons, canvas room-reveal animation, Revit/AutoCAD export implementation itself (see `docs/EXPORT_AND_BIM_ROADMAP.md`).
+
 ### MVP Rework 🚧 — LLM-first pipeline per `ArchiAI_Implementation_Workflow_fable.md` (in-place, started 2026-07)
 
 > The owner's MVP Implementation Workflow (prompt → **local LLM extraction** (LM Studio + Qwen3.5 9B on the host RTX 4060) → clarification → deterministic subdivision engine → quality+Vastu score → editable 2D SVG + the existing 3D editor with two-way sync → save/version → PNG/PDF/share/**IFC/DXF**) is being implemented **in place in this repo** (owner decision — not a greenfield sibling). Everything is additive: the legacy `parse_prompt → generate_layout` path, its 550+ tests, auth, workspaces, and billing remain untouched and green. Auth is KEPT (the workflow's "no accounts" was greenfield scope-cutting; ours is already built). Graph2Plan/fine-tuning/multi-candidate/native plugins stay excluded per the workflow.
@@ -766,6 +786,7 @@ Deferred (Phase 4 remainder): richer graph-driven placement honouring `preferred
 ## Development Rules
 
 - **Never hardcode secrets.** All credentials and keys go in `.env` (gitignored). Use `.env.example` for documentation.
+- **Never credit AI as a contributor.** No `Co-Authored-By` trailers naming AI models (Claude, Codex, Copilot, etc.) in commit messages, and no AI-identifying author/committer emails — commits always use the human owner's git identity.
 - **Never push directly to `main`.** Use feature branches. Branch naming: `sprint-1/feature-name`.
 - **Write tests before or alongside code**, not after.
 - **Every significant action must be logged.** Canvas edits, generation events, team changes — all go to `ActivityLog`.
@@ -796,6 +817,7 @@ docker-compose up
 | Document | Purpose |
 |---|---|
 | `docs/PROJECT_STRATEGY.md` | Full product strategy, all 20 sections |
+| `docs/EDITOR_3D_AND_SPACE_PLANNER_DIRECTION.md` | Owner-approved staged brief → layout → refinement → model workflow (Sprint 25+) |
 | `docs/superpowers/specs/2026-05-23-sprint1-auth-design.md` | Sprint 1 detailed design spec |
 
 ---

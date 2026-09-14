@@ -4,6 +4,8 @@ import { useEscapeToClose } from '../../hooks/useEscapeToClose'
 
 interface SavePopoverProps {
   designId: string | null
+  /** No generated layout exists yet — the honest pre-generation state. */
+  hasLayout: boolean
   saving: boolean
   saveError: string | null
   versionName: string
@@ -30,6 +32,7 @@ const STATUS_DOT: Record<SaveStatus, string> = {
 
 export function SavePopover({
   designId,
+  hasLayout,
   saving,
   saveError,
   versionName,
@@ -42,6 +45,9 @@ export function SavePopover({
   useEscapeToClose(open, () => setOpen(false))
   const saveStatus = useCanvasStore((s) => s.saveStatus)
   const lastSavedAt = useCanvasStore((s) => s.lastSavedAt)
+  // An empty project reports the store's default 'saved' — misleading before
+  // the first generation. Show the honest state until a layout exists.
+  const notGenerated = !hasLayout && !lastSavedAt
 
   return (
     <div className="relative">
@@ -50,10 +56,14 @@ export function SavePopover({
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
+        aria-label={notGenerated ? 'Not generated yet' : statusLabel(saveStatus, lastSavedAt)}
         className="flex items-center gap-2 rounded-lg border border-ink/10 bg-graphite-800/70 px-3 py-1.5 text-xs font-semibold text-ink hover:bg-graphite-800/90"
       >
-        <span aria-hidden="true" className={`h-2 w-2 rounded-full ${STATUS_DOT[saveStatus]}`} />
-        {statusLabel(saveStatus, lastSavedAt)}
+        <span
+          aria-hidden="true"
+          className={`h-2 w-2 rounded-full ${notGenerated ? 'border border-muted-light bg-transparent' : STATUS_DOT[saveStatus]}`}
+        />
+        <span className="max-w-12 truncate sm:max-w-none">{notGenerated ? 'Not generated yet' : statusLabel(saveStatus, lastSavedAt)}</span>
       </button>
 
       {open && (

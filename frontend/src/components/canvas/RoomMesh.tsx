@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { Html } from '@react-three/drei'
 import type { ThreeEvent } from '@react-three/fiber'
 import type { RefObject } from 'react'
@@ -16,6 +16,7 @@ import { ResizeHandles } from './ResizeHandles'
 import { roomVisualTreatment } from './roomVisualTreatment'
 import { displayRoomColor } from './editorPalette'
 import { formatArea } from '../../utils/format'
+import { wallModelPieces } from './modelGeometry'
 
 interface OrbitHandle {
   enabled: boolean
@@ -27,6 +28,7 @@ interface RoomMeshProps {
   readOnly?: boolean
   viewMode?: CanvasViewMode
   invalid?: boolean
+  modelStage?: boolean
 }
 
 interface PendingMove {
@@ -54,6 +56,7 @@ export function RoomMesh({
   readOnly = false,
   viewMode = '3d',
   invalid = false,
+  modelStage = false,
 }: RoomMeshProps) {
   const meshRef = useRef<THREE.Mesh>(null)
   const pendingMoveRef = useRef<PendingMove | null>(null)
@@ -63,6 +66,10 @@ export function RoomMesh({
   const showDimensions = useCanvasStore((s) => s.showDimensions)
   const setInteractionMode = useCanvasStore((s) => s.setInteractionMode)
   const setPointerIntent = useCanvasStore((s) => s.setPointerIntent)
+  const objects = useCanvasStore((s) => s.rooms)
+  const wallPieces = useMemo(() => modelStage && room.objectType === 'wall'
+    ? wallModelPieces(room, objects.filter((object) => object.objectType === 'door' || object.objectType === 'window'))
+    : null, [modelStage, room, objects])
 
   const isSelected = selectedId === room.id
   const definition = COMPONENT_REGISTRY[room.objectType]
@@ -73,6 +80,10 @@ export function RoomMesh({
   const isDimensionable = definition.canResize
   const isPlanView = viewMode !== '3d'
   const isSpace = definition.category === 'space'
+  const modelSurface = modelStage && (isSpace || (room.objectType === 'door' && typeof room.hostWallId === 'string'))
+  const renderHeight = modelSurface ? 0.045 : room.size.h
+  const renderY = modelSurface ? room.position.y - room.size.h / 2 + renderHeight / 2 : room.position.y
+  const modelFurniture = modelStage && room.objectType === 'furniture'
   const visual = roomVisualTreatment(
     definition,
     room.objectType,
@@ -105,6 +116,12 @@ export function RoomMesh({
   const handlePointerDown = (event: ThreeEvent<PointerEvent>) => {
     if (readOnly) return
     if (!isPrimaryPointerButton(event.button)) return
+    const state = useCanvasStore.getState()
+    if (state.placementMode) {
+      event.stopPropagation()
+      state.addObjectAt(state.placementMode, event.point.x, event.point.z)
+      return
+    }
 
     const intent = objectPointerIntent(event.button, isSelected, definition)
     if (intent === 'idle') return
@@ -214,7 +231,8 @@ export function RoomMesh({
       ref={meshRef}
       castShadow={!isPlanView}
       receiveShadow
-      position={[room.position.x, room.position.y, room.position.z]}
+      position={[room.position.x, renderY, room.position.z]}
+      raycast={wallPieces ? () => null : undefined}
       rotation={[
         THREE.MathUtils.degToRad(room.rotation.x),
         THREE.MathUtils.degToRad(room.rotation.y),
@@ -232,18 +250,39 @@ export function RoomMesh({
             }
       }
     >
-      <boxGeometry args={[room.size.w, room.size.h, room.size.d]} />
+      <boxGeometry args={[room.size.w, renderHeight, room.size.d]} />
       <meshStandardMaterial
-        color={displayRoomColor(room)}
+        visible={!wallPieces && !modelFurniture}
+        color={modelStage && isSpace ? (isSelected ? '#d8d1ed' : '#eeeae1') : displayRoomColor(room)}
         emissive={visual.emissive}
         emissiveIntensity={visual.emissiveIntensity}
-        transparent={visual.opacity < 1}
-        opacity={visual.opacity}
-        depthWrite={visual.depthWrite}
+        transparent={!modelStage && visual.opacity < 1}
+        opacity={modelStage ? 1 : visual.opacity}
+        depthWrite={modelStage || visual.depthWrite}
         roughness={visual.roughness}
         metalness={visual.metalness}
       />
-      {isSpace && !isPlanView && (
+      {wallPieces?.map((piece, index) => (
+        <mesh key={index} position={piece.position} castShadow receiveShadow>
+          <boxGeometry args={piece.size} />
+          <meshStandardMaterial color={isSelected ? '#cbbce8' : '#e2e1d7'} roughness={0.9} />
+        </mesh>
+      ))}
+      {modelFurniture && (
+        <>
+          <mesh position={[0, room.size.h / 2 - 0.06, 0]} castShadow receiveShadow>
+            <boxGeometry args={[room.size.w, Math.min(0.12, room.size.h), room.size.d]} />
+            <meshStandardMaterial color={isSelected ? '#ab94e0' : '#a894be'} roughness={0.8} />
+          </mesh>
+          {[-1, 1].flatMap((x) => [-1, 1].map((z) => (
+            <mesh key={`${x}:${z}`} position={[x * room.size.w * 0.38, -0.06, z * room.size.d * 0.38]} castShadow>
+              <boxGeometry args={[Math.min(0.07, room.size.w / 4), Math.max(0.05, room.size.h - 0.12), Math.min(0.07, room.size.d / 4)]} />
+              <meshStandardMaterial color="#54575c" roughness={0.6} />
+            </mesh>
+          )))}
+        </>
+      )}
+      {isSpace && !isPlanView && !modelStage && (
         <>
           <mesh
             position={[0, -room.size.h / 2 + 0.035, 0]}
@@ -278,7 +317,7 @@ export function RoomMesh({
           </mesh>
         </>
       )}
-      {(isSelected || definition.category === 'space' || room.objectType === 'stair') && (
+      {!modelStage && (isSelected || definition.category === 'space' || room.objectType === 'stair') && (
         <lineSegments>
           <edgesGeometry args={[new THREE.BoxGeometry(room.size.w, room.size.h, room.size.d)]} />
           <lineBasicMaterial
@@ -295,7 +334,7 @@ export function RoomMesh({
             args={[
               new THREE.BoxGeometry(
                 room.size.w + 0.08,
-                Math.max(room.size.h + 0.08, 0.12),
+                Math.max(renderHeight + 0.08, 0.12),
                 room.size.d + 0.08,
               ),
             ]}
@@ -312,7 +351,7 @@ export function RoomMesh({
     </mesh>
   )
 
-  const shouldShowLabel = !isThinComponent || isSelected
+  const shouldShowLabel = modelStage ? isSelected : !isThinComponent || isSelected
   const label = shouldShowLabel ? (
     <Html
       position={[room.position.x, room.position.y + room.size.h / 2 + 0.35, room.position.z]}
@@ -347,14 +386,14 @@ export function RoomMesh({
   ) : null
 
   const dimensions =
-    isDimensionable && (isSelected || (showDimensions && isPlanView)) ? (
+    !modelStage && isDimensionable && (isSelected || (showDimensions && isPlanView)) ? (
       <DimensionAnnotations room={room} emphasized={isSelected} />
     ) : null
 
   return (
     <>
       {mesh}
-      {isSelected && (isPlanView || room.objectType === 'room') && (
+      {!modelStage && isSelected && (isPlanView || room.objectType === 'room') && (
         <ResizeHandles
           room={room}
           orbitRef={orbitRef}

@@ -21,9 +21,12 @@ export function useAuth() {
   }
 
   async function logOut(): Promise<void> {
-    await authService.logout()
-    clearStore()
-    navigate('/')
+    try {
+      await authService.logout()
+    } finally {
+      clearStore()
+      navigate('/')
+    }
   }
 
   return { register, logIn, logOut, isAuthenticated, user }

@@ -59,9 +59,11 @@ describe('MVP pipeline service', () => {
     vi.mocked(api.post).mockResolvedValue({ data: response })
 
     await expect(extractBrief('one bedroom house')).resolves.toBe(response)
-    expect(api.post).toHaveBeenCalledWith('/api/extract', {
-      prompt: 'one bedroom house',
-    })
+    expect(api.post).toHaveBeenCalledWith(
+      '/api/extract',
+      { prompt: 'one bedroom house' },
+      { signal: undefined },
+    )
   })
 
   it('generates with backend aliases and explicit defaults intent', async () => {
@@ -83,12 +85,16 @@ describe('MVP pipeline service', () => {
         prompt: 'one bedroom house',
       }),
     ).resolves.toBe(response)
-    expect(api.post).toHaveBeenCalledWith('/api/generate', {
-      requirements,
-      useDefaults: true,
-      projectId: 'project-1',
-      prompt: 'one bedroom house',
-    })
+    expect(api.post).toHaveBeenCalledWith(
+      '/api/generate',
+      {
+        requirements,
+        useDefaults: true,
+        projectId: 'project-1',
+        prompt: 'one bedroom house',
+      },
+      { signal: undefined },
+    )
   })
 
   it('validates and saves canonical geometry without canvas JSON', async () => {

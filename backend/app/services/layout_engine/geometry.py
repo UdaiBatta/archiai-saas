@@ -76,14 +76,14 @@ class Rect:
         """
         # Vertical contact: my east edge on their west edge, or vice versa.
         for x in ((self.x2, other.x), (other.x2, self.x)):
-            if abs(x[0] - x[1]) <= eps:
+            if abs(x[0] - x[1]) <= eps + 1e-9:
                 y_lo = max(self.y, other.y)
                 y_hi = min(self.y2, other.y2)
                 if y_hi - y_lo > eps:
                     return Segment(x[0], y_lo, x[0], y_hi)
         # Horizontal contact: my south edge on their north edge, or vice versa.
         for y in ((self.y2, other.y), (other.y2, self.y)):
-            if abs(y[0] - y[1]) <= eps:
+            if abs(y[0] - y[1]) <= eps + 1e-9:
                 x_lo = max(self.x, other.x)
                 x_hi = min(self.x2, other.x2)
                 if x_hi - x_lo > eps:

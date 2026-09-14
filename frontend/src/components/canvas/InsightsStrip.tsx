@@ -79,54 +79,68 @@ export function InsightsStrip({ alternatives, onPickAlternative }: InsightsStrip
         )}
       </div>
 
-      {alternatives.length > 0 && (
-        <div className="relative">
-          {open && <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} aria-hidden="true" />}
-          <button
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-            className="flex items-center gap-1.5 rounded-xl border border-ink/10 bg-graphite-800/90 backdrop-blur px-3 py-1.5 text-xs font-medium text-muted shadow-sm hover:text-ink"
-          >
-            {alternatives.length} alternative{alternatives.length === 1 ? '' : 's'}
-            {typeof insights?.score === 'number' && (
-              <span className="font-mono tabular-nums text-muted-light">· current {insights.score}/100</span>
-            )}
-          </button>
-
-          {open && (
-            <div className="absolute bottom-10 left-0 z-40 flex w-64 flex-col gap-1.5 rounded-2xl border border-ink/10 bg-graphite-800 p-2 shadow-2xl">
-              {alternatives.map((option, index) => (
-                <button
-                  key={index}
-                  type="button"
-                  onClick={() => {
-                    onPickAlternative(option)
-                    setOpen(false)
-                  }}
-                  className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left hover:bg-ink/10"
-                >
-                  <LayoutThumbnail
-                    rooms={option.rooms}
-                    floors={option.floors}
-                    className="h-12 w-16 flex-shrink-0 overflow-hidden rounded-md border border-ink/10"
-                  />
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="text-[10px] font-medium uppercase tracking-wide text-muted-light">
-                      {engineLabel(option.metadata)}
-                    </span>
-                    <span className="font-mono text-[11px] tabular-nums text-muted">
-                      {roomCount(option)} rooms · {totalArea(option).toFixed(0)} m²
-                    </span>
-                  </span>
-                  <span className="font-mono text-sm font-semibold tabular-nums text-ink">
-                    {option.insights?.score ?? '—'}
-                  </span>
-                </button>
-              ))}
-            </div>
+      <div className="relative">
+        {open && alternatives.length > 0 && (
+          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} aria-hidden="true" />
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            if (alternatives.length > 0) setOpen((v) => !v)
+          }}
+          disabled={alternatives.length === 0}
+          title={
+            alternatives.length === 0
+              ? 'The engine returned a single optimal layout for this brief'
+              : 'Open layout options'
+          }
+          className="flex items-center gap-1.5 rounded-xl border border-ink/10 bg-graphite-800/90 backdrop-blur px-3 py-1.5 text-xs font-medium text-muted shadow-sm hover:text-ink disabled:cursor-not-allowed disabled:hover:text-muted"
+        >
+          {alternatives.length > 0 ? (
+            <>
+              {alternatives.length} alternative{alternatives.length === 1 ? '' : 's'}
+              {typeof insights?.score === 'number' && (
+                <span className="font-mono tabular-nums text-muted-light">· current {insights.score}/100</span>
+              )}
+            </>
+          ) : (
+            <span className="text-muted-light">1 optimal layout</span>
           )}
-        </div>
-      )}
+        </button>
+
+        {open && alternatives.length > 0 && (
+          <div className="absolute bottom-10 left-0 z-40 flex w-64 flex-col gap-1.5 rounded-2xl border border-ink/10 bg-graphite-800 p-2 shadow-2xl">
+            {alternatives.map((option, index) => (
+              <button
+                key={index}
+                type="button"
+                onClick={() => {
+                  onPickAlternative(option)
+                  setOpen(false)
+                }}
+                className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left hover:bg-ink/10"
+              >
+                <LayoutThumbnail
+                  rooms={option.rooms}
+                  floors={option.floors}
+                  className="h-12 w-16 flex-shrink-0 overflow-hidden rounded-md border border-ink/10"
+                />
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-muted-light">
+                    {engineLabel(option.metadata)}
+                  </span>
+                  <span className="font-mono text-[11px] tabular-nums text-muted">
+                    {roomCount(option)} rooms · {totalArea(option).toFixed(0)} m²
+                  </span>
+                </span>
+                <span className="font-mono text-sm font-semibold tabular-nums text-ink">
+                  {option.insights?.score ?? option.score ?? '—'}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

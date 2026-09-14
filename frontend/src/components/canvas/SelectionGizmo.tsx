@@ -33,14 +33,14 @@ export function SelectionGizmo() {
   }
 
   return (
-    <div className="absolute left-1/2 top-16 z-20 -translate-x-1/2 flex items-center gap-3 rounded-xl border border-ink/15 bg-graphite-800/95 backdrop-blur px-3.5 py-2 shadow-sm">
+    <div className="absolute left-1/2 top-28 z-20 flex max-w-[calc(100%-1.5rem)] -translate-x-1/2 items-center gap-2 rounded-xl border border-ink/15 bg-graphite-800/95 px-3 py-2 shadow-sm backdrop-blur">
       <span
         aria-hidden="true"
         className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
         style={{ backgroundColor: displayRoomColor(room) }}
       />
-      <span className="text-xs font-semibold text-ink">{room.label}</span>
-      <span className="font-mono text-xs tabular-nums text-muted">
+      <span className="max-w-28 truncate text-xs font-semibold text-ink">{room.label}</span>
+      <span className="hidden whitespace-nowrap font-mono text-xs tabular-nums text-muted lg:inline">
         {formatDims(room.size.w, room.size.d)} · {formatArea(area)}
       </span>
       <span className="h-4 w-px bg-ink/10" />

@@ -10,8 +10,11 @@ import type {
   RequirementsSpec,
 } from '../types/contracts'
 
-export async function extractBrief(prompt: string): Promise<ExtractResponse> {
-  const { data } = await api.post<ExtractResponse>('/api/extract', { prompt })
+export async function extractBrief(
+  prompt: string,
+  signal?: AbortSignal,
+): Promise<ExtractResponse> {
+  const { data } = await api.post<ExtractResponse>('/api/extract', { prompt }, { signal })
   return data
 }
 
@@ -24,13 +27,18 @@ export interface GenerateMvpOptions {
 
 export async function generateMvpLayout(
   options: GenerateMvpOptions,
+  signal?: AbortSignal,
 ): Promise<GenerateMvpResponse> {
-  const { data } = await api.post<GenerateMvpResponse>('/api/generate', {
-    requirements: options.requirements,
-    useDefaults: options.useDefaults ?? false,
-    projectId: options.projectId,
-    prompt: options.prompt,
-  })
+  const { data } = await api.post<GenerateMvpResponse>(
+    '/api/generate',
+    {
+      requirements: options.requirements,
+      useDefaults: options.useDefaults ?? false,
+      projectId: options.projectId,
+      prompt: options.prompt,
+    },
+    { signal },
+  )
   return data
 }
 

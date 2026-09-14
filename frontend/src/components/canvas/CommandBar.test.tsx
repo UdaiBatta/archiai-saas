@@ -26,13 +26,13 @@ describe('CommandBar recovery state', () => {
         prompt="A two-storey house on a 20m x 18m plot"
         setPrompt={vi.fn()}
         generating={false}
-        generateError="Local AI took too long to respond. Keep LM Studio open and try again."
+        generateError="The AI provider took too long to respond. Please try again."
         onSubmit={onSubmit}
       />,
     )
 
     expect(screen.getByRole('alert')).toHaveTextContent(
-      'Local AI took too long to respond.',
+      'The AI provider took too long to respond. Please try again.',
     )
     expect(screen.getByLabelText('Layout prompt')).toHaveValue(
       'A two-storey house on a 20m x 18m plot',
