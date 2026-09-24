@@ -18,6 +18,7 @@ brief text ──► /api/extract ──► RequirementsSpec ──► /api/gene
 | `api/projects`, `api/workspaces`, `api/shares`, `api/auth`, `api/billing` | CRUD, membership, public read-only links, JWT, plans/quota |
 | `services/extraction.py` + `services/llm_client.py` | brief text → `RequirementsSpec` (OpenAI-compatible LLM, rule fallback) |
 | `services/clarification.py` | decide *generate* vs *ask a question*; apply defaults |
+| `extraction._reconcile_program` | last pass after the model: merge the same room named twice, take bathroom counts from the brief's own words, drop rules about rooms that aren't in the program |
 | `services/planning` | `RequirementsSpec` → `ProgramGraph` → `EngineProgram` (rooms, zones, adjacency) |
 | `services/layout_engine` | `EngineProgram` → `LayoutPlan`: archetype bands, guillotine subdivision, walls, doors, best-of-N search |
 | `services/quality` | hard constraints (overlap, bounds, reachability, privacy chain) and soft scoring rule packs |
@@ -37,8 +38,21 @@ and `quality` are pure (no DB, no HTTP).
 - `Connection` — the user's choice for a room pair: `wall`, `door` (with `at`,
   0..1 along the edge) or `open`. Stored in `LayoutPlan.connections`.
 
+- `LayoutPlan.footprint` — where the building sits on the plot (the rest is
+  yard). The engine sizes the house to its rooms ×1.3 and grows it toward the
+  full plot only if the program doesn't fit (`plan_on_plot`).
+
 Walls and doors are **derived**. `rebuild_derived_geometry` recomputes them from
-rooms after every edit, honouring `connections`.
+rooms after every edit, honouring `connections`. Outside walls are the stretches
+of room edges no other room covers.
+
+### What a plan must pass (hard checks)
+
+No overlaps; inside the plot; minimum room sizes; every room reachable from the
+entrance; no room reachable only through a bedroom (an en-suite through its own
+bedroom is fine when another bathroom is reachable directly); every requested
+room present; every "must connect" in the brief met. The best-of-64 search only
+returns plans that pass; otherwise the brief is refused with the reason.
 
 ### How doors are chosen
 
