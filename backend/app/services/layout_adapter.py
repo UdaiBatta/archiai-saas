@@ -10,9 +10,36 @@ from math import hypot, radians
 
 from app.config.mvp_defaults import WALL_HEIGHT_M
 from app.schemas.layout_plan import Door, LayoutPlan, PlanRoom, Wall
-from app.services.layout_service import ROOM_COLORS
 from app.services.parser.vastu import is_vastu_requested
 
+ROOM_COLORS: dict[str, str] = {
+    "living_room":    "#b3b8e9",
+    "kitchen":        "#6bc0a1",
+    "master_bedroom": "#dea97d",
+    "bedroom":        "#e4a6c6",
+    "bathroom":       "#9abbe4",
+    "dining_room":    "#d6bd5d",
+    "office":         "#c8bced",
+    "study":          "#d2b7ed",
+    "workspace":      "#ac95e1",
+    "meeting_room":   "#9977d4",
+    "reception":      "#3cb4a6",
+    "waiting_room":   "#66bfb4",
+    "consultation_room": "#79bddb",
+    "classroom":      "#d0a254",
+    "retail_display": "#50bb77",
+    "checkout":       "#cead48",
+    "storage":        "#b7b4b2",
+    "entry":          "#7d8795",
+    "hallway":        "#afb6c1",
+    "balcony":        "#80cc9c",
+    "garage":         "#888380",
+    "utility":        "#e4e7ec",
+    "stairs":         "#b3b6bc",
+    "wall":           "#475569",
+    "door":           "#a0702c",
+    "window":         "#79bddb",
+}
 _FALLBACK_COLOR = "#94a3b8"
 _ROOM_COLOR_ALIASES = {
     "dining": "dining_room",

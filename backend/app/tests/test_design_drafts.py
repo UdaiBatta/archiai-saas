@@ -3,6 +3,7 @@ from sqlalchemy import func, select
 
 from app.models.design_version import DesignVersion
 from app.tests.conftest import TestSessionLocal
+from app.tests.conftest import generate_design
 
 
 async def _register_and_token(client: AsyncClient, email: str) -> str:
@@ -19,14 +20,7 @@ async def _create_design(client: AsyncClient, token: str, email_slug: str) -> di
         json={"title": f"Draft Project {email_slug}", "description": None},
         headers={"Authorization": f"Bearer {token}"},
     )
-    response = await client.post(
-        "/api/design/generate",
-        json={
-            "projectId": project.json()["id"],
-            "prompt": "2 bedroom apartment with kitchen",
-        },
-        headers={"Authorization": f"Bearer {token}"},
-    )
+    response = await generate_design(client, {"Authorization": f"Bearer {token}"}, project.json()["id"])
     return response.json()
 
 

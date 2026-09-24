@@ -25,37 +25,6 @@ async def get_owned_design(
     return design
 
 
-async def save_generated_design(
-    db: AsyncSession,
-    user_id: str,
-    project_id: str,
-    layout_json: dict,
-    prompt: str,
-) -> tuple[Design, DesignVersion]:
-    await require_project_edit_access(db, project_id, user_id)
-
-    design = Design(project_id=project_id, user_id=user_id, layout_json=layout_json)
-    db.add(design)
-    await db.flush()
-
-    version = DesignVersion(
-        design_id=design.id,
-        project_id=project_id,
-        user_id=user_id,
-        version_number=1,
-        version_name="Generated layout",
-        version_type="generated",
-        change_summary="Initial generated layout",
-        layout_json=layout_json,
-        prompt_used=prompt,
-    )
-    db.add(version)
-    await db.commit()
-    await db.refresh(design)
-    await db.refresh(version)
-    return design, version
-
-
 async def get_latest_project_design(
     db: AsyncSession,
     user_id: str,

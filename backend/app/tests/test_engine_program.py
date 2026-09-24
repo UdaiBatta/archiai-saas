@@ -3,6 +3,7 @@ additive: engine.py does not consume either yet (Phase 2.2b), so these tests
 only pin the bridge and adapter themselves."""
 import json
 from pathlib import Path
+from typing import NamedTuple
 
 import pytest
 
@@ -11,8 +12,35 @@ from app.services import catalog
 from app.services.layout_engine.subdivision import RoomNeed
 from app.services.planning import Edge, Node, ProgramGraph, from_requirements, to_engine_program
 from app.services.planning.program_completion import ensure_corridor, ensure_entry
-from app.services.planning.program_graph import from_room_specs
-from app.services.prompt_service import RoomSpec
+from app.services.planning.program_graph import (
+    _apply_type_semantics,
+    _classify_node_type,
+    _classify_zone,
+)
+
+
+class RoomSpec(NamedTuple):
+    label: str
+    room_type: str
+    w: float
+    h: float
+    d: float
+
+
+def from_room_specs(specs: list[RoomSpec]) -> ProgramGraph:
+    graph = ProgramGraph()
+    for spec in specs:
+        graph.add_node(_apply_type_semantics(Node(
+            type=_classify_node_type(spec.room_type),
+            space_type=spec.room_type,
+            label=spec.label,
+            zone=_classify_zone(spec.room_type),
+            width=spec.w,
+            depth=spec.d,
+            height=spec.h,
+            target_area_sqm=round(spec.w * spec.d, 2),
+        )))
+    return graph
 
 FIXTURES = Path(__file__).parent / "fixtures" / "requirements"
 

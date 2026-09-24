@@ -42,3 +42,32 @@ async def client():
     ) as c:
         yield c
     app.dependency_overrides.clear()
+
+
+# A small brief the canonical engine always fits; used by tests that need a
+# saved design as setup rather than testing generation itself.
+GENERATE_SPEC = {
+    "building_type": "apartment",
+    "floors": 1,
+    "rooms": [
+        {"type": "bedroom", "count": 2},
+        {"type": "kitchen", "count": 1},
+        {"type": "living_room", "count": 1},
+        {"type": "bathroom", "count": 1},
+    ],
+    "plot": {"width_m": 10, "depth_m": 12},
+    "facing": "east",
+}
+
+
+async def generate_design(client: AsyncClient, headers: dict, project_id: str | None = None):
+    """POST /api/generate; with a project, return its saved canvas layout
+    (GET .../latest), which carries designId/designVersionId and rooms."""
+    response = await client.post(
+        "/api/generate",
+        json={"requirements": GENERATE_SPEC, "useDefaults": True, "projectId": project_id},
+        headers=headers,
+    )
+    if project_id is None or response.status_code != 200:
+        return response
+    return await client.get(f"/api/design/project/{project_id}/latest", headers=headers)
