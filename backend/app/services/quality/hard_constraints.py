@@ -7,7 +7,7 @@ must stay fast), and the reject tier of the scorer (Phase 6).
 
 Violation codes (stable API): overlap, out_of_bounds, below_min_size,
 unreachable, missing_requested_room, through_room_access, unmet_must_connection,
-staircase_alignment.
+staircase_alignment, outdoor_room_inland, entry_inland.
 
 Reachability walks the access graph derived from doors: each door's midpoint
 connects every room whose boundary touches that point (interior doors connect
@@ -310,6 +310,51 @@ def _staircase_alignment_violations(
     )]
 
 
+def touches_outside(room: PlanRoom, plan: LayoutPlan) -> bool:
+    """Does the room have an outside wall (the building outline)?"""
+    if room.vertices is not None or plan.plot.boundary is not None:
+        shared = polygon.room_to_polygon(room).boundary.intersection(
+            polygon.plot_to_polygon(plan.plot).boundary
+        )
+        return shared.length > EPS
+    # The building's outline: its footprint when it sits inside a yard,
+    # otherwise the plot itself.
+    frame = plan.footprint
+    x0, y0 = (frame.x, frame.y) if frame else (0.0, 0.0)
+    x1 = frame.x + frame.w if frame else plan.plot.width_m
+    y1 = frame.y + frame.h if frame else plan.plot.depth_m
+    return (
+        room.x <= x0 + EPS
+        or room.y <= y0 + EPS
+        or room.x + room.w >= x1 - EPS
+        or room.y + room.h >= y1 - EPS
+    )
+
+
+# Rooms that only make sense against the outside of the house. A courtyard
+# is outdoor too, but enclosed on purpose, so it is not listed.
+_NEEDS_OUTSIDE = frozenset({"balcony", "terrace", "porch", "veranda"})
+
+
+def _inland_violations(plan: LayoutPlan) -> list[Violation]:
+    violations: list[Violation] = []
+    for room in plan.rooms:
+        kind = resolve_alias(room.type) or room.type  # the catalog calls an entry 'foyer'
+        if kind in _NEEDS_OUTSIDE and not touches_outside(room, plan):
+            violations.append(Violation(
+                code="outdoor_room_inland",
+                room_ids=[room.id],
+                message=f"{room.label} is boxed in by other rooms: it needs an outside wall",
+            ))
+        elif kind == "foyer" and (room.floor or 0) == 0 and not touches_outside(room, plan):
+            violations.append(Violation(
+                code="entry_inland",
+                room_ids=[room.id],
+                message=f"{room.label} has no outside wall, so there is no front door into it",
+            ))
+    return violations
+
+
 def validate(
     plan: LayoutPlan, requirements: RequirementsSpec | None = None
 ) -> list[Violation]:
@@ -380,6 +425,9 @@ def validate(
     # (f) every "must connect" pair in the brief actually connects.
     if requirements is not None:
         violations.extend(_unmet_must_connections(rooms, adjacency, requirements))
+
+    # (g) balconies and the entry reach the outside of the house.
+    violations.extend(_inland_violations(plan))
 
     return violations
 

@@ -13,6 +13,7 @@ from app.schemas.requirements import RequirementsSpec, RoomType
 from app.services import catalog
 from app.services.layout_engine import polygon
 from app.services.layout_engine.geometry import EPS, Rect
+from app.services.quality.hard_constraints import touches_outside
 
 
 @dataclass(frozen=True)
@@ -141,26 +142,6 @@ def privacy_rule(plan: LayoutPlan, _requirements: RequirementsSpec) -> SoftRuleR
     )
 
 
-def _touches_plot_edge(room: PlanRoom, plan: LayoutPlan) -> bool:
-    if room.vertices is not None or plan.plot.boundary is not None:
-        shared = polygon.room_to_polygon(room).boundary.intersection(
-            polygon.plot_to_polygon(plan.plot).boundary
-        )
-        return shared.length > EPS
-    # The building's outline: its footprint when it sits inside a yard,
-    # otherwise the plot itself.
-    frame = plan.footprint
-    x0, y0 = (frame.x, frame.y) if frame else (0.0, 0.0)
-    x1 = frame.x + frame.w if frame else plan.plot.width_m
-    y1 = frame.y + frame.h if frame else plan.plot.depth_m
-    return (
-        room.x <= x0 + EPS
-        or room.y <= y0 + EPS
-        or room.x + room.w >= x1 - EPS
-        or room.y + room.h >= y1 - EPS
-    )
-
-
 def natural_light_rule(plan: LayoutPlan, _requirements: RequirementsSpec) -> SoftRuleResult:
     daylight_rooms = [
         room
@@ -183,7 +164,7 @@ def natural_light_rule(plan: LayoutPlan, _requirements: RequirementsSpec) -> Sof
     if not daylight_rooms and not wet_rooms:
         return SoftRuleResult(name="natural_light", score=1.0)
 
-    lit = [room for room in daylight_rooms if _touches_plot_edge(room, plan)]
+    lit = [room for room in daylight_rooms if touches_outside(room, plan)]
     warnings = [
         QualityWarning(
             code="generic.natural_light",
@@ -200,7 +181,7 @@ def natural_light_rule(plan: LayoutPlan, _requirements: RequirementsSpec) -> Sof
             severity="info",
         )
         for room in wet_rooms
-        if not _touches_plot_edge(room, plan)
+        if not touches_outside(room, plan)
     )
     return SoftRuleResult(
         name="natural_light",

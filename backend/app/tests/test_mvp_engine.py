@@ -3,6 +3,7 @@ project's main go/no-go gate: the Hypothesis property suite (zero hard
 violations over the random spec space; DoesNotFitError is the only permitted
 alternative outcome, per the workflow's structured "plot too small" contract).
 """
+import json
 from pathlib import Path
 
 import pytest
@@ -808,3 +809,29 @@ def test_no_search_candidate_puts_the_front_door_off_the_entry(facing):
 
     spec = RequirementsSpec.model_validate({**_EAST_3BHK, "facing": facing})
     assert all(_front_door_room(c.plan).type == "entry" for c in generate_candidates(spec))
+
+
+# A real plan from the app (South-facing 4BHK villa example brief) that scored
+# 100 with its balcony and entry boxed in by other rooms, no outside wall.
+_VILLA = json.loads(
+    (Path(__file__).parent / "fixtures" / "golden" / "villa_inland_balcony.json").read_text(encoding="utf-8")
+)
+
+
+def test_boxed_in_balcony_and_entry_are_hard_violations():
+    plan = LayoutPlan.model_validate(_VILLA["layout"])
+    spec = RequirementsSpec.model_validate(_VILLA["requirements"])
+    codes = {v.code for v in validate(plan, spec)}
+    assert {"outdoor_room_inland", "entry_inland"} <= codes
+
+
+def test_villa_brief_gets_balcony_and_entry_on_outside_walls():
+    from app.services.layout_engine.search import generate_candidates
+    from app.services.quality.hard_constraints import touches_outside
+
+    spec = RequirementsSpec.model_validate(_VILLA["requirements"])
+    plan = generate_candidates(spec)[0].plan
+    assert validate(plan, spec) == []
+    for room in plan.rooms:
+        if room.type in ("balcony", "entry"):
+            assert touches_outside(room, plan), room.label
