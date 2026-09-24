@@ -10,9 +10,9 @@ At most three things are "now". Finished items are deleted, not archived.
    bedrooms ~3 × 11 m), and rooms along long office corridors. Next: a
    proportion rule in the score so the search prefers squarer rooms, and
    letting small private rooms (pooja, study) join the living zone.
-2. **Fit robustness.** Some briefs fit a plot facing one way and not another
-   (3BHK on 12 × 15 m facing north). Try the other archetypes and the rotated
-   band order before refusing.
+2. **Fit robustness.** The 3BHK and 4BHK fixtures now fit all four facings
+   since the building-footprint change. Still to do: try the other archetypes
+   and the rotated band order before refusing tight plots.
 3. **Editor page split.** `pages/Project/index.tsx` (~930 lines, 39 `useState`
    calls) and `store/canvasStore.ts` (~1.2k lines): a stage router
    (brief / review / edit) and a document store separate from UI state.
