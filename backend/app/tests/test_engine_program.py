@@ -346,7 +346,8 @@ def test_from_requirements_round_trips_into_engine_program():
     total_rooms = sum(r.count for r in spec.rooms)
     assert len(program.needs) == total_rooms
     assert len(program.avoid) == 4  # 2 bathrooms x (pooja + kitchen)
-    assert len(program.must_adjacent) == 2  # master_bedroom x 2 bathrooms
+    # One-to-one: the master bedroom is attached to ONE bathroom, not both.
+    assert len(program.must_adjacent) == 1
 
 
 # ── program_completion.ensure_entry (Phase 2.2b) ─────────────────────────────

@@ -147,11 +147,17 @@ def _touches_plot_edge(room: PlanRoom, plan: LayoutPlan) -> bool:
             polygon.plot_to_polygon(plan.plot).boundary
         )
         return shared.length > EPS
+    # The building's outline: its footprint when it sits inside a yard,
+    # otherwise the plot itself.
+    frame = plan.footprint
+    x0, y0 = (frame.x, frame.y) if frame else (0.0, 0.0)
+    x1 = frame.x + frame.w if frame else plan.plot.width_m
+    y1 = frame.y + frame.h if frame else plan.plot.depth_m
     return (
-        room.x <= EPS
-        or room.y <= EPS
-        or room.x + room.w >= plan.plot.width_m - EPS
-        or room.y + room.h >= plan.plot.depth_m - EPS
+        room.x <= x0 + EPS
+        or room.y <= y0 + EPS
+        or room.x + room.w >= x1 - EPS
+        or room.y + room.h >= y1 - EPS
     )
 
 

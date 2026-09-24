@@ -67,7 +67,7 @@ from app.services.layout_engine.archetypes import (
     vertical_core_bands,
     zoned_bands,
 )
-from app.services.layout_engine.geometry import EPS, Rect, Segment
+from app.services.layout_engine.geometry import EPS, Rect, Segment, uncovered_edges
 from app.services.layout_engine.polygon_subdivision import subdivide_polygon
 from app.services.layout_engine.subdivision import RoomNeed, SubdivisionError, subdivide
 from app.services.planning import (
@@ -288,8 +288,6 @@ def _round_inside(px: float, py: float, plot: "polygon.Polygon") -> Vertex:
 
 def _build_walls(
     placed: list[tuple[RoomNeed, Rect]],
-    plot_w: float,
-    plot_d: float,
     *,
     floor: int = 0,
     id_prefix: str = "",
@@ -324,15 +322,13 @@ def _build_walls(
             if seg is not None:
                 add(seg, need_a.key, need_b.key, _pair_kind(need_a, need_b, overrides))
 
-    for need, rect in placed:  # boundary portions belong to exactly one room
-        if rect.x <= EPS:
-            add(Segment(0.0, rect.y, 0.0, rect.y2), need.key, None)
-        if rect.x2 >= plot_w - EPS:
-            add(Segment(plot_w, rect.y, plot_w, rect.y2), need.key, None)
-        if rect.y <= EPS:
-            add(Segment(rect.x, 0.0, rect.x2, 0.0), need.key, None)
-        if rect.y2 >= plot_d - EPS:
-            add(Segment(rect.x, plot_d, rect.x2, plot_d), need.key, None)
+    # Outside walls: every stretch of a room edge that no other room covers.
+    # Measured from the rooms themselves, not the plot edge, so a building
+    # set back inside its plot (or edited away from it) keeps its shell.
+    for need, rect in placed:
+        others = [r for n, r in placed if n.key != need.key]
+        for seg in uncovered_edges(rect, others):
+            add(seg, need.key, None)
     return walls, wall_rooms
 
 
@@ -646,14 +642,22 @@ def _place_doors(
     #    wall, else another outside wall of the entry, else the same search
     #    over the next most public rooms, so a plan whose entry ended up
     #    inland still gets a way in.
+    # The street side is the building's own outermost edge in the facing
+    # direction (the plot edge only when the building fills the plot).
+    shell = [w for w in walls if wall_rooms[w.id][1] is None]
+    vertical = [w.x1 for w in shell if abs(w.x1 - w.x2) <= EPS]
+    horizontal = [w.y1 for w in shell if abs(w.y1 - w.y2) <= EPS]
+
     def on_facing(wall: Wall) -> bool:
-        if facing == Facing.east:
-            return abs(wall.x1 - wall.x2) <= EPS and wall.x1 > 0
-        if facing == Facing.west:
-            return abs(wall.x1 - wall.x2) <= EPS and wall.x1 <= EPS
-        if facing == Facing.south:
-            return abs(wall.y1 - wall.y2) <= EPS and wall.y1 > 0
-        return abs(wall.y1 - wall.y2) <= EPS and wall.y1 <= EPS
+        if facing in (Facing.east, Facing.west):
+            if abs(wall.x1 - wall.x2) > EPS or not vertical:
+                return False
+            edge = max(vertical) if facing == Facing.east else min(vertical)
+            return abs(wall.x1 - edge) <= EPS
+        if abs(wall.y1 - wall.y2) > EPS or not horizontal:
+            return False
+        edge = max(horizontal) if facing == Facing.south else min(horizontal)
+        return abs(wall.y1 - edge) <= EPS
 
     if all(w.floor == 0 for w in walls):
         for front_type in _FRONT_DOOR_ROOM_ORDER:
@@ -730,8 +734,6 @@ def rebuild_derived_geometry(
         else:
             walls, wall_rooms = _build_walls(
                 placed,
-                plan.plot.width_m,
-                plan.plot.depth_m,
                 floor=floor,
                 id_prefix=prefix,
                 overrides=overrides,
@@ -876,8 +878,6 @@ def plan_from_program(
 
     walls, wall_rooms = _build_walls(
         placed,
-        plot_w,
-        plot_d,
         floor=floor,
         id_prefix=id_prefix,
     )
@@ -986,10 +986,29 @@ def _generate_plan_multifloor(spec: RequirementsSpec) -> LayoutPlan:
     plot_w = spec.plot.width_m or DEFAULT_PLOT_WIDTH_M
     plot_d = spec.plot.depth_m or DEFAULT_PLOT_DEPTH_M
     facing = spec.facing or DEFAULT_FACING
+    programs = _programs_by_floor(spec)
+    # One footprint for every storey (they stack), sized to the largest.
+    area = max(sum(need.preferred_area for need in p.needs) for p in programs)
+    last_error: DoesNotFitError | None = None
+    for fw, fd in _footprint_candidates(area, plot_w, plot_d):
+        try:
+            plan = _stack_floors(spec, programs, fw, fd, facing)
+        except DoesNotFitError as exc:
+            last_error = exc
+            continue
+        dx, dy = _footprint_origin(fw, fd, plot_w, plot_d, facing)
+        return _placed_on_plot(plan, dx, dy, plot_w, plot_d)
+    assert last_error is not None
+    raise last_error
+
+
+def _stack_floors(
+    spec: RequirementsSpec, programs: list[EngineProgram], plot_w: float, plot_d: float, facing: Facing,
+) -> LayoutPlan:
     rooms: list[PlanRoom] = []
     walls: list[Wall] = []
     doors: list[Door] = []
-    for floor, program in enumerate(_programs_by_floor(spec)):
+    for floor, program in enumerate(programs):
         try:
             bands = vertical_core_bands(program, plot_w, plot_d, facing)
         except SubdivisionError as exc:
@@ -1111,6 +1130,94 @@ def _generate_plan_polygon(spec: RequirementsSpec) -> LayoutPlan:
     )
 
 
+# ── Building footprint ───────────────────────────────────────────────────────
+# A house does not fill its plot: it sits inside setbacks with open ground
+# around it. Filling the whole plot stretched every room to match it (a 60 m²
+# program on the 30 x 40 m default plot got 20x-sized rooms). The building is
+# sized to its program with comfort to spare and placed with a deeper yard on
+# the street side; if the program does not fit, the footprint grows back
+# toward the full plot, so nothing that fitted before stops fitting.
+_FOOTPRINT_COMFORT = 1.3   # program's preferred areas -> built area
+_FILL_WHOLE_PLOT_BELOW = 1.15  # plot within 15% of that: just use the plot
+_STREET_YARD_SHARE = 0.6   # of the spare depth, the part in front of the house
+_FOOTPRINT_STEP = 1.12     # growth per retry when the program doesn't fit
+
+
+def _footprint_candidates(program_area: float, plot_w: float, plot_d: float) -> list[tuple[float, float]]:
+    target = program_area * _FOOTPRINT_COMFORT
+    if plot_w * plot_d <= target * _FILL_WHOLE_PLOT_BELOW:
+        return [(plot_w, plot_d)]
+    # Smallest first, then ~12% steps up to the whole plot: the first size
+    # the program fits wins, so rooms stay as close to their own size as
+    # the layout allows.
+    scales, t = [], math.sqrt(target / (plot_w * plot_d))
+    while t < 1:
+        scales.append(t)
+        t *= _FOOTPRINT_STEP
+    return [(_round(plot_w * t), _round(plot_d * t)) for t in scales] + [(plot_w, plot_d)]
+
+
+def _footprint_origin(fw: float, fd: float, plot_w: float, plot_d: float, facing: Facing) -> tuple[float, float]:
+    spare_x, spare_y = plot_w - fw, plot_d - fd
+    street, back = _STREET_YARD_SHARE, 1 - _STREET_YARD_SHARE
+    if facing == Facing.east:
+        return _round(spare_x * back), _round(spare_y / 2)
+    if facing == Facing.west:
+        return _round(spare_x * street), _round(spare_y / 2)
+    if facing == Facing.south:
+        return _round(spare_x / 2), _round(spare_y * back)
+    return _round(spare_x / 2), _round(spare_y * street)
+
+
+def _placed_on_plot(plan: LayoutPlan, dx: float, dy: float, plot_w: float, plot_d: float) -> LayoutPlan:
+    """Move a plan generated on its footprint to its place on the plot."""
+    if dx == 0 and dy == 0 and (plan.plot.width_m, plan.plot.depth_m) == (plot_w, plot_d):
+        return plan
+    return plan.model_copy(update={
+        "plot": plan.plot.model_copy(update={"width_m": plot_w, "depth_m": plot_d}),
+        "footprint": PlanZoneSpan(
+            x=_round(dx), y=_round(dy), w=plan.plot.width_m, h=plan.plot.depth_m
+        ),
+        "rooms": [
+            r.model_copy(update={"x": _round(r.x + dx), "y": _round(r.y + dy)})
+            for r in plan.rooms
+        ],
+        "walls": [
+            w.model_copy(update={
+                "x1": _round(w.x1 + dx), "y1": _round(w.y1 + dy),
+                "x2": _round(w.x2 + dx), "y2": _round(w.y2 + dy),
+            })
+            for w in plan.walls
+        ],
+        "archetype_reasons": None if plan.archetype_reasons is None else [
+            reason.model_copy(update={"spans": [
+                s.model_copy(update={"x": _round(s.x + dx), "y": _round(s.y + dy)})
+                for s in reason.spans
+            ]})
+            for reason in plan.archetype_reasons
+        ],
+    })
+
+
+def plan_on_plot(
+    spec: RequirementsSpec, program: EngineProgram, plot_w: float, plot_d: float, facing: Facing,
+) -> LayoutPlan:
+    """``plan_from_program`` on a building footprint sized to the program,
+    placed on the plot (see the footprint notes above)."""
+    area = sum(need.preferred_area for need in program.needs)
+    last_error: DoesNotFitError | None = None
+    for fw, fd in _footprint_candidates(area, plot_w, plot_d):
+        try:
+            plan = plan_from_program(spec, program, fw, fd, facing)
+        except DoesNotFitError as exc:
+            last_error = exc
+            continue
+        dx, dy = _footprint_origin(fw, fd, plot_w, plot_d, facing)
+        return _placed_on_plot(plan, dx, dy, plot_w, plot_d)
+    assert last_error is not None
+    raise last_error
+
+
 def generate_plan(spec: RequirementsSpec) -> LayoutPlan:
     if spec.floors > 1:
         return _generate_plan_multifloor(spec)
@@ -1121,4 +1228,4 @@ def generate_plan(spec: RequirementsSpec) -> LayoutPlan:
     plot_d = spec.plot.depth_m or DEFAULT_PLOT_DEPTH_M
     facing = spec.facing or DEFAULT_FACING
     program = _build_program(spec)
-    return plan_from_program(spec, program, plot_w, plot_d, facing)
+    return plan_on_plot(spec, program, plot_w, plot_d, facing)

@@ -7,7 +7,7 @@ import {
   replaceDerivedCanvasObjects,
 } from '../services/mvpLayoutAdapter'
 import { useCanvasStore } from '../store/canvasStore'
-import type { Connection, Facing, RequirementsSpec } from '../types/contracts'
+import type { Connection, Facing, PlanZoneSpan, RequirementsSpec } from '../types/contracts'
 
 const DEFAULT_DEBOUNCE_MS = 300
 
@@ -69,6 +69,7 @@ export function useMvpQualityValidation({
   const includeVastu = useCanvasStore(
     (state) => state.layoutMetadata.mvpVastuEnabled === true,
   )
+  const building = useCanvasStore((state) => state.layoutMetadata.mvpFootprint) as PlanZoneSpan | undefined
   const connectionsValue = useCanvasStore((state) => state.layoutMetadata.mvpConnections)
   const connections = useMemo(() => parseConnections(connectionsValue), [connectionsValue])
   const fingerprint = useMemo(
@@ -109,6 +110,7 @@ export function useMvpQualityValidation({
         footprint,
         (facing ?? 'east') as Facing,
         connections,
+        building,
       )
       void validateAndSyncMvpLayout(plan, { requirements, includeVastu })
         .then(({ layout, quality }) => {
@@ -155,5 +157,5 @@ export function useMvpQualityValidation({
       cancelled = true
       window.clearTimeout(timeoutId)
     }
-  }, [connections, debounceMs, fingerprint, floors, includeVastu, objects, pipeline, requirementsValue])
+  }, [building, connections, debounceMs, fingerprint, floors, includeVastu, objects, pipeline, requirementsValue])
 }

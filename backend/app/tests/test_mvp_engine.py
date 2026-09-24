@@ -66,10 +66,29 @@ def test_fixture_produces_valid_plan(name):
 
 
 @pytest.mark.parametrize("name", FIXTURE_NAMES)
-def test_fixture_plan_fills_plot_exactly(name):
+def test_fixture_plan_tiles_its_building_exactly_inside_the_plot(name):
     plan = generate_plan(_load(name))
-    total = sum(r.w * r.h for r in plan.rooms)
-    assert total == pytest.approx(plan.plot.width_m * plan.plot.depth_m, rel=0.01)
+    min_x, min_y = min(r.x for r in plan.rooms), min(r.y for r in plan.rooms)
+    max_x, max_y = max(r.x + r.w for r in plan.rooms), max(r.y + r.h for r in plan.rooms)
+    # No gaps: the rooms exactly fill the building's rectangle ...
+    assert sum(r.w * r.h for r in plan.rooms) == pytest.approx((max_x - min_x) * (max_y - min_y), rel=0.01)
+    # ... which sits inside the plot (with yards when the plot has room).
+    assert min_x >= 0 and min_y >= 0
+    assert max_x <= plan.plot.width_m + 1e-6 and max_y <= plan.plot.depth_m + 1e-6
+
+
+def test_a_generous_plot_gets_a_house_sized_to_its_rooms_not_the_plot():
+    spec = _load("2bhk").model_copy(update={"plot": _load("2bhk").plot.model_copy(update={"width_m": 30.0, "depth_m": 40.0})})
+    plan = generate_plan(spec)
+    built = (max(r.x + r.w for r in plan.rooms) - min(r.x for r in plan.rooms)) * (
+        max(r.y + r.h for r in plan.rooms) - min(r.y for r in plan.rooms)
+    )
+    assert built < 0.25 * 30 * 40  # not stretched over the 1,200 m² plot
+    # Street side (east) keeps the deeper yard.
+    east_yard = 30 - max(r.x + r.w for r in plan.rooms)
+    west_yard = min(r.x for r in plan.rooms)
+    assert east_yard > west_yard
+    assert validate(plan, spec) == []
 
 
 def test_entry_lands_on_the_facing_side():
@@ -218,7 +237,7 @@ def test_avoid_pair_vetoes_a_door_even_when_it_is_the_only_bridge():
         (need("b", "bathroom"), Rect(3, 0, 3, 3)),
         (need("c", "entry"), Rect(6, 0, 3, 3)),
     ]
-    walls, wall_rooms = _build_walls(placed, 9.0, 3.0)
+    walls, wall_rooms = _build_walls(placed)
     spec = RequirementsSpec.model_validate({
         "rooms": [
             {"type": "kitchen", "count": 1},

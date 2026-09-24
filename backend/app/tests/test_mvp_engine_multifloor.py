@@ -47,8 +47,10 @@ def _hotel() -> RequirementsSpec:
 
 
 def _footprints(plan, room_type: str):
+    """Rects relative to the building's own corner (it may sit in a yard)."""
+    ox, oy = (plan.footprint.x, plan.footprint.y) if plan.footprint else (0.0, 0.0)
     return {
-        (room.x, room.y, room.w, room.h)
+        (round(room.x - ox, 3), round(room.y - oy, 3), room.w, room.h)
         for room in plan.rooms
         if room.type == room_type
     }

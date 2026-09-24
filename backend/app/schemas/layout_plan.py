@@ -190,10 +190,15 @@ class LayoutPlan(BaseModel):
     doors: list[Door] = Field(default_factory=list, max_length=2000)
     archetype_reasons: list[ArchetypeReason] | None = None
     connections: list[Connection] = Field(default_factory=list, max_length=2000)
+    # The building's outline on the plot (the rest is yard). None = the
+    # building fills the plot, as hand-built and polygon plans do.
+    footprint: PlanZoneSpan | None = None
 
     @model_serializer(mode="wrap")
     def _omit_optional_fields(self, handler):
         payload = handler(self)
+        if self.footprint is None:
+            payload.pop("footprint", None)
         if self.archetype_reasons is None:
             payload.pop("archetype_reasons", None)
         if not self.connections:

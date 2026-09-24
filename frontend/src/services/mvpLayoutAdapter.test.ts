@@ -123,6 +123,16 @@ describe('canonical MVP layout adapter', () => {
     expect(edgesFromLayout(plan)).toEqual([{ rooms: ['room-1', 'room-2'], kind: 'door' }])
   })
 
+  it('keeps the building footprint through an edit round-trip', () => {
+    const building = { x: 1, y: 2, w: 7, h: 9 }
+    const canvas = layoutPlanToCanvas({ ...layout, footprint: building })
+    expect(canvas.metadata?.mvpFootprint).toEqual(building)
+    const plan = canvasObjectsToLayoutPlan(
+      canvas.rooms, { x: 0, z: 0, w: 9, d: 12 }, 'east', [], canvas.metadata?.mvpFootprint as typeof building,
+    )
+    expect(plan.footprint).toEqual(building)
+  })
+
   it('draws no wall object for an open-plan edge', () => {
     const openPlan: LayoutPlan = {
       ...layout,

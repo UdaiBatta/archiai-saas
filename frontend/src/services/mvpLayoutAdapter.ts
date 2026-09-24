@@ -6,6 +6,7 @@ import type {
   HardQualitySnapshot,
   LayoutPlan,
   MvpQualitySnapshot,
+  PlanZoneSpan,
   RequirementsSpec,
   RoomEdge,
 } from '../types/contracts'
@@ -240,6 +241,7 @@ export function layoutPlanToCanvas(
       mvpVastuEnabled: /va?astu/i.test(options.prompt ?? ''),
       mvpEdges: edgesFromLayout(layout),
       mvpConnections: layout.connections ?? [],
+      ...(layout.footprint ? { mvpFootprint: layout.footprint } : {}),
       ...(layout.archetype_reasons?.length
         ? { archetypeReasons: layout.archetype_reasons }
         : {}),
@@ -277,6 +279,7 @@ export function canvasObjectsToLayoutPlan(
   footprint: { x: number; z: number; w: number; d: number },
   facing: Facing,
   connections: Connection[] = [],
+  building?: PlanZoneSpan,
 ): LayoutPlan {
   const rooms = objects
     .filter(
@@ -387,6 +390,7 @@ export function canvasObjectsToLayoutPlan(
     walls,
     doors,
     ...(connections.length ? { connections } : {}),
+    ...(building ? { footprint: building } : {}),
   }
 }
 

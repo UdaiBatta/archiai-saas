@@ -114,6 +114,8 @@ export interface LayoutPlan {
   doors: Door[]
   archetype_reasons?: ArchetypeReason[]
   connections?: Connection[]
+  /** The building's outline on the plot; absent when it fills the plot. */
+  footprint?: PlanZoneSpan
 }
 
 export type ConnectionKind = 'wall' | 'door' | 'open'

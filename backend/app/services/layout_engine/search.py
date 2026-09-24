@@ -2,7 +2,7 @@
 candidate search.
 
 The production MVP API uses :func:`best_candidate` for rectangular plots.
-Every candidate flows through the exact same proven ``engine.plan_from_program``
+Every candidate flows through the exact same proven ``engine.plan_on_plot``
 pipeline ``generate_plan()`` itself uses, parameterized by a room-order-
 shuffled copy of the same ``EngineProgram`` — so a candidate carries the
 identical zero-overlap/zero-gap/reachability guarantees a single-shot plan
@@ -45,7 +45,7 @@ from app.services.layout_engine.engine import (
     _build_program,
     _guard_program_size,
     generate_plan,
-    plan_from_program,
+    plan_on_plot,
 )
 from app.services.planning import EngineProgram, ProgramGraph, from_requirements
 from app.services.planning.graph_scoring import score_graph_satisfaction
@@ -121,7 +121,7 @@ def _anneal(
     for _ in range(max(0, iterations)):
         neighbor_program = _swap_neighbor(current_program, rng)
         try:
-            plan = plan_from_program(spec, neighbor_program, plot_w, plot_d, facing)
+            plan = plan_on_plot(spec, neighbor_program, plot_w, plot_d, facing)
         except DoesNotFitError:
             temp *= _ANNEAL_COOLING
             continue
@@ -192,7 +192,7 @@ def generate_candidates(
             continue
         seen_orders.add(order)
         try:
-            plan = plan_from_program(spec, program, plot_w, plot_d, facing)
+            plan = plan_on_plot(spec, program, plot_w, plot_d, facing)
         except DoesNotFitError as exc:
             last_error = exc
             continue

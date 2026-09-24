@@ -131,15 +131,15 @@ def test_best_candidate_raises_when_the_plot_genuinely_cannot_fit_anything():
 def test_search_finds_a_meaningfully_better_layout_than_single_shot():
     """Pin the measured gain among plans that pass sanitary circulation.
 
-    The former 91-point candidate left one bathroom reachable only through a
-    private room. Once that became a hard violation, the best valid candidate
-    is 81; the search still improves materially over the 72-point baseline.
+    Stacking the attached and the common bathroom back to back, keeping the
+    balcony with the living room, and sizing the house to its rooms (not the
+    plot) lifted the single shot from 72 to 90; the search reaches 100.
     """
     spec = _load("3bhk_adjacencies")
     single_shot_score = score(generate_plan(spec), spec).score
     best_score = score(best_candidate(spec, n=64, seed=0), spec).score
-    assert single_shot_score == 72
-    assert best_score == 81
+    assert single_shot_score == 90
+    assert best_score == 100
     assert best_score - single_shot_score >= 8
 
 

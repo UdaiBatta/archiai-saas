@@ -80,17 +80,31 @@ def sector_for_room(room: PlanRoom, plot: PlanPlot) -> str:
     return f"{vertical}{horizontal}"
 
 
+def _building_sectors(plan: LayoutPlan) -> dict[str, str]:
+    """Each room's compass sector within the house itself — the house may
+    sit on its footprint inside a larger plot with yards around it."""
+    fp = plan.footprint
+    if fp is None:
+        return {room.id: sector_for_room(room, plan.plot) for room in plan.rooms}
+    frame = PlanPlot(width_m=fp.w, depth_m=fp.h, facing=plan.plot.facing)
+    return {
+        room.id: sector_for_room(room.model_copy(update={"x": room.x - fp.x, "y": room.y - fp.y}), frame)
+        for room in plan.rooms
+    }
+
+
 def evaluate_vastu(plan: LayoutPlan) -> VastuEvaluation:
     rules = {rule.room_type: rule for rule in load_rules()}
     earned = 0.0
     possible = 0.0
     warnings: list[QualityWarning] = []
 
+    sector_of = _building_sectors(plan)
     for room in plan.rooms:
         rule = rules.get(room.type)
         if rule is None:
             continue
-        sector = sector_for_room(room, plan.plot)
+        sector = sector_of[room.id]
         possible += rule.weight
         preferred = ", ".join(rule.preferred_zones)
         if sector in rule.preferred_zones:
@@ -117,7 +131,7 @@ def evaluate_vastu(plan: LayoutPlan) -> VastuEvaluation:
         )
 
     for room in plan.rooms:
-        if sector_for_room(room, plan.plot) == "center":
+        if sector_of[room.id] == "center":
             warnings.append(
                 QualityWarning(
                     code="vastu.brahmasthan_occupied",

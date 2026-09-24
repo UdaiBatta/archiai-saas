@@ -6,7 +6,7 @@ Rect math. Used three ways: engine self-check (Phase 1 tests), the
 must stay fast), and the reject tier of the scorer (Phase 6).
 
 Violation codes (stable API): overlap, out_of_bounds, below_min_size,
-unreachable, missing_requested_room, through_room_access,
+unreachable, missing_requested_room, through_room_access, unmet_must_connection,
 staircase_alignment.
 
 Reachability walks the access graph derived from doors: each door's midpoint
@@ -194,13 +194,26 @@ def _through_room_access_violations(
 
     exempt_pairs = _must_exempt_pairs(rooms, requirements)
     labels = {r.id: r.label for r in rooms}
+    via_public = _walk(start, adjacency, frozenset(private_ids))
+    shared_bathroom_reachable = bool(sanitary_ids & via_public)
     violations: list[Violation] = []
     for pid in sorted(target_ids):
         if pid == start or pid not in reachable:
             continue  # a disconnected room is already reported as `unreachable`
+        # An en-suite: a bathroom may be reached through the one private room
+        # it opens straight into — as long as the home also has a bathroom
+        # nobody has to cross a bedroom to reach. A home whose ONLY bathroom
+        # sits behind a bedroom still fails.
+        own_bedroom = (
+            adjacency.get(pid, set())
+            if pid in sanitary_ids and shared_bathroom_reachable
+            else set()
+        )
         blocked = frozenset(
             other for other in private_ids
-            if other != pid and frozenset((pid, other)) not in exempt_pairs
+            if other != pid
+            and frozenset((pid, other)) not in exempt_pairs
+            and other not in own_bedroom
         )
         if pid not in _walk(start, adjacency, blocked):
             violations.append(Violation(
@@ -364,4 +377,41 @@ def validate(
     # (e) privacy-chain check (workflow Phase 4.5) — see module docstring.
     violations.extend(_through_room_access_violations(plan, adjacency, start, seen, requirements))
 
+    # (f) every "must connect" pair in the brief actually connects.
+    if requirements is not None:
+        violations.extend(_unmet_must_connections(rooms, adjacency, requirements))
+
+    return violations
+
+
+def _unmet_must_connections(
+    rooms: list[PlanRoom], adjacency: dict[str, set[str]], requirements: RequirementsSpec
+) -> list[Violation]:
+    """A brief's "must connect A and B" is met when some A and some B are
+    joined by a door or an open edge. A type missing from the plan is left to
+    ``missing_requested_room``."""
+    by_type: dict[str, list[PlanRoom]] = {}
+    for room in rooms:
+        by_type.setdefault(resolve_alias(room.type) or room.type, []).append(room)
+    violations: list[Violation] = []
+    seen: set[frozenset] = set()
+    for pref in requirements.adjacency:
+        if pref.strength != "must":
+            continue
+        a = resolve_alias(pref.room_a) or pref.room_a
+        b = resolve_alias(pref.room_b) or pref.room_b
+        if frozenset((a, b)) in seen or a not in by_type or b not in by_type:
+            continue
+        seen.add(frozenset((a, b)))
+        met = any(
+            rb.id in adjacency.get(ra.id, ())
+            for ra in by_type[a] for rb in by_type[b] if ra.id != rb.id
+        )
+        if not met:
+            label_a, label_b = by_type[a][0].label, by_type[b][0].label
+            violations.append(Violation(
+                code="unmet_must_connection",
+                room_ids=[by_type[a][0].id, by_type[b][0].id],
+                message=f"The brief asks for {label_a} to connect to {label_b}, but they don't.",
+            ))
     return violations

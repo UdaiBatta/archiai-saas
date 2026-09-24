@@ -346,8 +346,9 @@ async def test_generate_returns_multi_floor_canonical_and_canvas_geometry(
         if room["type"] == "staircase"
     ]
     assert len(stairs) == 2
+    footprint = body["layout"].get("footprint") or {"x": 0.0, "y": 0.0}
     assert {
-        (room["x"], room["y"], room["w"], room["h"])
+        (round(room["x"] - footprint["x"], 3), round(room["y"] - footprint["y"], 3), room["w"], room["h"])
         for room in stairs
     } == {(0.0, 0.0, 1.2, 2.4)}
 

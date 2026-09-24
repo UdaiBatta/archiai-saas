@@ -76,7 +76,12 @@ def _classify_node_type(space_type: str) -> NodeType:
     return "space"
 
 
+_OUTDOOR_TYPES = frozenset({"balcony", "terrace", "patio", "deck", "garden", "courtyard", "veranda"})
+
+
 def _classify_zone(space_type: str) -> Zone:
+    if space_type in _OUTDOOR_TYPES:
+        return "outdoor"
     if space_type in _CIRCULATION_TYPES:
         return "circulation"
     if space_type in _SERVICE_TYPES:
@@ -312,19 +317,27 @@ def from_requirements(spec: RequirementsSpec) -> ProgramGraph:
                 return nodes
         return []
 
+    def pairs_for(pref) -> list[tuple[Node, Node]]:
+        a_nodes, b_nodes = nodes_for(pref.room_a), nodes_for(pref.room_b)
+        if pref.strength.upper() != "MUST":
+            return [(a, b) for a in a_nodes for b in b_nodes]
+        # "Master bedroom must connect to a bathroom" attaches ONE bathroom,
+        # not every bathroom in the house: pair instances one to one, the
+        # smaller side's rooms each getting a partner.
+        return list(zip(a_nodes, b_nodes))
+
     for pref in spec.adjacency:
         strength = pref.strength.upper()
-        for a in nodes_for(pref.room_a):
-            for b in nodes_for(pref.room_b):
-                if a.id == b.id:
-                    continue
-                graph.add_edge(Edge(
-                    node_a=a.id, node_b=b.id,
-                    relation_type="adjacent",
-                    strength=strength,
-                    door_required=strength == "MUST",
-                    reason=f"requirements adjacency {pref.room_a}~{pref.room_b}",
-                ))
+        for a, b in pairs_for(pref):
+            if a.id == b.id:
+                continue
+            graph.add_edge(Edge(
+                node_a=a.id, node_b=b.id,
+                relation_type="adjacent",
+                strength=strength,
+                door_required=strength == "MUST",
+                reason=f"requirements adjacency {pref.room_a}~{pref.room_b}",
+            ))
 
     for pair in spec.avoid_adjacency:
         for a in nodes_for(pair.room_a):

@@ -225,6 +225,7 @@ def layout_plan_to_canvas(
         "mvpVastuEnabled": is_vastu_requested(prompt or ""),
         "mvpEdges": room_edges(plan),
         "mvpConnections": [c.model_dump(mode="json") for c in plan.connections],
+        **({"mvpFootprint": plan.footprint.model_dump(mode="json")} if plan.footprint else {}),
     }
     if requirements is not None:
         metadata["mvpRequirements"] = requirements
