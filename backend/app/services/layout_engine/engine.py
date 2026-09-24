@@ -89,6 +89,14 @@ _PRIVACY_THRESHOLD = 2  # matches quality.hard_constraints' own through_room_acc
 
 _SANITARY_TYPES = frozenset({"bathroom", "ensuite", "toilet", "washroom", "wc"})
 
+# Where a front door may go, most preferred first (catalog keys: "entry"
+# resolves to "foyer"). Non-residential programs enter through a lobby or
+# reception the same way.
+_FRONT_DOOR_ROOM_ORDER = (
+    "foyer", "lobby", "reception", "living_room", "open_plan_living",
+    "hallway", "corridor", "dining_room", "kitchen",
+)
+
 # Shared edges between two of these get no wall and no door (open plan).
 _OPEN_PLAN_TYPES = frozenset({
     "living_room", "open_plan_living", "dining_room", "dining_area", "kitchen",
@@ -254,6 +262,28 @@ def _programs_by_floor(spec: RequirementsSpec) -> list[EngineProgram]:
 
 def _round(v: float) -> float:
     return round(v, 3)
+
+
+def _round_inside(px: float, py: float, plot: "polygon.Polygon") -> Vertex:
+    """Round a vertex to the millimetre grid without leaving the plot.
+
+    Plain rounding (what rectangular rooms use) can push a point on a slanted
+    boundary 1 mm outside it. Keep plain rounding whenever the plot covers
+    it, so polygon and rectangle neighbours agree; otherwise take the nearest
+    of the other surrounding grid points that stays inside. Deterministic in
+    (px, py), so rooms sharing a vertex agree."""
+    from shapely.geometry import Point
+
+    plain = (_round(px), _round(py))
+    if plot.covers(Point(*plain)):
+        return Vertex(x=plain[0], y=plain[1])
+    xs = {round(math.floor(px * 1000) / 1000, 3), round(math.ceil(px * 1000) / 1000, 3)}
+    ys = {round(math.floor(py * 1000) / 1000, 3), round(math.ceil(py * 1000) / 1000, 3)}
+    candidates = sorted((math.hypot(x - px, y - py), x, y) for x in xs for y in ys)
+    for _, x, y in candidates:
+        if plot.covers(Point(x, y)):
+            return Vertex(x=x, y=y)
+    return Vertex(x=plain[0], y=plain[1])
 
 
 def _build_walls(
@@ -612,25 +642,30 @@ def _place_doors(
             f"no door-sized wall reaches: {', '.join(unreachable)} — increase plot size"
         )
 
-    # 4. Front door on the entry's facing-side boundary wall (best effort).
-    entry_key = next((n.key for n, _ in placed if n.type == RoomType.entry.value), None)
-    if entry_key is not None:
-        def on_facing(wall: Wall) -> bool:
-            if facing == Facing.east:
-                return abs(wall.x1 - wall.x2) <= EPS and wall.x1 > 0
-            if facing == Facing.west:
-                return abs(wall.x1 - wall.x2) <= EPS and wall.x1 <= EPS
-            if facing == Facing.south:
-                return abs(wall.y1 - wall.y2) <= EPS and wall.y1 > 0
-            return abs(wall.y1 - wall.y2) <= EPS and wall.y1 <= EPS
+    # 4. Front door on the ground floor: the entry's street-facing outside
+    #    wall, else another outside wall of the entry, else the same search
+    #    over the next most public rooms, so a plan whose entry ended up
+    #    inland still gets a way in.
+    def on_facing(wall: Wall) -> bool:
+        if facing == Facing.east:
+            return abs(wall.x1 - wall.x2) <= EPS and wall.x1 > 0
+        if facing == Facing.west:
+            return abs(wall.x1 - wall.x2) <= EPS and wall.x1 <= EPS
+        if facing == Facing.south:
+            return abs(wall.y1 - wall.y2) <= EPS and wall.y1 > 0
+        return abs(wall.y1 - wall.y2) <= EPS and wall.y1 <= EPS
 
-        boundary = [
-            w for w in walls
-            if wall_rooms[w.id] == (entry_key, None) and _wall_length(w) >= _MIN_DOOR_EDGE
-        ]
-        best = next((w for w in boundary if on_facing(w)), None) or (boundary[0] if boundary else None)
-        if best is not None:
-            add_door(best, DOOR_WIDTH_M)
+    if all(w.floor == 0 for w in walls):
+        for front_type in _FRONT_DOOR_ROOM_ORDER:
+            outside = [
+                w for w in walls
+                if wall_rooms[w.id][1] is None
+                and canonical_type(types_by_key[wall_rooms[w.id][0]]) == front_type
+                and _wall_length(w) >= _MIN_DOOR_EDGE
+            ]
+            if outside:
+                add_door(next((w for w in outside if on_facing(w)), outside[0]), DOOR_WIDTH_M)
+                break
 
     return doors
 
@@ -1042,6 +1077,10 @@ def _generate_plan_polygon(spec: RequirementsSpec) -> LayoutPlan:
     walls, wall_rooms = _build_walls_polygon(placed, plot_polygon)
     doors = _place_doors(placed, walls, wall_rooms, spec, facing, program.zone_of)
 
+    boundary_ring = list(plot_polygon.exterior.coords)[:-1]
+    boundary = [Vertex(x=_round(px), y=_round(py)) for px, py in boundary_ring]
+    rounded_plot = polygon.polygon_from_vertices(boundary)
+
     rooms = []
     for need, poly in placed:
         minx, miny, maxx, maxy = poly.bounds
@@ -1050,7 +1089,7 @@ def _generate_plan_polygon(spec: RequirementsSpec) -> LayoutPlan:
         vertices = None
         if not polygon.is_axis_aligned_rect(poly):
             ring = list(poly.exterior.coords)[:-1]  # drop the closing duplicate
-            vertices = [Vertex(x=_round(px), y=_round(py)) for px, py in ring]
+            vertices = [_round_inside(px, py, rounded_plot) for px, py in ring]
         rooms.append(PlanRoom(
             # `need.type` is already validated (see the rect path's own
             # comment above) — no RoomType(...) cast, same migration.
@@ -1059,13 +1098,12 @@ def _generate_plan_polygon(spec: RequirementsSpec) -> LayoutPlan:
         ))
 
     plot_minx, plot_miny, plot_maxx, plot_maxy = plot_polygon.bounds
-    boundary_ring = list(plot_polygon.exterior.coords)[:-1]
     return LayoutPlan(
         plot=PlanPlot(
             width_m=plot_maxx - plot_minx,
             depth_m=plot_maxy - plot_miny,
             facing=facing,
-            boundary=[Vertex(x=_round(px), y=_round(py)) for px, py in boundary_ring],
+            boundary=boundary,
         ),
         rooms=rooms,
         walls=walls,

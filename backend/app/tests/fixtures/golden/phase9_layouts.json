@@ -950,6 +950,13 @@
           "offset": 1.279,
           "wall_ref": "w10",
           "width": 0.9
+        },
+        {
+          "floor": 0,
+          "id": "d6",
+          "offset": 1.436,
+          "wall_ref": "w22",
+          "width": 0.9
         }
       ],
       "plot": {
@@ -5012,6 +5019,13 @@
           "width": 0.9
         },
         {
+          "floor": 0,
+          "id": "f0-d2",
+          "offset": 8.287,
+          "wall_ref": "f0-w19",
+          "width": 0.9
+        },
+        {
           "floor": 1,
           "id": "f1-d1",
           "offset": 0.15,
@@ -5728,6 +5742,13 @@
           "width": 0.9
         },
         {
+          "floor": 0,
+          "id": "f0-d2",
+          "offset": 7.23,
+          "wall_ref": "f0-w19",
+          "width": 0.9
+        },
+        {
           "floor": 1,
           "id": "f1-d1",
           "offset": 0.15,
@@ -6441,6 +6462,13 @@
           "id": "f0-d1",
           "offset": 0.15,
           "wall_ref": "f0-w1",
+          "width": 0.9
+        },
+        {
+          "floor": 0,
+          "id": "f0-d2",
+          "offset": 8.339,
+          "wall_ref": "f0-w19",
           "width": 0.9
         },
         {

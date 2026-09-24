@@ -716,3 +716,16 @@ def test_connection_between_rooms_that_no_longer_touch_is_dropped():
     rebuilt = _rebuilt_with(plan, spec, {"room_a": a, "room_b": b, "kind": "open"})
 
     assert rebuilt.connections == []
+
+
+_TEMPLATES = sorted(p.stem for p in FIXTURES.glob("template_*.json"))
+
+
+@pytest.mark.parametrize("name", FIXTURE_NAMES + _TEMPLATES)
+def test_every_plan_has_exactly_one_front_door(name):
+    # Templates call the entry "foyer" and some place it inland; both used
+    # to leave the plan with no way in.
+    plan = generate_plan(_load(name))
+    outside = {w.id for w in plan.walls if w.rooms is None}
+
+    assert len([d for d in plan.doors if d.wall_ref in outside]) == 1
