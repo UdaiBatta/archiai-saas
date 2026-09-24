@@ -11,7 +11,6 @@ describe('CommandBar recovery state', () => {
 
     render(
       <CommandBar
-        roomCount={0}
         showParams={false}
         setShowParams={vi.fn()}
         plotWidthM=""

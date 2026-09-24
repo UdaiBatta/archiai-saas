@@ -244,6 +244,9 @@ export default function ProjectPage() {
   >('idle')
   const [generateError, setGenerateError] = useState<string | null>(null)
   const [briefReview, setBriefReview] = useState<ExtractResponse | null>(null)
+  // Brief step over an existing plan (Edit ▸ Edit brief). Without a plan the
+  // brief step is simply what the page shows.
+  const [editingBrief, setEditingBrief] = useState(false)
   const [reviewPrompt, setReviewPrompt] = useState('')
   const [generationNotice, setGenerationNotice] = useState<string | null>(null)
   const [layoutSaving, setLayoutSaving] = useState(false)
@@ -387,6 +390,7 @@ export default function ProjectPage() {
       setBriefReview(null)
       setReviewPrompt('')
       setPrompt('')
+      setEditingBrief(false)
     } catch (err) {
       if (axios.isCancel(err) || controller.signal.aborted) return
       const clarification = clarificationFromError(err)
@@ -802,6 +806,13 @@ export default function ProjectPage() {
                 onDelete: handleDelete,
                 onHistory: () => setHistoryOpen(true),
                 onActivity: () => setActivityOpen(true),
+                onEditBrief: () => {
+                  // Start from the brief this plan was made from.
+                  const saved = useCanvasStore.getState().layoutMetadata.prompt
+                  if (!prompt.trim() && typeof saved === 'string') setPrompt(saved)
+                  setGenerateError(null)
+                  setEditingBrief(true)
+                },
                 optionCount: modelStage ? 0 : alternatives.length,
                 activeOption,
                 onPickOption: (index) => handlePickOption(alternatives[index]),
@@ -837,7 +848,7 @@ export default function ProjectPage() {
               />
             )}
 
-            {roomCount > 0 && <>
+            {roomCount > 0 && !editingBrief && <>
               <div className="absolute inset-x-3 top-16 z-30 flex flex-wrap items-center justify-between gap-2">
                 {modelStage ? <div className="flex items-center gap-3"><button type="button" onClick={leaveModelStage} disabled={generating} className="rounded-lg border border-ink/15 bg-graphite-800/95 px-3 py-2 text-xs text-ink">← Back to layout</button><span className="text-xs font-semibold text-ink">3D model</span></div> : <ViewModeSwitcher disabled={generating} />}
                 <div className="flex items-center gap-2">
@@ -880,8 +891,12 @@ export default function ProjectPage() {
               </div>
             )}
 
-            {(!modelStage || roomCount === 0) && <CommandBar
-              roomCount={roomCount}
+            {editingBrief && roomCount > 0 && (
+              <div aria-hidden="true" className="absolute inset-0 z-10 bg-graphite-900/75 backdrop-blur-sm" />
+            )}
+
+            {(roomCount === 0 || editingBrief) && <CommandBar
+              onBackToPlan={roomCount > 0 ? () => setEditingBrief(false) : undefined}
               showParams={showParams}
               setShowParams={setShowParams}
               plotWidthM={plotWidthM}

@@ -191,6 +191,23 @@ describe('ProjectPage canvas views', () => {
       throw Object.assign(new Error('not found'), { response: { status: 404 } })
     })
   })
+  it('keeps the brief out of the way once a plan exists, and reopens it from Edit', async () => {
+    renderProjectPage()
+    const user = userEvent.setup()
+    await screen.findByRole('tab', { name: '2D Plan' })
+    expect(screen.queryByLabelText('Layout prompt')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('menuitem', { name: 'Edit' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit brief…' }))
+    // Starts from the brief this plan was made from.
+    expect(screen.getByLabelText('Layout prompt')).toHaveValue('starter')
+    expect(screen.queryByRole('tab', { name: '2D Plan' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Back to plan' }))
+    expect(screen.queryByLabelText('Layout prompt')).not.toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: '2D Plan' })).toBeInTheDocument()
+  })
+
   it('enters the model stage and returns without losing geometry or undo history', async () => {
     renderProjectPage()
     const user = userEvent.setup()
@@ -320,7 +337,7 @@ describe('ProjectPage generation flow', () => {
     renderProjectPage()
     const user = userEvent.setup()
     await user.type(await screen.findByLabelText('Layout prompt'), 'a small school')
-    await user.click(screen.getByRole('button', { name: 'Generate' }))
+    await user.click(screen.getByRole('button', { name: 'Review brief' }))
     await user.type(await screen.findByLabelText('Answer 1'), 'five')
     await user.type(screen.getByLabelText('Additional requirements'), 'and a library')
     await user.click(screen.getByRole('button', { name: 'Re-check brief' }))
@@ -334,7 +351,7 @@ describe('ProjectPage generation flow', () => {
     renderProjectPage()
     const user = userEvent.setup()
     await user.type(await screen.findByLabelText('Layout prompt'), 'a school with four classrooms')
-    await user.click(screen.getByRole('button', { name: 'Generate' }))
+    await user.click(screen.getByRole('button', { name: 'Review brief' }))
     await user.click(await screen.findByRole('button', { name: 'Generate layout' }))
     const signal = vi.mocked(api.post).mock.calls[1][2]?.signal as AbortSignal
     await user.click(screen.getByRole('button', { name: 'Cancel generation' }))
@@ -430,7 +447,7 @@ describe('ProjectPage generation flow', () => {
     await user.type(screen.getByLabelText(/Floors/), '2')
     await user.selectOptions(screen.getByLabelText('Entry faces'), 'N')
     await user.type(screen.getByLabelText('Layout prompt'), 'studio apartment')
-    await user.click(screen.getByRole('button', { name: 'Generate' }))
+    await user.click(screen.getByRole('button', { name: 'Review brief' }))
     expect(await screen.findByText('2 floors')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Generate layout' }))
 
@@ -531,7 +548,7 @@ describe('ProjectPage generation flow', () => {
     const user = userEvent.setup()
 
     await user.type(await screen.findByLabelText('Layout prompt'), 'apartment with bedroom')
-    await user.click(screen.getByRole('button', { name: 'Generate' }))
+    await user.click(screen.getByRole('button', { name: 'Review brief' }))
     await user.click(await screen.findByRole('button', { name: 'Generate layout' }))
 
     expect(useCanvasStore.getState().viewMode).toBe('floor_plan')
@@ -610,7 +627,7 @@ describe('ProjectPage generation flow', () => {
     renderProjectPage()
     const user = userEvent.setup()
     await user.type(await screen.findByLabelText('Layout prompt'), 'one bedroom house')
-    await user.click(screen.getByRole('button', { name: 'Generate' }))
+    await user.click(screen.getByRole('button', { name: 'Review brief' }))
     expect(await screen.findByText('Your brief, understood.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Generate with defaults' }))
 

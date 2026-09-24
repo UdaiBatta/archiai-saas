@@ -19,6 +19,7 @@ export interface EditorMenubarProps {
   onDelete: () => void
   onHistory: () => void
   onActivity: () => void
+  onEditBrief: () => void
   optionCount: number
   activeOption: number
   onPickOption: (index: number) => void
@@ -91,6 +92,8 @@ export function EditorMenubar(props: EditorMenubarProps) {
       </MenubarMenu>
 
       <MenubarMenu label="Edit">
+        <MenubarItem onClick={props.onEditBrief} disabled={!hasPlan}>Edit brief…</MenubarItem>
+        <MenubarSeparator />
         <MenubarItem onClick={undo} disabled={!canUndo} shortcut="Ctrl Z">Undo</MenubarItem>
         <MenubarItem onClick={redo} disabled={!canRedo} shortcut="Ctrl ⇧ Z">Redo</MenubarItem>
       </MenubarMenu>
