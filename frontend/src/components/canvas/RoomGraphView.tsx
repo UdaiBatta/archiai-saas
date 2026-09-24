@@ -1,7 +1,9 @@
 import { useMemo } from 'react'
 import { useCanvasStore } from '../../store/canvasStore'
-import { ZONE_META, ZONE_ORDER, type ZoneType } from './editorPalette'
-import { buildRoomGraph, type RoomGraphNode } from './roomGraphModel'
+import type { ConnectionKind } from '../../types/contracts'
+import { EDITOR_PALETTE, ZONE_META, ZONE_ORDER } from './editorPalette'
+import type { RoomGraphNode } from './roomGraphModel'
+import { useAccessGraph } from './useAccessGraph'
 
 interface RoomGraphViewProps {
   className?: string
@@ -9,99 +11,86 @@ interface RoomGraphViewProps {
 
 const NODE_W = 150
 const NODE_H = 44
-const NODE_GAP = 22
-const GROUP_GAP = 56
-const GROUP_PAD = 16
-const GROUP_HEADER = 30
+const COL_GAP = 70
+const ROW_GAP = 18
+const PAD = 40
+const HEADER = 34
+
+const NEXT_KIND: Record<ConnectionKind, ConnectionKind> = { wall: 'door', door: 'open', open: 'wall' }
+const EDGE_STYLE: Record<ConnectionKind, { stroke: string; width: number; dash?: string; opacity: number }> = {
+  door: { stroke: EDITOR_PALETTE.edgeDoor, width: 1.6, opacity: 0.95 },
+  open: { stroke: EDITOR_PALETTE.edgeOpen, width: 3.2, opacity: 0.95 },
+  wall: { stroke: EDITOR_PALETTE.edgeWall, width: 1, dash: '2 5', opacity: 0.55 },
+}
 
 interface PlacedNode extends RoomGraphNode {
   x: number
   y: number
 }
 
-interface ZoneGroup {
-  zone: ZoneType
-  x: number
-  y: number
-  w: number
-  h: number
-  nodes: PlacedNode[]
-}
-
 /**
- * Room Graph lens: rooms as nodes grouped into zone regions, with direct
- * (shared wall) and proximity connections derived from the live layout
- * geometry. Selecting a node selects the same object as every other view.
+ * Justified access graph: the entrance on the left, each column one room
+ * deeper. Lines are how rooms meet — door, open, or wall (adjacent, no way
+ * through). Click a line to cycle it; the plan, 3D model and this graph all
+ * update from the same change.
  */
 export function RoomGraphView({ className }: RoomGraphViewProps) {
-  const rooms = useCanvasStore((s) => s.rooms)
   const floors = useCanvasStore((s) => s.floors)
   const selectedFloor = useCanvasStore((s) => s.selectedFloor)
   const selectedId = useCanvasStore((s) => s.selectedId)
   const selectRoom = useCanvasStore((s) => s.selectRoom)
   const deselectAll = useCanvasStore((s) => s.deselectAll)
+  const setConnection = useCanvasStore((s) => s.setConnection)
 
-  const sortedLevels = useMemo(
-    () => [...floors].sort((a, b) => a.level - b.level).map((floor) => floor.level),
-    [floors],
-  )
   const activeLevel =
-    selectedFloor === 'all' ? sortedLevels[0] ?? 0 : selectedFloor
+    selectedFloor === 'all' ? Math.min(0, ...floors.map((floor) => floor.level)) : selectedFloor
+  const graph = useAccessGraph(activeLevel)
 
-  const { nodes, edges } = useMemo(
-    () => buildRoomGraph(rooms, activeLevel),
-    [rooms, activeLevel],
-  )
-
-  const { groups, positioned, width, height } = useMemo(() => {
-    const byZone = new Map<ZoneType, RoomGraphNode[]>()
-    for (const node of nodes) {
-      const list = byZone.get(node.zone) ?? []
-      list.push(node)
-      byZone.set(node.zone, list)
-    }
-    const zones = ZONE_ORDER.filter((zone) => byZone.has(zone))
-    const columns = Math.max(1, Math.min(zones.length, 3))
-    const groupW = NODE_W + GROUP_PAD * 2
-    const placedGroups: ZoneGroup[] = []
-    const nodeIndex = new Map<string, PlacedNode>()
-
-    const columnBottoms = new Array(columns).fill(GROUP_GAP)
-    zones.forEach((zone, index) => {
-      const column = index % columns
-      const zoneNodes = byZone.get(zone)!
-      const groupH = GROUP_HEADER + zoneNodes.length * (NODE_H + NODE_GAP) + GROUP_PAD
-      const x = GROUP_GAP + column * (groupW + GROUP_GAP)
-      const y = columnBottoms[column]
-      columnBottoms[column] = y + groupH + GROUP_GAP
-
-      const placedNodes: PlacedNode[] = zoneNodes.map((node, nodeIdx) => {
-        const placed: PlacedNode = {
-          ...node,
-          x: x + GROUP_PAD,
-          y: y + GROUP_HEADER + nodeIdx * (NODE_H + NODE_GAP),
-        }
-        nodeIndex.set(node.id, placed)
-        return placed
-      })
-      placedGroups.push({ zone, x, y, w: groupW, h: groupH, nodes: placedNodes })
+  const { columns, placed, width, height } = useMemo(() => {
+    const maxDepth = Math.max(0, ...graph.nodes.map((node) => node.depth ?? 0))
+    const unreachable = graph.nodes.some((node) => node.depth === null)
+    const columnCount = maxDepth + 1 + (unreachable ? 1 : 0)
+    const byColumn: RoomGraphNode[][] = Array.from({ length: columnCount }, () => [])
+    for (const node of graph.nodes) byColumn[node.depth ?? columnCount - 1].push(node)
+    const zoneRank = (node: RoomGraphNode) => ZONE_ORDER.indexOf(node.zone)
+    const index = new Map<string, PlacedNode>()
+    byColumn.forEach((column, c) => {
+      column
+        .sort((a, b) => zoneRank(a) - zoneRank(b) || a.label.localeCompare(b.label))
+        .forEach((node, r) => {
+          index.set(node.id, {
+            ...node,
+            x: PAD + c * (NODE_W + COL_GAP),
+            y: PAD + HEADER + r * (NODE_H + ROW_GAP),
+          })
+        })
     })
-
+    const tallest = Math.max(1, ...byColumn.map((column) => column.length))
     return {
-      groups: placedGroups,
-      positioned: nodeIndex,
-      width: GROUP_GAP + columns * (groupW + GROUP_GAP),
-      height: Math.max(...columnBottoms, 300),
+      columns: byColumn.map((column, c) => ({
+        label: unreachable && c === columnCount - 1 ? 'Unreachable' : c === 0 ? 'Entrance' : `Depth ${c}`,
+        x: PAD + c * (NODE_W + COL_GAP),
+        empty: column.length === 0,
+      })),
+      placed: index,
+      width: PAD * 2 + columnCount * NODE_W + (columnCount - 1) * COL_GAP,
+      height: PAD * 2 + HEADER + tallest * (NODE_H + ROW_GAP),
     }
-  }, [nodes])
+  }, [graph.nodes])
 
+  const labelOf = (id: string) => placed.get(id)?.label ?? id
+  const route = selectedId ? graph.routes.get(selectedId) : undefined
+  const routeEdges = new Set(
+    (route ?? []).slice(1).map((id, i) => [route![i], id].sort().join('|')),
+  )
+  const warnings = graph.findings.filter((finding) => finding.severity === 'warn')
 
   return (
     <div className={`relative overflow-hidden bg-graphite-900 ${className ?? ''}`}>
       <div className="h-full w-full overflow-auto" data-testid="room-graph-canvas">
         <svg
           role="application"
-          aria-label="Room relationship graph"
+          aria-label="Room access graph"
           width="100%"
           viewBox={`0 0 ${width} ${height}`}
           preserveAspectRatio="xMidYMid meet"
@@ -110,132 +99,148 @@ export function RoomGraphView({ className }: RoomGraphViewProps) {
             if (event.button === 0) deselectAll()
           }}
         >
-          {/* Zone group regions */}
-          {groups.map((group) => (
-            <g key={group.zone}>
-              <rect
-                x={group.x}
-                y={group.y}
-                width={group.w}
-                height={group.h}
-                rx={12}
-                fill={ZONE_META[group.zone].color}
-                fillOpacity={0.09}
-                stroke={ZONE_META[group.zone].color}
-                strokeOpacity={0.45}
-                strokeDasharray="5 4"
-              />
-              <text
-                x={group.x + GROUP_PAD}
-                y={group.y + 19}
-                fontSize={11}
-                fontWeight={700}
-                fill={ZONE_META[group.zone].color}
-                style={{ textTransform: 'uppercase', letterSpacing: '0.08em' }}
-              >
-                {ZONE_META[group.zone].label} zone
-              </text>
-            </g>
+          {columns.map((column) => (
+            <text
+              key={column.label}
+              x={column.x}
+              y={PAD + 12}
+              fontSize={11}
+              fontWeight={700}
+              fill={column.label === 'Unreachable' ? EDITOR_PALETTE.invalid : EDITOR_PALETTE.dimension}
+              style={{ textTransform: 'uppercase', letterSpacing: '0.08em' }}
+            >
+              {column.label}
+            </text>
           ))}
 
-          {/* Connections */}
-          {edges.map((edge) => {
-            const from = positioned.get(edge.source)
-            const to = positioned.get(edge.target)
+          {graph.edges.map((edge) => {
+            const from = placed.get(edge.source)
+            const to = placed.get(edge.target)
             if (!from || !to) return null
-            const x1 = from.x + NODE_W / 2
-            const y1 = from.y + NODE_H / 2
-            const x2 = to.x + NODE_W / 2
-            const y2 = to.y + NODE_H / 2
-            const touched =
-              selectedId !== null &&
-              (edge.source === selectedId || edge.target === selectedId)
+            const [x1, y1] = [from.x + NODE_W / 2, from.y + NODE_H / 2]
+            const [x2, y2] = [to.x + NODE_W / 2, to.y + NODE_H / 2]
             const midX = (x1 + x2) / 2
+            const d = `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`
+            const style = EDGE_STYLE[edge.kind]
+            const onRoute = routeEdges.has([edge.source, edge.target].sort().join('|'))
+            const faded = selectedId !== null && !onRoute && edge.source !== selectedId && edge.target !== selectedId
+            const next = NEXT_KIND[edge.kind]
             return (
-              <path
-                key={`${edge.source}-${edge.target}`}
-                d={`M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`}
-                fill="none"
-                stroke={touched ? '#FFFFFF' : edge.kind === 'direct' ? '#909094' : '#6A6A6E'}
-                strokeWidth={touched ? 2 : 1.2}
-                strokeDasharray={edge.kind === 'proximity' ? '4 4' : undefined}
-                opacity={selectedId && !touched ? 0.35 : 0.9}
-              />
-            )
-          })}
-
-          {/* Nodes */}
-          {groups.flatMap((group) =>
-            group.nodes.map((node) => {
-              const selected = node.id === selectedId
-              return (
-                <g
-                  key={node.id}
+              <g key={`${edge.source}-${edge.target}`}>
+                <path
+                  d={d}
+                  fill="none"
+                  stroke={onRoute ? '#FFFFFF' : style.stroke}
+                  strokeWidth={onRoute ? style.width + 1 : style.width}
+                  strokeDasharray={style.dash}
+                  opacity={faded ? 0.25 : style.opacity}
+                  pointerEvents="none"
+                />
+                <path
+                  d={d}
+                  fill="none"
+                  stroke="transparent"
+                  strokeWidth={14}
                   role="button"
-                  aria-label={`${node.label}, ${ZONE_META[node.zone].label} zone`}
-                  data-testid={`graph-node-${node.id}`}
-                  transform={`translate(${node.x} ${node.y})`}
+                  aria-label={`${labelOf(edge.source)} to ${labelOf(edge.target)}: ${edge.kind}. Change to ${next}`}
+                  data-testid={`graph-edge-${edge.source}-${edge.target}`}
                   style={{ cursor: 'pointer' }}
                   onPointerDown={(event) => {
                     event.stopPropagation()
-                    if (event.button === 0) selectRoom(node.id)
+                    if (event.button === 0) setConnection(edge.source, edge.target, next)
                   }}
                 >
-                  <rect
-                    width={NODE_W}
-                    height={NODE_H}
-                    rx={9}
-                    fill={selected ? '#F5F5F6' : '#2B2B2C'}
-                    stroke={selected ? '#FFFFFF' : ZONE_META[node.zone].color}
-                    strokeWidth={selected ? 2 : 1.2}
-                  />
-                  <circle
-                    cx={16}
-                    cy={NODE_H / 2}
-                    r={4.5}
-                    fill={ZONE_META[node.zone].color}
-                  />
-                  <text
-                    x={30}
-                    y={NODE_H / 2 - 3}
-                    fontSize={11.5}
-                    fontWeight={600}
-                    fill={selected ? '#1B1B1C' : '#F5F5F6'}
-                  >
-                    {node.label.length > 17 ? `${node.label.slice(0, 16)}…` : node.label}
-                  </text>
-                  <text
-                    x={30}
-                    y={NODE_H / 2 + 11}
-                    fontSize={9.5}
-                    fill={selected ? '#464648' : '#909094'}
-                  >
-                    {node.areaSqm.toFixed(0)} m²
-                  </text>
-                </g>
-              )
-            }),
-          )}
+                  <title>{`${labelOf(edge.source)} ↔ ${labelOf(edge.target)}: ${edge.kind} (click for ${next})`}</title>
+                </path>
+              </g>
+            )
+          })}
+
+          {[...placed.values()].map((node) => {
+            const selected = node.id === selectedId
+            const flagged = warnings.some((finding) => finding.roomId === node.id)
+            return (
+              <g
+                key={node.id}
+                role="button"
+                aria-label={`${node.label}, ${ZONE_META[node.zone].label} zone, ${node.depth === null ? 'unreachable' : `depth ${node.depth}`}`}
+                data-testid={`graph-node-${node.id}`}
+                transform={`translate(${node.x} ${node.y})`}
+                style={{ cursor: 'pointer' }}
+                onPointerDown={(event) => {
+                  event.stopPropagation()
+                  if (event.button === 0) selectRoom(node.id)
+                }}
+              >
+                <rect
+                  width={NODE_W}
+                  height={NODE_H}
+                  rx={9}
+                  fill={selected ? '#F5F5F6' : '#2B2B2C'}
+                  stroke={flagged ? EDITOR_PALETTE.warning : selected ? '#FFFFFF' : ZONE_META[node.zone].color}
+                  strokeWidth={selected || flagged ? 2 : 1.2}
+                />
+                <circle cx={16} cy={NODE_H / 2} r={4.5} fill={ZONE_META[node.zone].color} />
+                <text x={30} y={NODE_H / 2 - 3} fontSize={11.5} fontWeight={600} fill={selected ? '#1B1B1C' : '#F5F5F6'}>
+                  {node.label.length > 17 ? `${node.label.slice(0, 16)}…` : node.label}
+                </text>
+                <text x={30} y={NODE_H / 2 + 11} fontSize={9.5} fill={selected ? '#464648' : '#909094'}>
+                  {ZONE_META[node.zone].label} · {node.areaSqm.toFixed(0)} m²
+                </text>
+              </g>
+            )
+          })}
         </svg>
       </div>
 
-      {/* Connection-type legend */}
+      <aside
+        aria-label="Access reasoning"
+        className="absolute right-3 top-28 z-10 max-h-[55%] w-[min(19rem,calc(100%-1.5rem))] overflow-y-auto rounded-xl border border-ink/10 bg-graphite-800/95 p-3 text-xs shadow-xl backdrop-blur"
+      >
+        <h2 className="mb-2 text-[11px] font-semibold text-ink">Access reasoning</h2>
+        {route && route.length > 0 && (
+          <p className="mb-2 text-muted" data-testid="graph-route">
+            <span className="font-semibold text-ink">Route: </span>
+            {route.map(labelOf).join(' → ')}
+          </p>
+        )}
+        {selectedId && !route && placed.has(selectedId) && (
+          <p className="mb-2 text-danger">{labelOf(selectedId)} has no route from the entrance.</p>
+        )}
+        {graph.findings.length === 0 ? (
+          <p className="text-ok">Every room is reachable, and none only through a bedroom.</p>
+        ) : (
+          <ul className="space-y-1.5">
+            {graph.findings.map((finding, i) => (
+              <li key={i} className={finding.severity === 'warn' ? 'text-warn' : 'text-muted'}>
+                <button type="button" className="text-left hover:underline" onClick={() => selectRoom(finding.roomId)}>
+                  {finding.message}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </aside>
+
       <div className="pointer-events-none absolute bottom-10 left-16 z-10 flex items-center gap-4 rounded-lg border border-ink/10 bg-graphite-800/95 px-3 py-2 text-[10px] text-muted backdrop-blur">
-        <span className="flex items-center gap-1.5">
-          <span aria-hidden="true" className="inline-block h-px w-5 bg-graphite-300" />
-          Direct connection
-        </span>
-        <span className="flex items-center gap-1.5">
-          <svg width="20" height="2" aria-hidden="true">
-            <line x1="0" y1="1" x2="20" y2="1" stroke="#6A6A6E" strokeWidth="2" strokeDasharray="4 3" />
-          </svg>
-          Proximity
-        </span>
+        {(['door', 'open', 'wall'] as const).map((kind) => (
+          <span key={kind} className="flex items-center gap-1.5">
+            <svg width="20" height="4" aria-hidden="true">
+              <line x1="0" y1="2" x2="20" y2="2" stroke={EDGE_STYLE[kind].stroke} strokeWidth={EDGE_STYLE[kind].width} strokeDasharray={EDGE_STYLE[kind].dash} />
+            </svg>
+            {kind === 'door' ? 'Door' : kind === 'open' ? 'Open (no wall)' : 'Wall (no way through)'}
+          </span>
+        ))}
+        <span>· click a line to change it</span>
       </div>
 
-      {nodes.length === 0 && (
+      {graph.nodes.length === 0 ? (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-muted-light">
           Add rooms or generate a layout to see the room graph.
+        </div>
+      ) : !graph.hasConnectionData && (
+        <div className="pointer-events-none absolute inset-x-0 top-20 flex justify-center text-xs text-muted-light">
+          Connections appear once the layout syncs: make any edit to refresh them.
         </div>
       )}
     </div>

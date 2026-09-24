@@ -25,6 +25,11 @@ export const EDITOR_PALETTE = {
   chrome: '#1C1D1E',
   card: '#232425',
   measure: '#C9A96E',
+  // Access graph: how two rooms meet.
+  edgeDoor: '#BDBDC0',
+  edgeOpen: '#8069DF',
+  edgeWall: '#6A6A6E',
+  warning: '#C9A96E',
 } as const
 
 /**

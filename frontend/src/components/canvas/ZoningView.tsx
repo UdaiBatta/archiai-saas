@@ -6,6 +6,9 @@ import { PlanDirectionLabels } from './PlanDirectionLabels'
 import { parseOrientation } from './orientationModel'
 import { formatArea } from '../../utils/format'
 import { isZonableObject, zoneForRoom } from './zoneModel'
+import { useAccessGraph } from './useAccessGraph'
+import { zoneEntrances } from './roomGraphModel'
+import { ZONE_ORDER } from './editorPalette'
 
 interface ZoningViewProps {
   className?: string
@@ -47,6 +50,11 @@ export function ZoningView({ className }: ZoningViewProps) {
   const fontSize = Math.max(0.2, Math.min(0.5, Math.max(bounds.w, bounds.d) / 40))
 
   const orientation = parseOrientation(layoutMetadata)
+  const graph = useAccessGraph(activeLevel)
+  const entrances = useMemo(() => zoneEntrances(graph), [graph])
+  const entranceZone = graph.nodes.find((node) => node.id === graph.entranceId)?.zone
+  const presentZones = ZONE_ORDER.filter((zone) => graph.nodes.some((node) => node.zone === zone))
+  const labelOf = (id: string) => graph.nodes.find((node) => node.id === id)?.label ?? id
 
   return (
     <div className={`relative overflow-hidden bg-graphite-900 ${className ?? ''}`}>
@@ -138,6 +146,33 @@ export function ZoningView({ className }: ZoningViewProps) {
           />
         )}
       </svg>
+
+      {graph.hasConnectionData && presentZones.length > 0 && (
+        <aside
+          aria-label="How zones connect"
+          className="absolute right-3 top-28 z-10 w-[min(18rem,calc(100%-1.5rem))] rounded-xl border border-ink/10 bg-graphite-800/95 p-3 text-xs shadow-xl backdrop-blur"
+        >
+          <h2 className="mb-2 text-[11px] font-semibold text-ink">How zones connect</h2>
+          <ul className="space-y-1.5">
+            {presentZones.map((zone) => {
+              const entry = entrances.get(zone)
+              return (
+                <li key={zone} className="flex gap-2">
+                  <span aria-hidden="true" className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ background: ZONE_META[zone].color }} />
+                  <span className="text-muted">
+                    <span className="font-semibold text-ink">{ZONE_META[zone].label}</span>{' '}
+                    {zone === entranceZone
+                      ? 'holds the entrance.'
+                      : entry
+                        ? `entered from ${[...entry.from].map(labelOf).join(', ')} (${entry.doors} door${entry.doors === 1 ? '' : 's'}${entry.open ? `, ${entry.open} open` : ''}).`
+                        : 'has no way in from another zone.'}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        </aside>
+      )}
 
       {zonableRooms.length === 0 && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-muted-light">

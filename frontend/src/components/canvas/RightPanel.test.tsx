@@ -132,6 +132,10 @@ describe('RightPanel site & orientation', () => {
         room({ id: 'b', label: 'Bathroom', roomType: 'bathroom', position: { x: 6, y: 1.5, z: 2 } }),
       ],
       selectedId: 'k',
+      layoutMetadata: {
+        ...useCanvasStore.getState().layoutMetadata,
+        mvpEdges: [{ rooms: ['b', 'k'], kind: 'wall' }],
+      },
     })
     render(<RightPanel />)
 

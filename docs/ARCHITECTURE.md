@@ -64,6 +64,8 @@ User `wall` connections and spec `avoid_adjacency` pairs never get a door.
 | `components/canvas/Plan2D*` | SVG floor plan (primary editor) |
 | `components/canvas/Canvas3D`, `RoomMesh` | React Three Fiber: real walls with door openings, rooms as floor slabs |
 | `components/canvas/RoomConnections` | Wall / Door / Open switch per neighbour of the selected room |
+| `components/canvas/roomGraphModel` + `useAccessGraph` | the access graph: synced edges with the user's newer choices laid over them, depth from the entrance, routes, and reasoning findings (unreachable, only-through-a-bedroom, private room opened to public) |
+| `components/canvas/RoomGraphView`, `ZoningView` | justified access graph (click a line to cycle wall/door/open) and how each zone is entered, both recomputed on every change |
 
 Canvas metadata carries `mvpRequirements`, `mvpQuality`, `mvpEdges` (how each
 room pair meets, from the last sync) and `mvpConnections` (the user's choices).

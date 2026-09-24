@@ -249,7 +249,7 @@ describe('ProjectPage canvas views', () => {
     await user.click(screen.getByRole('tab', { name: 'Room Graph' }))
     expect(useCanvasStore.getState().viewMode).toBe('graph')
     expect(
-      screen.getByRole('application', { name: 'Room relationship graph' }),
+      screen.getByRole('application', { name: 'Room access graph' }),
     ).toBeInTheDocument()
   })
 
