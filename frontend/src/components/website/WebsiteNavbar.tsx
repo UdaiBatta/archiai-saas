@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuthStore } from '../../store/authStore'
 
 // Every link lands on something that exists: a section of the landing page
@@ -18,56 +18,98 @@ export function useStartDesigningTarget() {
 }
 
 /**
- * Top navbar for the marketing pages (landing, pricing). No editor chrome:
- * the tool rail only exists inside editor screens.
+ * The link pill: a highlight slides under whichever link is hovered or
+ * focused, and the label inverts over it (mix-blend-difference).
+ */
+function NavPill({ isActive }: { isActive: (to: string) => boolean }) {
+  const [cursor, setCursor] = useState({ left: 0, width: 0, opacity: 0 })
+  // Measure the <li> (positioned inside the pill), not the link inside it.
+  const moveTo = (link: HTMLElement) => {
+    const item = link.parentElement ?? link
+    setCursor({ left: item.offsetLeft, width: item.offsetWidth, opacity: 1 })
+  }
+
+  return (
+    <ul
+      className="relative flex items-center rounded-full border border-ink/15 bg-graphite-950/60 p-1 backdrop-blur-md"
+      onMouseLeave={() => setCursor((c) => ({ ...c, opacity: 0 }))}
+    >
+      {NAV_LINKS.map((link) => (
+        // The blend lives on the <li>: it is the layer that sits over the
+        // highlight, so its label inverts (white -> dark) where they overlap.
+        <li key={link.label} className="relative z-10 mix-blend-difference">
+          <Link
+            to={link.to}
+            aria-current={isActive(link.to) ? 'page' : undefined}
+            onMouseEnter={(e) => moveTo(e.currentTarget)}
+            onFocus={(e) => moveTo(e.currentTarget)}
+            onBlur={() => setCursor((c) => ({ ...c, opacity: 0 }))}
+            className={`block rounded-full px-4 py-1.5 text-sm font-medium text-white focus-visible:outline-none ${
+              isActive(link.to) ? 'underline decoration-ember decoration-2 underline-offset-[6px]' : ''
+            }`}
+          >
+            {link.label}
+          </Link>
+        </li>
+      ))}
+      <li
+        aria-hidden="true"
+        className="absolute inset-y-1 z-0 rounded-full bg-ink transition-all duration-300 ease-out motion-reduce:transition-none"
+        style={{ left: cursor.left, width: cursor.width, opacity: cursor.opacity }}
+      />
+    </ul>
+  )
+}
+
+/**
+ * Navbar for the marketing pages (landing, pricing). See-through over the
+ * hero, darkening once the page scrolls; no editor chrome.
  */
 export function WebsiteNavbar() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const startTarget = useStartDesigningTarget()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
   const { pathname } = useLocation()
-  const focusRing = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/40'
+  const focusRing = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/50'
 
-  const isActiveLink = (to: string) => {
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 24)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  const isActive = (to: string) => {
     const path = to.split('#')[0] || '/'
     return path !== '/' && pathname.startsWith(path)
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-ink/10 bg-surface/90 backdrop-blur">
-      <nav aria-label="Main" className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-        <div className="flex items-center gap-8">
-          <Link to="/" className={`flex items-baseline gap-px rounded ${focusRing}`} aria-label="ArchiAI home">
-            <span className="text-base font-extrabold tracking-wide text-ink">ARCHI</span>
-            <span className="text-base font-extrabold tracking-wide text-muted">·AI</span>
-          </Link>
-          <div className="hidden items-center gap-6 md:flex">
-            {NAV_LINKS.map((link) => (
-              <Link
-                key={link.label}
-                to={link.to}
-                aria-current={isActiveLink(link.to) ? 'page' : undefined}
-                className={`rounded-md px-1 py-0.5 text-sm font-medium transition-colors ${focusRing} ${
-                  isActiveLink(link.to)
-                    ? 'text-ink underline decoration-ink/40 underline-offset-8'
-                    : 'text-muted hover:text-ink'
-                }`}
-              >
-                {link.label}
-              </Link>
-            ))}
-          </div>
+    <header
+      className={`sticky top-0 z-40 transition-colors duration-300 ${
+        scrolled || menuOpen ? 'bg-graphite-950/85 backdrop-blur-md' : 'bg-transparent'
+      }`}
+    >
+      <nav aria-label="Main" className="mx-auto grid h-16 w-full max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-4 px-4 sm:px-6">
+        <Link to="/" className={`flex items-baseline gap-px justify-self-start rounded ${focusRing}`} aria-label="ArchiAI home">
+          <span className="text-base font-black tracking-wide text-ink" style={{ fontStretch: '125%' }}>ARCHI</span>
+          <span className="text-base font-black tracking-wide text-ember" style={{ fontStretch: '125%' }}>·AI</span>
+        </Link>
+
+        <div className="hidden md:block">
+          <NavPill isActive={isActive} />
         </div>
 
-        <div className="hidden items-center gap-2.5 md:flex">
+        <div className="hidden items-center gap-2 justify-self-end md:flex">
           {!isAuthenticated && (
-            <Link to="/login" className={`rounded-lg px-3 py-1.5 text-sm font-medium text-muted hover:text-ink ${focusRing}`}>
+            <Link to="/login" className={`rounded-full px-3 py-1.5 text-sm font-medium text-graphite-100 hover:text-ink ${focusRing}`}>
               Log in
             </Link>
           )}
           <Link
             to={startTarget}
-            className={`rounded-lg bg-ink px-3.5 py-1.5 text-sm font-semibold text-graphite-900 hover:bg-graphite-100 ${focusRing}`}
+            className={`rounded-full bg-ember px-4 py-2 text-sm font-bold text-ink shadow-[0_6px_24px_rgba(255,59,31,0.35)] transition-transform hover:-translate-y-px ${focusRing}`}
           >
             {isAuthenticated ? 'Open dashboard' : 'Start designing'}
           </Link>
@@ -77,7 +119,7 @@ export function WebsiteNavbar() {
           type="button"
           aria-label={menuOpen ? 'Close menu' : 'Open menu'}
           aria-expanded={menuOpen}
-          className={`flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-ink/10 hover:text-ink md:hidden ${focusRing}`}
+          className={`col-start-3 flex h-9 w-9 items-center justify-center justify-self-end rounded-full text-graphite-100 hover:bg-ink/10 hover:text-ink md:hidden ${focusRing}`}
           onClick={() => setMenuOpen((open) => !open)}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
@@ -87,13 +129,13 @@ export function WebsiteNavbar() {
       </nav>
 
       {menuOpen && (
-        <div className="border-t border-ink/10 bg-surface px-4 pb-4 pt-2 md:hidden">
+        <div className="border-t border-ink/10 px-4 pb-4 pt-2 md:hidden">
           {NAV_LINKS.map((link) => (
             <Link
               key={link.label}
               to={link.to}
               onClick={() => setMenuOpen(false)}
-              className="block rounded-lg px-2 py-2 text-sm font-medium text-muted hover:bg-ink/5 hover:text-ink"
+              className="block rounded-lg px-2 py-2 text-sm font-medium text-graphite-100 hover:bg-ink/5 hover:text-ink"
             >
               {link.label}
             </Link>
@@ -103,7 +145,7 @@ export function WebsiteNavbar() {
               <Link
                 to="/login"
                 onClick={() => setMenuOpen(false)}
-                className="rounded-lg border border-ink/15 px-3 py-2 text-center text-sm font-medium text-ink"
+                className="rounded-full border border-ink/15 px-3 py-2 text-center text-sm font-medium text-ink"
               >
                 Log in
               </Link>
@@ -111,7 +153,7 @@ export function WebsiteNavbar() {
             <Link
               to={startTarget}
               onClick={() => setMenuOpen(false)}
-              className="rounded-lg bg-ink px-3 py-2 text-center text-sm font-semibold text-graphite-900"
+              className="rounded-full bg-ember px-3 py-2 text-center text-sm font-bold text-ink"
             >
               {isAuthenticated ? 'Open dashboard' : 'Start designing'}
             </Link>

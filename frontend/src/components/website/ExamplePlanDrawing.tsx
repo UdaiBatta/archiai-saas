@@ -9,7 +9,7 @@ import { zoneForRoom } from '../canvas/zoneModel'
  * solid walls, open-plan edges left open, doors as gaps, and the yard
  * around the house. Hovering a room names it with its size.
  */
-export function ExamplePlanDrawing({ plan }: { plan: ExamplePlan['plan'] }) {
+export function ExamplePlanDrawing({ plan, compact = false }: { plan: ExamplePlan['plan']; compact?: boolean }) {
   const [hovered, setHovered] = useState<string | null>(null)
   const { width_m: w, depth_m: d } = plan.plot
   const pad = 0.6
@@ -43,7 +43,7 @@ export function ExamplePlanDrawing({ plan }: { plan: ExamplePlan['plan'] }) {
                 fill={ZONE_META[zone].color}
                 fillOpacity={active ? 0.95 : 0.6}
               />
-              {r.w >= 2 && r.h >= 1.1 && (
+              {!compact && r.w >= 2 && r.h >= 1.1 && (
                 <text
                   x={r.x + r.w / 2}
                   y={r.y + r.h / 2}
@@ -96,13 +96,13 @@ export function ExamplePlanDrawing({ plan }: { plan: ExamplePlan['plan'] }) {
           )
         })}
       </svg>
-      <figcaption className="mt-2 flex min-h-[1.25rem] items-center justify-between gap-3 font-mono text-[11px] text-muted-light">
+      {!compact && <figcaption className="mt-2 flex min-h-[1.25rem] items-center justify-between gap-3 font-mono text-[11px] text-muted-light">
         <span>{room ? `${room.label} · ${room.w.toFixed(1)} × ${room.h.toFixed(1)} m` : 'Hover a room for its size'}</span>
         <span>
           plot {w} × {d} m
           {plan.footprint && ` · house ${plan.footprint.w.toFixed(1)} × ${plan.footprint.h.toFixed(1)} m`}
         </span>
-      </figcaption>
+      </figcaption>}
     </figure>
   )
 }

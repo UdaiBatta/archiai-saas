@@ -4,7 +4,7 @@ import { WebsiteNavbar, useStartDesigningTarget } from '../../components/website
 import { WebsiteFooter } from '../../components/website/WebsiteFooter'
 import { AsciiField } from '../../components/website/AsciiField'
 import { ExamplePlanDrawing } from '../../components/website/ExamplePlanDrawing'
-import { FeatureCard } from '../../components/website/FeatureCard'
+import { FeatureBento } from '../../components/website/FeatureBento'
 import { PricingCard } from '../../components/website/PricingCard'
 import { EXAMPLE } from '../../constants/examplePlan'
 import { PLANS } from '../../constants/plans'
@@ -30,51 +30,6 @@ const STEPS = [
   },
 ]
 
-const FEATURES = [
-  {
-    title: 'Your brief, read back to you',
-    description: 'Rooms, counts, must-connect and keep-apart rules are shown for review before a plan is drawn.',
-    icon: <path d="M4 5h16M4 10h16M4 15h10M16 18l2 2 4-4" />,
-  },
-  {
-    title: 'Plans checked against the brief',
-    description: 'A broken “must connect”, an unreachable room or a bathroom only reachable through a bedroom is never shown as valid.',
-    icon: (
-      <>
-        <path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6z" />
-        <path d="M9 12l2 2 4-4" />
-      </>
-    ),
-  },
-  {
-    title: 'Walls, doors and openings you choose',
-    description: 'Between any two rooms: a solid wall, a door you can slide along it, or open plan. Edits stay put.',
-    icon: <path d="M4 20V4h16v16M4 12h7M15 12h5M11 12a4 4 0 0 1 4-4" />,
-  },
-  {
-    title: 'Access graph and zoning',
-    description: 'See how you walk from the entrance to every room, and how each zone is entered, updated on every change.',
-    icon: (
-      <>
-        <circle cx="5" cy="12" r="2" />
-        <circle cx="19" cy="6" r="2" />
-        <circle cx="19" cy="18" r="2" />
-        <path d="M7 12h5l5-5M12 12l5 5" />
-      </>
-    ),
-  },
-  {
-    title: '2D plan and 3D model',
-    description: 'One plan in both views: real walls with door openings in 3D, and open-plan areas that read as one space.',
-    icon: <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12v9M12 12L4 7.5" />,
-  },
-  {
-    title: 'Versions, sharing and export',
-    description: 'Named versions and auto-saved drafts, PNG and PDF export, read-only share links, and team workspaces.',
-    icon: <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />,
-  },
-]
-
 /** A hand-drawn arrow accent. */
 function HandArrow({ className = '' }: { className?: string }) {
   return (
@@ -82,6 +37,29 @@ function HandArrow({ className = '' }: { className?: string }) {
       <path d="M90 12 C 80 60 58 82 36 62 C 18 44 38 22 58 32 C 76 42 68 72 46 84" />
       <path d="M62 80 L46 84 L50 68" />
     </svg>
+  )
+}
+
+/** A card of real checks floating over the hero's dot field. */
+function FloatingCard({ className, label, lines, footer }: { className: string; label: string; lines: string[]; footer?: string }) {
+  return (
+    <div className={`absolute w-64 motion-safe:animate-float ${className}`}>
+      <div className="rounded-2xl border border-ink/15 border-l-2 border-l-ember bg-graphite-950/85 p-4 shadow-[0_20px_50px_rgba(0,0,0,0.6)] backdrop-blur-sm">
+        <p className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.16em] text-ember-soft">
+          <span className="h-1.5 w-1.5 rounded-full bg-ember" />
+          {label}
+        </p>
+        <ul className="mt-3 space-y-1.5 text-[13px] font-medium text-graphite-100">
+          {lines.map((line) => (
+            <li key={line} className="flex gap-2">
+              <span className="text-ok">✓</span>
+              {line}
+            </li>
+          ))}
+        </ul>
+        {footer && <p className="mt-3 border-t border-ink/10 pt-2 font-mono text-[11px] text-graphite-200">{footer}</p>}
+      </div>
+    </div>
   )
 }
 
@@ -99,7 +77,8 @@ export default function Landing() {
 
       <main>
         {/* Hero */}
-        <section className="relative isolate overflow-hidden border-b border-ink/10">
+        {/* Pulled up under the see-through navbar so the field runs to the top. */}
+        <section className="relative isolate -mt-16 overflow-hidden border-b border-ink/10 pt-16">
           <AsciiField className="absolute inset-0 -z-10" />
           <div
             aria-hidden="true"
@@ -138,28 +117,18 @@ export default function Landing() {
 
             {/* Real checks from the example, floating over the field. */}
             <div className="pointer-events-none absolute inset-0 hidden lg:block" aria-hidden="true">
-              <div className="absolute right-[3%] top-[16%] w-56 rotate-[8deg] motion-safe:animate-float">
-                <div className="rounded-3xl border border-ink/25 bg-ink/10 p-5 shadow-2xl backdrop-blur-md">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ember-soft">Brief understood</p>
-                  <ul className="mt-3 space-y-1.5 text-sm font-semibold text-ink">
-                    <li>✓ 3 bedrooms · 2 bathrooms</li>
-                    <li>✓ 1 dining · 1 pooja room</li>
-                    <li>✓ 12 × 15 m · faces east</li>
-                  </ul>
-                </div>
-              </div>
-              <div className="absolute bottom-[14%] right-[20%] w-60 -rotate-[6deg] motion-safe:animate-float [animation-delay:1.5s]">
-                <div className="rounded-3xl border border-ink/25 bg-ink/10 p-5 shadow-2xl backdrop-blur-md">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ember-soft">Plan checked</p>
-                  <ul className="mt-3 space-y-1.5 text-sm font-semibold text-ink">
-                    <li>✓ Balcony ↔ living room</li>
-                    <li>✓ Master bath attached</li>
-                    <li>✓ Kitchen away from baths</li>
-                  </ul>
-                  <p className="mt-3 font-mono text-[11px] text-graphite-200">score {EXAMPLE.score}/100</p>
-                </div>
-              </div>
-              <HandArrow className="absolute bottom-[30%] right-[40%] h-20 w-20 -rotate-[70deg] text-ember" />
+              <FloatingCard
+                className="right-[3%] top-[20%] rotate-[4deg]"
+                label="Plan checked"
+                lines={['Balcony opens off the living room', 'Master bath attached', 'Kitchen kept away from baths']}
+                footer={`Quality score ${EXAMPLE.score}/100`}
+              />
+              <FloatingCard
+                className="bottom-[16%] right-[22%] -rotate-[3deg] [animation-delay:1.5s]"
+                label="Brief understood"
+                lines={['3 bedrooms · 2 bathrooms', '1 dining · 1 pooja room', '12 × 15 m plot · faces east']}
+              />
+              <HandArrow className="absolute bottom-[31%] right-[42%] h-20 w-20 -rotate-[70deg] text-ember" />
             </div>
 
             <Link
@@ -262,11 +231,7 @@ export default function Landing() {
           <div className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6">
             <p className="font-mono text-xs uppercase tracking-[0.2em] text-ember">In the app today</p>
             <h2 className="mt-2 text-3xl font-black text-ink" style={{ fontStretch: '115%' }}>What you get</h2>
-            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {FEATURES.map((feature) => (
-                <FeatureCard key={feature.title} {...feature} />
-              ))}
-            </div>
+            <FeatureBento />
           </div>
         </section>
 

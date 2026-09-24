@@ -58,11 +58,11 @@ describe('Landing page', () => {
 
   it('shows the real example: brief, what was understood, and the generated plan', () => {
     renderLanding()
-    expect(screen.getByText(`“${EXAMPLE.brief}”`)).toBeInTheDocument()
     const example = document.getElementById('example')!
+    expect(within(example).getByText(`“${EXAMPLE.brief}”`)).toBeInTheDocument()
     expect(within(example).getByText('2 bathrooms')).toBeInTheDocument()
     expect(within(example).getByText('Keep apart: kitchen ↔ bathroom')).toBeInTheDocument()
-    expect(screen.getByRole('img', { name: /Generated floor plan: .*Master Bedroom/ })).toBeInTheDocument()
+    expect(within(example).getByRole('img', { name: /Generated floor plan: .*Master Bedroom/ })).toBeInTheDocument()
   })
 
   it('sends a signed-in visitor to their dashboard instead of sign-up', () => {
