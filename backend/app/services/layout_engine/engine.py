@@ -415,6 +415,26 @@ def _pair_priority(pair: frozenset, zone_of: dict[str, str]) -> int:
     return 2
 
 
+def _max_matching(partners: dict[str, list[str]]) -> dict[str, str]:
+    """Maximum one-to-one pairing (Kuhn's augmenting paths): left room ->
+    its own right room. Tiny inputs (rooms of two types on one floor)."""
+    match_right: dict[str, str] = {}
+
+    def augment(left: str, seen: set[str]) -> bool:
+        for right in partners[left]:
+            if right in seen:
+                continue
+            seen.add(right)
+            if right not in match_right or augment(match_right[right], seen):
+                match_right[right] = left
+                return True
+        return False
+
+    for left in partners:
+        augment(left, set())
+    return {left: right for right, left in match_right.items()}
+
+
 def _place_doors(
     placed: list[tuple[RoomNeed, Rect]],
     walls: list[Wall],
@@ -496,25 +516,39 @@ def _place_doors(
         if width is not None:
             add_door(best, width, chosen.at)
 
+    # Bathrooms that open into their own room (en-suites): they are reached
+    # through that room, never given a corridor door that would stand in for
+    # the bedroom's own.
+    ensuite_keys: set[str] = set()
+
     # 1. `must`-adjacency doors (attached bathroom onto its bedroom, etc.).
+    #    One door per room pair, matched one-to-one: "each bedroom has its
+    #    own bathroom" gives every bedroom a door to a bathroom of its own,
+    #    not one door for the whole rule.
     for pref in spec.adjacency:
         if pref.strength != "must":
             continue
-        for pair, pair_walls in by_pair.items():
-            pair_types = {canonical_type(types_by_key[k]) for k in pair}
-            pref_a = canonical_type(pref.room_a)
-            pref_b = canonical_type(pref.room_b)
-            if pair in forced_walls:
-                continue
-            if pair_types == {pref_a, pref_b} or (
-                pref_a == pref_b
-                and len(pair_types) == 1
-                and pair_types == {pref_a}
-            ):
-                best = max(pair_walls, key=_wall_length)
-                if _wall_length(best) >= _MIN_DOOR_EDGE:
-                    add_door(best, DOOR_WIDTH_M)
-                break
+        pref_a = canonical_type(pref.room_a)
+        pref_b = canonical_type(pref.room_b)
+        doorable = {
+            pair: pair_walls for pair, pair_walls in by_pair.items()
+            if pair not in forced_walls
+            and max(_wall_length(w) for w in pair_walls) >= _MIN_DOOR_EDGE
+            and {canonical_type(types_by_key[k]) for k in pair} == {pref_a, pref_b}
+        }
+        if pref_a == pref_b:
+            # Same-type pair (rare): one door, as before.
+            chosen = list(doorable)[:1]
+        else:
+            side_a = sorted({k for pair in doorable for k in pair if canonical_type(types_by_key[k]) == pref_a})
+            partners = {
+                a: sorted(k for pair in doorable if a in pair for k in pair if k != a)
+                for a in side_a
+            }
+            chosen = [frozenset(pair) for pair in _max_matching(partners).items()]
+        for pair in chosen:
+            add_door(max(doorable[pair], key=_wall_length), DOOR_WIDTH_M)
+            ensuite_keys.update(k for k in pair if canonical_type(types_by_key[k]) in _SANITARY_TYPES)
 
     # 1.5. Guarantee any corridor/hallway spine has a door to a NON-PRIVATE
     #      neighbour, using its widest available shared wall even if narrow
@@ -532,10 +566,13 @@ def _place_doors(
     #      an invented opening.
     _MIN_PHYSICAL_DOOR_EDGE = 0.4
     for corridor_key in (k for k, t in types_by_key.items() if t in ("corridor", "hallway")):
+        # A bathroom is a dead end, never the corridor's link to the rest of
+        # the house; an en-suite especially (its door belongs to its bedroom).
         candidates = [
             (pair, walls) for pair, walls in by_pair.items()
             if corridor_key in pair
             and catalog.privacy_level_for(types_by_key[next(iter(pair - {corridor_key}))]) < _PRIVACY_THRESHOLD
+            and canonical_type(types_by_key[next(iter(pair - {corridor_key}))]) not in _SANITARY_TYPES
             and not is_avoided(pair)
         ]
         if not candidates:
@@ -598,11 +635,12 @@ def _place_doors(
         """Add one door from the reached set to an unreached room.
 
         Tier 0 grows only out of public/circulation rooms; tier 1 may also
-        grow out of a bathroom; tier 2 out of anything. The caller always
-        retries the lowest tier first, so a room is only reached through a
-        bathroom, or last of all through a private room, when nothing better
-        reaches it (a room reachable only through a bedroom fails the
-        validator's through_room_access check)."""
+        grow out of a kitchen, laundry, garage or store; tier 2 out of
+        anything (a bathroom or bedroom). The caller always retries the
+        lowest tier first, so a room is only reached through one of those
+        when nothing better reaches it, and the validator then flags it
+        (walk_through_room). An en-suite is never the way into its own
+        bedroom below tier 2."""
         for pair, pair_walls in ranked_pairs:
             a, b = sorted(pair)
             if (a in connected) == (b in connected):
@@ -612,7 +650,13 @@ def _place_doors(
             source = a if a in connected else b
             private = catalog.privacy_level_for(types_by_key[source]) >= _PRIVACY_THRESHOLD
             sanitary = canonical_type(types_by_key[source]) in _SANITARY_TYPES
-            if (tier == 0 and (private or sanitary)) or (tier == 1 and private):
+            service = canonical_type(types_by_key[source]) in catalog.NO_THROUGH_TYPES
+            target = b if source == a else a
+            if (private or sanitary) and tier < 2:
+                continue
+            if service and tier < 1:
+                continue
+            if target in ensuite_keys and tier < 2:
                 continue
             best = max(pair_walls, key=_wall_length)
             if _wall_length(best) >= _MIN_DOOR_EDGE:
@@ -631,6 +675,44 @@ def _place_doors(
 
     while connect_one(0) or connect_one(1) or connect_one(2):
         pass
+
+    # 3. A home needs a bathroom nobody has to cross a bedroom to reach. If
+    #    every bathroom ended up an en-suite (a door only from its bedroom),
+    #    give one a second door onto a public room or the corridor as well.
+    sanitary_keys = [k for k, t in types_by_key.items() if canonical_type(t) in _SANITARY_TYPES]
+    if sanitary_keys:
+        links: dict[str, set[str]] = {}
+        for x, y in [wall_rooms[d.wall_ref] for d in doors] + open_links:
+            if y is not None:
+                links.setdefault(x, set()).add(y)
+                links.setdefault(y, set()).add(x)
+
+        def passable(key: str) -> bool:
+            return (
+                catalog.privacy_level_for(types_by_key[key]) < _PRIVACY_THRESHOLD
+                and canonical_type(types_by_key[key]) not in _SANITARY_TYPES
+            )
+
+        public = {circulation}
+        frontier = [circulation]
+        while frontier:
+            current = frontier.pop()
+            for nxt in links.get(current, ()):
+                if nxt not in public and passable(nxt):
+                    public.add(nxt)
+                    frontier.append(nxt)
+        if not any(links.get(k, set()) & public for k in sanitary_keys):
+            for key in sorted(sanitary_keys):
+                options = [
+                    max(pw, key=_wall_length) for pair, pw in by_pair.items()
+                    if key in pair and next(iter(pair - {key})) in public
+                    and not is_avoided(pair)
+                    and max(_wall_length(w) for w in pw) >= _NARROW_DOOR_EDGE
+                ]
+                if options:
+                    best = max(options, key=_wall_length)
+                    add_door(best, DOOR_WIDTH_M if _wall_length(best) >= _MIN_DOOR_EDGE else _NARROW_DOOR_WIDTH)
+                    break
 
     unreachable = [n.label for n, _ in placed if n.key not in connected]
     if unreachable and not allow_disconnected:
@@ -959,11 +1041,14 @@ def plan_from_program(
 
         violations = validate(plan, spec)
         if violations:
+            messages = "; ".join(violation.message for violation in violations)
             if band_plan is None and archetype_key != "zoned_bands":
                 try:
                     safe_bands = zoned_bands(program, plot_w, plot_d, facing)
                 except SubdivisionError as exc:
-                    raise DoesNotFitError(f"{exc} — increase plot size") from exc
+                    # Report the rule this layout broke, not the fallback's
+                    # geometry complaint, which would hide the real reason.
+                    raise DoesNotFitError(messages) from exc
                 return plan_from_program(
                     spec,
                     program,
@@ -974,7 +1059,6 @@ def plan_from_program(
                     floor=floor,
                     id_prefix=id_prefix,
                 )
-            messages = "; ".join(violation.message for violation in violations)
             raise DoesNotFitError(messages)
     return plan
 

@@ -51,17 +51,31 @@ of room edges no other room covers.
 No overlaps; inside the plot; minimum room sizes; every room reachable from the
 entrance; no room reachable only through a bedroom (an en-suite through its own
 bedroom is fine when another bathroom is reachable directly); every requested
-room present; every "must connect" in the brief met. The best-of-64 search only
-returns plans that pass; otherwise the brief is refused with the reason.
+room present; every "must connect" in the brief met; balconies, terraces,
+porches and verandas on an outside wall, and the ground-floor entry too.
+
+In homes (house, apartment, villa, duplex), also: no room reachable only by
+walking through a bedroom, bathroom, kitchen, laundry, utility room, garage or
+store (`walk_through_room`). Closets (store, pantry, laundry, utility) may sit
+behind the room they serve, and a room the brief attaches on purpose may sit
+behind its partner (an en-suite behind its bedroom), never the reverse.
+
+The best-of-64 search only returns plans that pass; otherwise the brief is
+refused with the rule that failed.
 
 ### How doors are chosen
 
 1. User `door` connections, where the user put them.
-2. `must` adjacencies (e.g. master bathroom onto master bedroom).
+2. `must` adjacencies, matched one-to-one: "each bedroom has its own bathroom"
+   gives every bedroom a door to a bathroom of its own.
 3. A spanning tree from the circulation room, growing out of public rooms first,
-   then bathrooms, and through a bedroom only as a last resort. Open-plan edges
-   count as already connected, so living/dining/kitchen/entry need no doors.
-4. One front door on the ground floor: the most public room with an outside wall,
+   then kitchens/laundries/garages, and through a bathroom or bedroom only as a
+   last resort. An en-suite is never a bedroom's way in, and never the
+   corridor's link to the house. Open-plan edges count as already connected,
+   so living/dining/kitchen/entry need no doors.
+4. If every bathroom ended up an en-suite, one also gets a door onto a public
+   room or the corridor, so nobody has to cross a bedroom to reach a bathroom.
+5. One front door on the ground floor: the most public room with an outside wall,
    street side preferred.
 
 User `wall` connections and spec `avoid_adjacency` pairs never get a door.

@@ -1,5 +1,6 @@
 """Rule-pack registry and deterministic activation."""
 
+from app.services.quality.hard_constraints import RESIDENTIAL_BUILDINGS
 from app.schemas.layout_plan import LayoutPlan
 from app.schemas.requirements import RequirementsSpec
 from app.services.quality.packs.base import RulePack
@@ -19,7 +20,6 @@ from app.services.quality.soft_rules import (
 )
 from app.services.quality.vastu import evaluate_vastu
 
-_RESIDENTIAL_BUILDINGS = {"house", "apartment", "villa", "duplex"}
 _HEALTHCARE_TYPES = {"consultation_room", "exam_room", "treatment_room", "waiting_room"}
 _WORKPLACE_TYPES = {"meeting_room", "conference_room", "open_workspace", "coworking_area"}
 _HOSPITALITY_EDU_TYPES = {"classroom", "hotel_room", "guest_room"}
@@ -83,7 +83,7 @@ REGISTRY: dict[str, RulePack] = {
         weights={"privacy": 0.20, "bath_kitchen": 0.15},
         evaluate=_residential,
         applies_to=lambda _plan, requirements: (
-            requirements.building_type.value in _RESIDENTIAL_BUILDINGS
+            requirements.building_type.value in RESIDENTIAL_BUILDINGS
         ),
     ),
     "healthcare": RulePack(

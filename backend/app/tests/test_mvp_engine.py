@@ -835,3 +835,83 @@ def test_villa_brief_gets_balcony_and_entry_on_outside_walls():
     for room in plan.rooms:
         if room.type in ("balcony", "entry"):
             assert touches_outside(room, plan), room.label
+
+
+def _row_plan(types: list[str], building: str = "house", must: list[tuple[str, str]] = ()):
+    """Rooms 3 m wide side by side along x (4 m deep), doored in a chain:
+    a door on every shared edge, the front door on the first room's west wall.
+    The simplest plan where the only way to room N runs through rooms 1..N-1."""
+    rooms = [
+        {"id": f"r{i}", "type": t, "label": t.replace("_", " ").title(), "x": 3.0 * i, "y": 0.0, "w": 3.0, "h": 4.0}
+        for i, t in enumerate(types)
+    ]
+    walls = [{"id": "w_front", "x1": 0.0, "y1": 0.0, "x2": 0.0, "y2": 4.0}] + [
+        {"id": f"w{i}", "x1": 3.0 * i, "y1": 0.0, "x2": 3.0 * i, "y2": 4.0, "rooms": [f"r{i - 1}", f"r{i}"]}
+        for i in range(1, len(types))
+    ]
+    doors = [{"id": "d_front", "wall_ref": "w_front", "offset": 1.5}] + [
+        {"id": f"d{i}", "wall_ref": f"w{i}", "offset": 1.5} for i in range(1, len(types))
+    ]
+    plan = LayoutPlan.model_validate({
+        "plot": {"width_m": 3.0 * len(types), "depth_m": 4.0, "facing": "west"},
+        "rooms": rooms, "walls": walls, "doors": doors,
+    })
+    spec = RequirementsSpec.model_validate({
+        "building_type": building, "floors": 1, "plot": {"width_m": 3.0 * len(types), "depth_m": 4.0},
+        "facing": "west", "rooms": [], "spaces": [{"space_type": t, "count": 1} for t in types],
+        "adjacency": [{"room_a": a, "room_b": b, "strength": "must"} for a, b in must],
+        "avoid_adjacency": [],
+    })
+    return plan, spec
+
+
+def _walk_through(plan, spec):
+    return [v.message for v in validate(plan, spec) if v.code == "walk_through_room"]
+
+
+def test_walking_through_a_kitchen_to_the_living_room_is_rejected_in_a_home():
+    plan, spec = _row_plan(["entry", "kitchen", "living_room"])
+    assert _walk_through(plan, spec) == ["Living Room can only be reached by walking through the Kitchen"]
+
+
+def test_a_bedroom_behind_its_own_bathroom_is_rejected_even_when_attached():
+    # "Must connect" lets the en-suite sit behind its bedroom, never the reverse.
+    plan, spec = _row_plan(["entry", "bathroom", "bedroom"], must=[("bedroom", "bathroom")])
+    assert _walk_through(plan, spec) == ["Bedroom can only be reached by walking through the Bathroom"]
+
+
+def test_a_garage_behind_a_bedroom_is_rejected():
+    plan, spec = _row_plan(["entry", "bedroom", "garage"])
+    assert _walk_through(plan, spec) == ["Garage can only be reached by walking through the Bedroom"]
+
+
+def test_closets_and_attached_rooms_may_sit_behind_the_room_they_serve():
+    plan, spec = _row_plan(["entry", "kitchen", "pantry"])
+    assert _walk_through(plan, spec) == []
+    plan, spec = _row_plan(["entry", "bedroom", "bathroom"], must=[("bedroom", "bathroom")])
+    assert validate(plan, spec) == []
+
+
+def test_service_rooms_are_not_blockers_outside_homes():
+    # A warehouse office is reached across its storage floor.
+    plan, spec = _row_plan(["entry", "storage", "office"], building="other")
+    assert _walk_through(plan, spec) == []
+
+
+def test_villa_brief_gives_every_bedroom_its_own_bathroom_and_a_corridor_door():
+    from app.services.layout_engine.search import generate_candidates
+    from app.services.quality.hard_constraints import _door_adjacency
+
+    spec = RequirementsSpec.model_validate(_VILLA["requirements"])
+    plan = generate_candidates(spec)[0].plan
+    assert validate(plan, spec) == []
+    adjacency = _door_adjacency(plan)
+    kind = {r.id: r.type for r in plan.rooms}
+    bedrooms = [r.id for r in plan.rooms if r.type == "bedroom"]
+    # Each bedroom opens onto the corridor itself, not via a bathroom...
+    assert all(any(kind[n] == "corridor" for n in adjacency[b]) for b in bedrooms)
+    # ...and has a bathroom of its own: four bedrooms, four distinct en-suites.
+    ensuites = {n for b in bedrooms for n in adjacency[b] if kind[n] == "bathroom"}
+    assert len(ensuites) == len(bedrooms) == 4
+    for b in bedrooms:
+        assert any(kind[n] == "bathroom" for n in adjacency[b])

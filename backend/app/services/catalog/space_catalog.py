@@ -51,6 +51,13 @@ _SERVICE_TYPES = frozenset({
     "utility", "garage", "mudroom", "pantry", "mechanical", "plant", "shaft",
     "store_room", "stock_room",
 })
+# Rooms nobody should have to walk THROUGH to get somewhere else: you reach
+# them, you don't pass through them. (Bathrooms and bedrooms are covered by
+# the privacy rule; a mudroom is a passage by design, so it isn't listed.)
+NO_THROUGH_TYPES = frozenset({
+    "kitchen", "kitchenette", "laundry", "utility", "pantry", "garage",
+    "storage", "store_room", "stock_room", "mechanical", "plant",
+})
 _WET_TYPES = frozenset({
     "bathroom", "ensuite", "toilet", "washroom", "wc", "kitchen", "kitchenette",
     "laundry", "utility", "pantry",
