@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom'
 
-import Dashboard from './pages/Dashboard'
+import ProjectsPage from './pages/Projects'
+import NewProjectPage from './pages/NewProject'
 import ProjectPage from './pages/Project'
 import Landing from './pages/Landing'
 import Login from './pages/Login'
@@ -18,7 +19,7 @@ function ProtectedRoute() {
 
 function PublicOnlyRoute() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
-  return isAuthenticated ? <Navigate to="/dashboard" replace /> : <Outlet />
+  return isAuthenticated ? <Navigate to="/projects" replace /> : <Outlet />
 }
 
 export default function App() {
@@ -33,7 +34,10 @@ export default function App() {
           <Route path="/register" element={<Register />} />
         </Route>
         <Route element={<ProtectedRoute />}>
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/projects" element={<ProjectsPage />} />
+          <Route path="/projects/new" element={<NewProjectPage />} />
+          {/* Old links and bookmarks. */}
+          <Route path="/dashboard" element={<Navigate to="/projects" replace />} />
           <Route path="/projects/:id" element={<ProjectPage />} />
           <Route path="/workspaces" element={<WorkspacesPage />} />
           <Route path="/workspaces/:id" element={<WorkspacePage />} />

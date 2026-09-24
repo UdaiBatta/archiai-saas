@@ -33,7 +33,7 @@ vi.mock('../../components/canvas/Inspector', () => ({
 vi.mock('../../services/project.service', () => ({
   default: {
     get: vi.fn(),
-    list: vi.fn(),
+    list: vi.fn().mockResolvedValue([]),
     create: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
@@ -351,6 +351,36 @@ describe('ProjectPage generation flow', () => {
     expect(screen.queryByRole('tab', { name: '2D Plan' })).not.toBeInTheDocument()
   })
 
+  it('reads a brief from /projects/new back for review on arrival', async () => {
+    vi.mocked(api.post).mockImplementation(async (url: string) => {
+      if (url === '/api/extract') {
+        return {
+          data: {
+            requirements: {
+              building_type: 'apartment', floors: 1, rooms: [{ type: 'bedroom', count: 1 }],
+              adjacency: [], avoid_adjacency: [], plot: { width_m: null, depth_m: null }, facing: null, missing_info: [],
+            },
+            route: 'generate', questions: [], optional_missing: [],
+            understood_summary: ['Building: Apartment', '1 floor', '1 bedroom'],
+          },
+        }
+      }
+      throw new Error('unexpected POST ' + url)
+    })
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/projects/p1', state: { initialPrompt: 'apartment with a bedroom', review: true } }]}>
+        <Routes>
+          <Route path="/projects/:id" element={<ProjectPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    // Straight to review: nothing is generated until the user confirms.
+    expect(await screen.findByRole('button', { name: 'Generate layout' })).toBeInTheDocument()
+    expect(api.post).toHaveBeenCalledWith('/api/extract', expect.objectContaining({ prompt: 'apartment with a bedroom' }), expect.anything())
+    expect(api.post).not.toHaveBeenCalledWith('/api/generate', expect.anything(), expect.anything())
+  })
+
   it('sends reviewed overrides to canonical multi-floor generation', async () => {
     const extracted = {
       requirements: {
@@ -504,9 +534,11 @@ describe('ProjectPage generation flow', () => {
     await user.click(screen.getByRole('button', { name: 'Generate' }))
     await user.click(await screen.findByRole('button', { name: 'Generate layout' }))
 
-    const options = await screen.findByRole('combobox', { name: 'Layout option' })
     expect(useCanvasStore.getState().viewMode).toBe('floor_plan')
-    await user.selectOptions(options, '1')
+    await user.click(await screen.findByRole('menuitem', { name: 'Plan' }))
+    ;(await screen.findByRole('menuitem', { name: 'Layout options' })).focus()
+    await user.keyboard('{ArrowRight}')
+    await user.click(await screen.findByRole('menuitemradio', { name: 'Option 2' }))
 
     expect(useCanvasStore.getState().rooms.map((room) => room.label)).toEqual(['Bedroom'])
     expect(useCanvasStore.getState().saveStatus).toBe('unsaved')
@@ -609,8 +641,8 @@ describe('ProjectPage history drawer', () => {
     renderProjectPage()
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('button', { name: 'More actions' }))
-    await user.click(screen.getByRole('button', { name: 'History' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Plan' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Version history' }))
 
     expect(screen.getByRole('dialog', { name: 'Version history' })).toBeInTheDocument()
   })
@@ -619,8 +651,8 @@ describe('ProjectPage history drawer', () => {
     renderProjectPage()
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('button', { name: 'More actions' }))
-    await user.click(screen.getByRole('button', { name: 'History' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Plan' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Version history' }))
 
     const closeButton = screen.getByRole('button', { name: 'Close history' })
     await userEvent.click(closeButton)
@@ -634,8 +666,8 @@ describe('ProjectPage history drawer', () => {
     renderProjectPage()
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('button', { name: 'More actions' }))
-    await user.click(screen.getByRole('button', { name: 'Activity' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Plan' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Activity' }))
 
     expect(screen.getByRole('dialog', { name: 'Project activity' })).toBeInTheDocument()
   })

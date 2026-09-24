@@ -24,7 +24,7 @@ function renderLanding() {
 }
 
 // Every route the app defines (App.tsx); a link anywhere else leads nowhere.
-const REAL_ROUTES = ['/', '/pricing', '/login', '/register', '/dashboard']
+const REAL_ROUTES = ['/', '/pricing', '/login', '/register', '/projects']
 const REAL_SECTIONS = ['how-it-works', 'example', 'features']
 
 beforeEach(() => {
@@ -69,8 +69,8 @@ describe('Landing page', () => {
   it('sends a signed-in visitor to their dashboard instead of sign-up', () => {
     useAuthStore.setState({ isAuthenticated: true })
     renderLanding()
-    expect(screen.getAllByRole('link', { name: 'Start designing — free' })[0]).toHaveAttribute('href', '/dashboard')
-    expect(screen.getByRole('link', { name: 'Open dashboard' })).toHaveAttribute('href', '/dashboard')
+    expect(screen.getAllByRole('link', { name: 'Start designing — free' })[0]).toHaveAttribute('href', '/projects')
+    expect(screen.getByRole('link', { name: 'Your projects' })).toHaveAttribute('href', '/projects')
   })
 
   it('starts Starter from the pricing preview and keeps unreleased plans disabled', async () => {

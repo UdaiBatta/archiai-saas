@@ -14,7 +14,7 @@ const NAV_LINKS: { label: string; to: string }[] = [
 /** Where "Start designing" goes: the editor if signed in, sign-up if not. */
 export function useStartDesigningTarget() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
-  return isAuthenticated ? '/dashboard' : '/register'
+  return isAuthenticated ? '/projects' : '/register'
 }
 
 /**
@@ -102,7 +102,7 @@ export function WebsiteNavbar() {
             to={startTarget}
             className={`rounded-full bg-ember px-4 py-2 text-sm font-bold text-ink shadow-[0_6px_24px_rgba(255,59,31,0.35)] transition-transform hover:-translate-y-px ${focusRing}`}
           >
-            {isAuthenticated ? 'Open dashboard' : 'Start designing'}
+            {isAuthenticated ? 'Your projects' : 'Start designing'}
           </Link>
         </div>
 
@@ -146,7 +146,7 @@ export function WebsiteNavbar() {
               onClick={() => setMenuOpen(false)}
               className="rounded-full bg-ember px-3 py-2 text-center text-sm font-bold text-ink"
             >
-              {isAuthenticated ? 'Open dashboard' : 'Start designing'}
+              {isAuthenticated ? 'Your projects' : 'Start designing'}
             </Link>
           </div>
         </div>

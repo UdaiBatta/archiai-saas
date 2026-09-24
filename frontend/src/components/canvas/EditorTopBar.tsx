@@ -1,6 +1,6 @@
 import { Avatar } from '../ui/Avatar'
 import { LevelMenu } from './LevelMenu'
-import { OverflowMenu } from './OverflowMenu'
+import { EditorMenubar, type EditorMenubarProps } from './EditorMenubar'
 import { SavePopover } from './SavePopover'
 
 interface EditorTopBarProps {
@@ -31,18 +31,7 @@ interface EditorTopBarProps {
   setChangeSummary: (value: string) => void
   onSaveLayout: () => void
 
-  onHistory: () => void
-  onActivity: () => void
-  onExportImage: () => void
-  onExportPdf: () => void
-  onDuplicate: () => void
-  onEditProject: () => void
-  onDelete: () => void
-  exportingImage: boolean
-  exportingPdf: boolean
-  duplicating: boolean
-  deleting: boolean
-  roomCount: number
+  menubar: EditorMenubarProps
   exportError: string | null
   duplicateError: string | null
   deleteError: string | null
@@ -72,18 +61,7 @@ export function EditorTopBar({
   changeSummary,
   setChangeSummary,
   onSaveLayout,
-  onHistory,
-  onActivity,
-  onExportImage,
-  onExportPdf,
-  onDuplicate,
-  onEditProject,
-  onDelete,
-  exportingImage,
-  exportingPdf,
-  duplicating,
-  deleting,
-  roomCount,
+  menubar,
   exportError,
   duplicateError,
   deleteError,
@@ -102,6 +80,8 @@ export function EditorTopBar({
           <span className="hidden text-sm font-extrabold tracking-wide sm:inline">ARCHI</span>
           <span className="hidden text-sm font-extrabold tracking-wide text-ink sm:inline">·AI</span>
         </button>
+        <span className="hidden h-3.5 w-px bg-ink/15 sm:block" />
+        <EditorMenubar {...menubar} />
         <span className="hidden h-3.5 w-px bg-ink/15 sm:block" />
 
         {editing ? (
@@ -157,24 +137,6 @@ export function EditorTopBar({
       </div>
 
       <div className="pointer-events-auto flex shrink-0 items-center justify-end gap-1 sm:gap-2">
-        <OverflowMenu
-          onHistory={onHistory}
-          onActivity={onActivity}
-          onExportImage={onExportImage}
-          onExportPdf={onExportPdf}
-          onDuplicate={onDuplicate}
-          onEdit={onEditProject}
-          onDelete={onDelete}
-          exportingImage={exportingImage}
-          exportingPdf={exportingPdf}
-          duplicating={duplicating}
-          deleting={deleting}
-          roomCount={roomCount}
-          exportError={exportError}
-          duplicateError={duplicateError}
-          deleteError={deleteError}
-        />
-
         <button
           type="button"
           aria-label="Share project"
@@ -203,6 +165,13 @@ export function EditorTopBar({
 
         <span className="hidden md:block"><Avatar name={avatarName} size={7.5} /></span>
       </div>
+
+      {/* Menu actions close their menu, so their failures show here. */}
+      {(exportError || duplicateError || deleteError) && (
+        <p role="alert" className="pointer-events-auto absolute inset-x-0 top-full border-b border-danger/30 bg-danger/10 px-4 py-1.5 text-xs text-danger">
+          {exportError ?? duplicateError ?? deleteError}
+        </p>
+      )}
     </div>
   )
 }

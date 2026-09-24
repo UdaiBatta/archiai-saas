@@ -13,7 +13,7 @@ describe('Sidebar', () => {
     )
 
     expect(screen.getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
-      '/dashboard',
+      '/projects',
       '/workspaces',
     ])
   })

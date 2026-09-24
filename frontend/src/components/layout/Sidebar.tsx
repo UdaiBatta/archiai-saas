@@ -61,7 +61,7 @@ export function Sidebar({
         <span className="text-lg font-bold">ArchiAI</span>
       </div>
       <nav className="flex-1 space-y-1 p-3">
-        <NavLink to="/dashboard" className={navClassName}>
+        <NavLink to="/projects" className={navClassName}>
           <NavIcon name="projects" />
           <span className="flex-1">Projects</span>
           {typeof projectCount === 'number' && (

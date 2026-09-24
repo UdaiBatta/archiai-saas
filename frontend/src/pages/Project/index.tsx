@@ -556,7 +556,7 @@ export default function ProjectPage() {
         const apiErr = err as { response?: { status?: number; data?: { error?: string } } }
         if (!active) return
         if (apiErr.response?.status === 404) {
-          navigate('/dashboard')
+          navigate('/projects')
         } else {
           setError(apiErr.response?.data?.error ?? 'Failed to load project')
           setLoading(false)
@@ -596,15 +596,16 @@ export default function ProjectPage() {
     )
   }, [viewMode, setSearchParams])
 
-  // Prefill the prompt when arriving from the Dashboard's hero composer,
-  // which creates the project first and forwards the brief via navigation
-  // state rather than auto-generating sight-unseen.
+  // Arriving from /projects/new: the brief was just written there, so read
+  // it back for review at once (review, not generate: nothing is drawn
+  // until the user confirms what was understood).
   useEffect(() => {
-    const initialPrompt = (location.state as { initialPrompt?: string } | null)?.initialPrompt
-    if (initialPrompt) {
-      setPrompt(initialPrompt)
-      navigate(location.pathname, { replace: true, state: null })
-    }
+    const state = location.state as { initialPrompt?: string; review?: boolean } | null
+    if (!state?.initialPrompt) return
+    setPrompt(state.initialPrompt)
+    navigate(location.pathname, { replace: true, state: null })
+    if (state.review) void requestBriefReview(state.initialPrompt)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per arrival
   }, [location.pathname, location.state, navigate])
 
   const enterEditMode = () => {
@@ -645,7 +646,7 @@ export default function ProjectPage() {
     setDeleting(true)
     try {
       await projectService.delete(id)
-      navigate('/dashboard')
+      navigate('/projects')
     } catch (err) {
       const apiErr = err as { response?: { data?: { error?: string } } }
       setDeleteError(apiErr.response?.data?.error ?? 'Failed to delete project')
@@ -775,7 +776,7 @@ export default function ProjectPage() {
 
             <EditorTopBar
               projectTitle={project.title}
-              onBackToDashboard={() => navigate('/dashboard')}
+              onBackToDashboard={() => navigate('/projects')}
               editing={editing}
               editTitle={editTitle}
               setEditTitle={setEditTitle}
@@ -797,18 +798,28 @@ export default function ProjectPage() {
               changeSummary={changeSummary}
               setChangeSummary={setChangeSummary}
               onSaveLayout={handleSaveLayout}
-              onHistory={() => setHistoryOpen(true)}
-              onActivity={() => setActivityOpen(true)}
-              onExportImage={handleExportImage}
-              onExportPdf={handleExportPdf}
-              onDuplicate={handleDuplicate}
-              onEditProject={enterEditMode}
-              onDelete={handleDelete}
-              exportingImage={exportingImage}
-              exportingPdf={exportingPdf}
-              duplicating={duplicating}
-              deleting={deleting}
-              roomCount={roomCount}
+              menubar={{
+                projectId: project.id,
+                roomCount,
+                onNewProject: () => navigate('/projects/new'),
+                onOpenProject: (projectId) => navigate(`/projects/${projectId}`),
+                onAllProjects: () => navigate('/projects'),
+                onDuplicate: handleDuplicate,
+                onExportImage: handleExportImage,
+                onExportPdf: handleExportPdf,
+                onShare: () => setShareOpen(true),
+                onProjectDetails: enterEditMode,
+                onDelete: handleDelete,
+                onHistory: () => setHistoryOpen(true),
+                onActivity: () => setActivityOpen(true),
+                optionCount: modelStage ? 0 : alternatives.length,
+                activeOption,
+                onPickOption: (index) => handlePickOption(alternatives[index]),
+                exportingImage,
+                exportingPdf,
+                duplicating,
+                deleting,
+              }}
               exportError={exportError}
               duplicateError={duplicateError}
               deleteError={deleteError}
@@ -840,7 +851,7 @@ export default function ProjectPage() {
               <div className="absolute inset-x-3 top-16 z-30 flex flex-wrap items-center justify-between gap-2">
                 {modelStage ? <div className="flex items-center gap-3"><button type="button" onClick={leaveModelStage} disabled={generating} className="rounded-lg border border-ink/15 bg-graphite-800/95 px-3 py-2 text-xs text-ink">← Back to layout</button><span className="text-xs font-semibold text-ink">3D model</span></div> : <ViewModeSwitcher disabled={generating} />}
                 <div className="flex items-center gap-2">
-                  {!modelStage && alternatives.length > 0 && <select aria-label="Layout option" disabled={generating} value={activeOption} onChange={(event) => handlePickOption(alternatives[Number(event.target.value)])} className="max-w-36 rounded-lg border border-ink/10 bg-graphite-800 px-2 py-2 text-xs text-ink">{alternatives.map((_, index) => <option key={index} value={index}>Option {index + 1}{index === 0 ? ' · recommended' : ''}</option>)}</select>}
+                  
                   <button type="button" aria-expanded={panelOpen} onClick={() => setPanelOpen(!panelOpen)} className="rounded-lg border border-ink/15 bg-graphite-800 px-3 py-2 text-xs text-ink lg:hidden">Rooms & details</button>
                 </div>
               </div>
