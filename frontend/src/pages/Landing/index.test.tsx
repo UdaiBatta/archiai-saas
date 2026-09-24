@@ -35,7 +35,7 @@ describe('Landing page', () => {
   it('leads with what the product does and one main action', () => {
     renderLanding()
     expect(
-      screen.getByRole('heading', { level: 1, name: 'Write the brief. Get a plan that follows it.' }),
+      screen.getByRole('heading', { level: 1, name: 'Write the brief. Get the plan.' }),
     ).toBeInTheDocument()
     expect(screen.getAllByRole('link', { name: 'Start designing — free' })[0]).toHaveAttribute('href', '/register')
     // No editor chrome on marketing pages.

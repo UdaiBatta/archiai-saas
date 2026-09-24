@@ -41,6 +41,8 @@ const config: Config = {
           dim: '#5B4CB0',
         },
         // Status colors, deliberately muted per the approved direction.
+        // Marketing accent: the sunset tint of the landing page's dot field.
+        ember: { DEFAULT: '#FF3B1F', soft: '#FF7A45', deep: '#7A1A0C' },
         ok: '#8FAE94',
         warn: '#C9A96E',
         danger: '#C97B70',
@@ -62,12 +64,18 @@ const config: Config = {
           '0%': { opacity: '0', transform: 'translateY(-10px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
+        float: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-14px)' },
+        },
       },
       animation: {
         // Use behind motion-safe: so reduced-motion users get none of it.
         'fade-up': 'fade-up 0.4s cubic-bezier(0.22, 0.9, 0.3, 1) both',
         'fade-in': 'fade-in 0.25s ease both',
         'slide-down': 'slide-down 0.4s cubic-bezier(0.22, 0.9, 0.3, 1) both',
+        float: 'float 6s ease-in-out infinite',
+        'spin-slow': 'spin 14s linear infinite',
       },
     },
   },
