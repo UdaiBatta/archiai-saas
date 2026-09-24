@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useAuthStore } from '../../store/authStore'
 
 // Every link lands on something that exists: a section of the landing page
@@ -62,23 +62,16 @@ function NavPill({ isActive }: { isActive: (to: string) => boolean }) {
 }
 
 /**
- * Navbar for the marketing pages (landing, pricing). See-through over the
- * hero, darkening once the page scrolls; no editor chrome.
+ * Navbar for the marketing pages (landing, pricing). No bar at all: the
+ * logo, the link pill and the actions float as separate pieces, each with
+ * its own blur so it stays readable over whatever scrolls beneath.
  */
 export function WebsiteNavbar() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const startTarget = useStartDesigningTarget()
   const [menuOpen, setMenuOpen] = useState(false)
-  const [scrolled, setScrolled] = useState(false)
   const { pathname } = useLocation()
   const focusRing = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/50'
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 24)
-    onScroll()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
 
   const isActive = (to: string) => {
     const path = to.split('#')[0] || '/'
@@ -87,12 +80,10 @@ export function WebsiteNavbar() {
 
   return (
     <header
-      className={`sticky top-0 z-40 transition-colors duration-300 ${
-        scrolled || menuOpen ? 'bg-graphite-950/85 backdrop-blur-md' : 'bg-transparent'
-      }`}
+      className={`sticky top-0 z-40 ${menuOpen ? 'bg-night/95 backdrop-blur-md' : ''}`}
     >
       <nav aria-label="Main" className="mx-auto grid h-16 w-full max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-4 px-4 sm:px-6">
-        <Link to="/" className={`flex items-baseline gap-px justify-self-start rounded ${focusRing}`} aria-label="ArchiAI home">
+        <Link to="/" className={`flex items-baseline gap-px justify-self-start rounded-full border border-ink/15 bg-graphite-950/60 px-4 py-2 backdrop-blur-md ${focusRing}`} aria-label="ArchiAI home">
           <span className="text-base font-black tracking-wide text-ink" style={{ fontStretch: '125%' }}>ARCHI</span>
           <span className="text-base font-black tracking-wide text-ember" style={{ fontStretch: '125%' }}>·AI</span>
         </Link>
@@ -103,7 +94,7 @@ export function WebsiteNavbar() {
 
         <div className="hidden items-center gap-2 justify-self-end md:flex">
           {!isAuthenticated && (
-            <Link to="/login" className={`rounded-full px-3 py-1.5 text-sm font-medium text-graphite-100 hover:text-ink ${focusRing}`}>
+            <Link to="/login" className={`rounded-full border border-ink/15 bg-graphite-950/60 px-4 py-2 text-sm font-medium text-graphite-100 backdrop-blur-md hover:text-ink ${focusRing}`}>
               Log in
             </Link>
           )}

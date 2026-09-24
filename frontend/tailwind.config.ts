@@ -43,6 +43,8 @@ const config: Config = {
         // Status colors, deliberately muted per the approved direction.
         // Marketing accent: the sunset tint of the landing page's dot field.
         ember: { DEFAULT: '#FF3B1F', soft: '#FF7A45', deep: '#7A1A0C' },
+        // Landing page ground: the near-black under the dot field.
+        night: '#0B0A0A',
         ok: '#8FAE94',
         warn: '#C9A96E',
         danger: '#C97B70',

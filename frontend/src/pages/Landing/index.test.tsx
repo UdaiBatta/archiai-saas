@@ -61,7 +61,8 @@ describe('Landing page', () => {
     const example = document.getElementById('example')!
     expect(within(example).getByText(`“${EXAMPLE.brief}”`)).toBeInTheDocument()
     expect(within(example).getByText('2 bathrooms')).toBeInTheDocument()
-    expect(within(example).getByText('Keep apart: kitchen ↔ bathroom')).toBeInTheDocument()
+    expect(within(example).getByText('Keep apart')).toBeInTheDocument()
+    expect(within(example).getByText('kitchen ↔ bathroom')).toBeInTheDocument()
     expect(within(example).getByRole('img', { name: /Generated floor plan: .*Master Bedroom/ })).toBeInTheDocument()
   })
 

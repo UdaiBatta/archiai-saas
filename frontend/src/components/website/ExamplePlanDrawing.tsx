@@ -1,11 +1,21 @@
 import { useState } from 'react'
 
 import type { ExamplePlan } from '../../constants/examplePlan'
-import { EDITOR_PALETTE, ZONE_META } from '../canvas/editorPalette'
+import type { ZoneType } from '../canvas/editorPalette'
 import { zoneForRoom } from '../canvas/zoneModel'
 
+// Landing palette: living spaces glow ember, private rooms stay dark.
+const ZONE_FILL: Record<ZoneType, string> = {
+  public: 'fill-ember/25',
+  service: 'fill-ember-soft/20',
+  private: 'fill-ink/[0.07]',
+  collaborative: 'fill-ink/[0.07]',
+  circulation: 'fill-ink/[0.03]',
+  utility: 'fill-ink/[0.05]',
+}
+
 /**
- * Draws a real generated plan (not a mock-up): rooms coloured by zone,
+ * Draws a real generated plan (not a mock-up), blueprint style: rooms tinted by zone,
  * solid walls, open-plan edges left open, doors as gaps, and the yard
  * around the house. Hovering a room names it with its size.
  */
@@ -24,9 +34,9 @@ export function ExamplePlanDrawing({ plan, compact = false }: { plan: ExamplePla
         aria-label={`Generated floor plan: ${plan.rooms.map((r) => r.label).join(', ')}`}
         className="mx-auto block max-h-[26rem] w-full"
       >
-        <rect x={0} y={0} width={w} height={d} fill="none" stroke={EDITOR_PALETTE.planGrid} strokeWidth={0.06} strokeDasharray="0.25 0.2" />
+        <rect x={0} y={0} width={w} height={d} fill="none" className="stroke-ink/25" strokeWidth={0.05} strokeDasharray="0.25 0.2" />
         {plan.footprint && (
-          <text x={w - 0.15} y={d - 0.2} textAnchor="end" fontSize={0.42} fill={EDITOR_PALETTE.dimension}>
+          <text x={w - 0.15} y={d - 0.2} textAnchor="end" fontSize={0.42} className="fill-ink/40 font-mono">
             yard
           </text>
         )}
@@ -40,8 +50,7 @@ export function ExamplePlanDrawing({ plan, compact = false }: { plan: ExamplePla
                 y={r.y}
                 width={r.w}
                 height={r.h}
-                fill={ZONE_META[zone].color}
-                fillOpacity={active ? 0.95 : 0.6}
+                className={active ? 'fill-ember/45' : ZONE_FILL[zone]}
               />
               {!compact && r.w >= 2 && r.h >= 1.1 && (
                 <text
@@ -67,8 +76,8 @@ export function ExamplePlanDrawing({ plan, compact = false }: { plan: ExamplePla
             y1={wall.y1}
             x2={wall.x2}
             y2={wall.y2}
-            stroke={wall.kind === 'open' ? EDITOR_PALETTE.dimension : EDITOR_PALETTE.planFrame}
-            strokeWidth={wall.kind === 'open' ? 0.04 : 0.16}
+            className={wall.kind === 'open' ? 'stroke-ember-soft/60' : 'stroke-ink/90'}
+            strokeWidth={wall.kind === 'open' ? 0.05 : 0.14}
             strokeDasharray={wall.kind === 'open' ? '0.2 0.18' : undefined}
             strokeLinecap="square"
             pointerEvents="none"
@@ -89,8 +98,8 @@ export function ExamplePlanDrawing({ plan, compact = false }: { plan: ExamplePla
               y1={y1}
               x2={x1 + ux * door.width}
               y2={y1 + uy * door.width}
-              stroke={EDITOR_PALETTE.selection}
-              strokeWidth={0.2}
+              className="stroke-ember"
+              strokeWidth={0.22}
               pointerEvents="none"
             />
           )

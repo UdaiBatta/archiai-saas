@@ -11,6 +11,7 @@ const ROOM_TYPE_ZONES: Record<string, ZoneType> = {
   living_room: 'public',
   lounge: 'public',
   dining_room: 'public',
+  dining: 'public', // what the layout engine emits
   lobby: 'public',
   reception: 'public',
   waiting_room: 'public',
@@ -36,6 +37,7 @@ const ROOM_TYPE_ZONES: Record<string, ZoneType> = {
   pantry: 'service',
   laundry: 'service',
   garage: 'service',
+  parking: 'service',
   hallway: 'circulation',
   corridor: 'circulation',
   stairs: 'circulation',

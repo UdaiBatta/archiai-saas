@@ -39,10 +39,13 @@ describe('Pricing page', () => {
     renderPricing()
     const user = userEvent.setup()
 
-    expect(screen.getByText('$29/mo')).toBeInTheDocument()
+    // The amount and its period are styled apart: "$29" + "/mo".
+    expect(screen.getByText('$29')).toBeInTheDocument()
+    expect(screen.getAllByText('/mo').length).toBeGreaterThan(0)
     await user.click(screen.getByRole('tab', { name: /annual/i }))
-    expect(screen.getByText('$290/yr')).toBeInTheDocument()
-    expect(screen.queryByText('$29/mo')).not.toBeInTheDocument()
+    expect(screen.getByText('$290')).toBeInTheDocument()
+    expect(screen.queryByText('$29')).not.toBeInTheDocument()
+    expect(screen.queryByText('/mo')).not.toBeInTheDocument()
   })
 
   it('starts the free plan by sending you to sign-up', async () => {

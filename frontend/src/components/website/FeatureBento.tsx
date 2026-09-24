@@ -3,6 +3,10 @@ import type { ReactNode } from 'react'
 import { EXAMPLE } from '../../constants/examplePlan'
 import { ExamplePlanDrawing } from './ExamplePlanDrawing'
 
+/** The landing's panel: dark tile, hairline ring, ember glow from below. */
+export const panelClass =
+  'rounded-2xl bg-graphite-950 ring-1 ring-ink/10 shadow-[inset_0_-20px_80px_-20px_rgba(255,59,31,0.12)]'
+
 /**
  * "What you get" as a bento grid. Every tile's graphic is built from the
  * real example (the brief, its rules, the generated plan), not stock art.
@@ -23,7 +27,7 @@ function BentoCard({
 }) {
   return (
     <article
-      className={`group relative flex flex-col overflow-hidden rounded-2xl bg-graphite-950 ring-1 ring-ink/10 shadow-[inset_0_-20px_80px_-20px_rgba(255,59,31,0.12)] transition-shadow hover:ring-ember/40 ${className}`}
+      className={`group relative flex flex-col overflow-hidden ${panelClass} transition-shadow hover:ring-ember/40 ${className}`}
     >
       <div className="relative h-56 shrink-0 overflow-hidden" aria-hidden="true">
         <div className="absolute inset-0 transition-transform duration-500 ease-out group-hover:-translate-y-1 group-hover:scale-[1.03] motion-reduce:transition-none">

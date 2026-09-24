@@ -42,7 +42,7 @@ export default function PricingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-surface text-ink">
+    <div className="min-h-screen bg-night text-ink">
       <WebsiteNavbar />
 
       <main className="mx-auto w-full max-w-6xl px-4 pb-20 pt-12 sm:px-6">
