@@ -748,3 +748,63 @@ def test_every_plan_has_exactly_one_front_door(name):
     outside = {w.id for w in plan.walls if w.rooms is None}
 
     assert len([d for d in plan.doors if d.wall_ref in outside]) == 1
+
+
+# The landing page's brief (rooms in the order the extractor lists them).
+# Its entry used to land on the corridor side of the street band, boxed in
+# by dining/kitchen, so the front door went on the living room instead.
+_EAST_3BHK = {
+    "building_type": "house", "floors": 1, "plot": {"width_m": 12, "depth_m": 15},
+    "rooms": [
+        {"type": "master_bedroom", "count": 1}, {"type": "bedroom", "count": 2},
+        {"type": "pooja_room", "count": 1}, {"type": "kitchen", "count": 1},
+        {"type": "living_room", "count": 1}, {"type": "balcony", "count": 1},
+        {"type": "bathroom", "count": 2}, {"type": "dining", "count": 1},
+    ],
+    "adjacency": [
+        {"room_a": "balcony", "room_b": "living_room", "strength": "must"},
+        {"room_a": "master_bedroom", "room_b": "bathroom", "strength": "must"},
+        {"room_a": "bedroom", "room_b": "bathroom", "strength": "should"},
+        {"room_a": "kitchen", "room_b": "dining", "strength": "should"},
+        {"room_a": "kitchen", "room_b": "living_room", "strength": "should"},
+    ],
+    "avoid_adjacency": [{"room_a": "kitchen", "room_b": "bathroom"}],
+}
+
+
+def _front_door_room(plan):
+    """The room whose outside wall holds the front door."""
+    walls = {w.id: w for w in plan.walls}
+    (door,) = [d for d in plan.doors if walls[d.wall_ref].rooms is None]
+    w = walls[door.wall_ref]
+    mx, my = (w.x1 + w.x2) / 2, (w.y1 + w.y2) / 2
+    for room in plan.rooms:
+        r = _room_rect(room)
+        on_x = abs(mx - r.x) < 1e-6 or abs(mx - (r.x + r.w)) < 1e-6
+        on_y = abs(my - r.y) < 1e-6 or abs(my - (r.y + r.d)) < 1e-6
+        if (on_x and r.y - 1e-6 <= my <= r.y + r.d + 1e-6) or (on_y and r.x - 1e-6 <= mx <= r.x + r.w + 1e-6):
+            return room
+    raise AssertionError("front door wall touches no room")
+
+
+@pytest.mark.parametrize("facing", ["north", "south", "east", "west"])
+def test_entry_reaches_the_street_and_holds_the_front_door(facing):
+    plan = generate_plan(RequirementsSpec.model_validate({**_EAST_3BHK, "facing": facing}))
+    assert _front_door_room(plan).type == "entry"
+
+
+@pytest.mark.parametrize("name", FIXTURE_NAMES)
+def test_front_door_opens_into_the_entry(name):
+    plan = generate_plan(_load(name))
+    if any(r.type == "entry" for r in plan.rooms):
+        assert _front_door_room(plan).type == "entry"
+
+
+@pytest.mark.parametrize("facing", ["east", "west"])
+def test_no_search_candidate_puts_the_front_door_off_the_entry(facing):
+    # The web app shows the best of these candidates; before the fix, 9 of
+    # 64 had the entry boxed in and the winner's front door was in the living room.
+    from app.services.layout_engine.search import generate_candidates
+
+    spec = RequirementsSpec.model_validate({**_EAST_3BHK, "facing": facing})
+    assert all(_front_door_room(c.plan).type == "entry" for c in generate_candidates(spec))
