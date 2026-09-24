@@ -94,7 +94,10 @@ export function RoomGraphView({ className }: RoomGraphViewProps) {
           width="100%"
           viewBox={`0 0 ${width} ${height}`}
           preserveAspectRatio="xMidYMid meet"
-          className="min-h-full select-none"
+          // Never draw bigger than 1:1: a small graph would otherwise be
+          // blown up to the full width (nodes several times their size).
+          style={{ maxWidth: width }}
+          className="mx-auto block select-none"
           onPointerDown={(event) => {
             if (event.button === 0) deselectAll()
           }}

@@ -235,7 +235,7 @@ export function ToolRail({ modelStage = false }: { modelStage?: boolean }) {
     },
     {
       key: 'more',
-      label: 'More components',
+      label: 'More', // the full name was cut off under a 48 px button
       active: moreOpen,
       onClick: () => setMoreOpen((value) => !value),
     },

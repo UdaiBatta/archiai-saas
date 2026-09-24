@@ -11,7 +11,7 @@ export function DraftToast({ visible, onRecover, onDismiss }: DraftToastProps) {
     <div
       role="status"
       aria-live="polite"
-      className="absolute left-1/2 top-16 z-20 flex -translate-x-1/2 items-center gap-3 rounded-full border border-warn/30 bg-graphite-800/95 backdrop-blur px-4 py-2 shadow-sm"
+      className="absolute right-3 top-16 z-20 flex items-center gap-3 rounded-full border border-warn/30 bg-graphite-800/95 backdrop-blur px-4 py-2 shadow-sm"
     >
       <p className="text-xs font-medium text-warn">
         Unsaved draft found. You can recover your last auto-saved changes.

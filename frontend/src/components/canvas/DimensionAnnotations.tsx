@@ -1,11 +1,11 @@
 import { Html, Line } from '@react-three/drei'
 import { Room } from '../../store/canvasStore'
 import { ACCENT_HEX, DIM_HEX } from '../../constants/theme'
-import { formatArea, formatDims, formatMeters } from '../../utils/format'
+import { formatMeters } from '../../utils/format'
 
 interface DimensionAnnotationsProps {
   room: Room
-  /** Selected room gets bold lines + an area badge; others (when the global toggle is on) get faint lines only. */
+  /** Selected room gets bold lines; others (when the global toggle is on) get faint lines only. */
   emphasized: boolean
 }
 
@@ -13,8 +13,8 @@ const OFFSET = 0.45
 const TICK = 0.18
 
 export function DimensionAnnotations({ room, emphasized }: DimensionAnnotationsProps) {
-  const { x, y, z } = room.position
-  const { w, d, h } = room.size
+  const { x, z } = room.position
+  const { w, d } = room.size
   const halfW = w / 2
   const halfD = d / 2
   const lineY = 0.02
@@ -53,7 +53,7 @@ export function DimensionAnnotations({ room, emphasized }: DimensionAnnotationsP
       />
       <Html position={[x, lineY, widthLineZ - 0.3]} center zIndexRange={[1, 0]} style={{ pointerEvents: 'none' }}>
         <span
-          className={`rounded-md px-1.5 py-0.5 font-mono text-[10px] font-medium tabular-nums shadow-sm ${
+          className={`whitespace-nowrap rounded-md px-1.5 py-0.5 font-mono text-[10px] font-medium tabular-nums shadow-sm ${
             emphasized
               ? 'bg-ink text-graphite-900'
               : 'border border-ink/10 bg-graphite-800/90 text-muted'
@@ -90,7 +90,7 @@ export function DimensionAnnotations({ room, emphasized }: DimensionAnnotationsP
       />
       <Html position={[depthLineX - 0.3, lineY, z]} center zIndexRange={[1, 0]} style={{ pointerEvents: 'none' }}>
         <span
-          className={`rounded-md px-1.5 py-0.5 font-mono text-[10px] font-medium tabular-nums shadow-sm ${
+          className={`whitespace-nowrap rounded-md px-1.5 py-0.5 font-mono text-[10px] font-medium tabular-nums shadow-sm ${
             emphasized
               ? 'bg-ink text-graphite-900'
               : 'border border-ink/10 bg-graphite-800/90 text-muted'
@@ -100,15 +100,6 @@ export function DimensionAnnotations({ room, emphasized }: DimensionAnnotationsP
         </span>
       </Html>
 
-      {/* Area badge — selected room only; sits above the room label with
-          enough clearance that the two don't overlap at typical zoom. */}
-      {emphasized && (
-        <Html position={[x, y + h / 2 + 0.95, z]} center zIndexRange={[1, 0]} style={{ pointerEvents: 'none' }}>
-          <span className="rounded-md border border-ink/15 bg-graphite-800/95 px-2 py-1 font-mono text-[11px] font-semibold tabular-nums text-ink shadow-sm">
-            {formatDims(w, d)} · {formatArea(w * d)}
-          </span>
-        </Html>
-      )}
     </group>
   )
 }

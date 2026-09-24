@@ -15,7 +15,6 @@ import { DimensionAnnotations } from './DimensionAnnotations'
 import { ResizeHandles } from './ResizeHandles'
 import { roomVisualTreatment } from './roomVisualTreatment'
 import { displayRoomColor } from './editorPalette'
-import { formatArea } from '../../utils/format'
 import { wallModelPieces } from './modelGeometry'
 
 interface OrbitHandle {
@@ -328,8 +327,10 @@ export function RoomMesh({
       zIndexRange={[1, 0]}
       style={{ pointerEvents: 'none' }}
     >
+      {/* One line per room keeps neighbouring small rooms' labels from
+          stacking on each other; the area lives in the selection toolbar. */}
       <div
-        className={`min-w-max rounded-lg border bg-graphite-800/90 px-2.5 py-1.5 shadow-md backdrop-blur ${
+        className={`min-w-max whitespace-nowrap rounded-md border bg-graphite-800/90 px-2 py-0.5 shadow-md backdrop-blur ${
           invalid
             ? 'border-danger/70 text-danger ring-2 ring-danger/20'
             : isSelected
@@ -345,11 +346,6 @@ export function RoomMesh({
           />
           {room.label}
         </div>
-        {isSpace && !isSelected && (
-          <div className="mt-0.5 pl-3 text-[9px] font-medium text-muted-light">
-            {formatArea(room.size.w * room.size.d)}
-          </div>
-        )}
       </div>
     </Html>
   ) : null

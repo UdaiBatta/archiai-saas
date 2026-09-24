@@ -32,6 +32,7 @@ import {
   type GenerationOverrides,
 } from '../../services/mvpGenerationPolicy'
 import { useCanvasStore, type CanvasViewMode } from '../../store/canvasStore'
+import { layoutThumbnailDataUrl } from '../../components/canvas/LayoutThumbnail'
 import { VersionHistoryDrawer } from '../../components/canvas/VersionHistoryDrawer'
 import { ActivityDrawer } from '../../components/canvas/ActivityDrawer'
 import { useAutoSave } from '../../hooks/useAutoSave'
@@ -41,20 +42,11 @@ import { ShareProjectDialog } from '../../components/projects/ShareProjectDialog
 import type { CanvasLayout } from '../../store/canvasStore'
 import type { ExtractResponse } from '../../types/contracts'
 
+// The card preview is drawn from the plan data. A screenshot of the first
+// <canvas> came out black whenever the 2D (SVG) view was the one on screen.
 function captureCanvasThumbnail() {
-  const canvas = document.querySelector('canvas')
-  if (!canvas) return null
-  try {
-    return canvas.toDataURL('image/png')
-  } catch {
-    return null
-  }
-}
-
-function waitForNextPaint() {
-  return new Promise<void>((resolve) => {
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-  })
+  const { rooms, floors } = useCanvasStore.getState()
+  return layoutThumbnailDataUrl(rooms, floors)
 }
 
 function exportFileName(projectTitle: string, extension: string) {
@@ -287,16 +279,14 @@ export default function ProjectPage() {
     [],
   )
 
-  // Refreshes the Dashboard-card thumbnail right after Generate, not
+  // Refreshes the project-card thumbnail right after Generate, not
   // just on manual Save Layout — Generate already persists a Design behind
   // the scenes, so a project can otherwise sit with no real preview
-  // indefinitely if the user never clicks Save. Fire-and-forget: waits one
-  // paint for the new layout to actually render, then best-effort uploads
-  // it without blocking or failing the generation flow.
+  // indefinitely if the user never clicks Save. Fire-and-forget: a
+  // best-effort upload that never blocks or fails the generation flow.
   const refreshThumbnailAfterGenerate = () => {
     if (!id) return
     void (async () => {
-      await waitForNextPaint()
       const thumbnailUrl = captureCanvasThumbnail()
       if (!thumbnailUrl) return
       try {
