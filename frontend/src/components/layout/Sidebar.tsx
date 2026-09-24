@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom'
+import { Link, NavLink } from 'react-router-dom'
 
 import { Button } from '../ui/Button'
 import { Avatar } from '../ui/Avatar'
@@ -56,9 +56,12 @@ export function Sidebar({
   const displayName = userName ?? userEmail ?? ''
 
   return (
-    <aside className="flex w-44 flex-shrink-0 flex-col bg-graphite-800/80 backdrop-blur text-ink lg:w-52 border-r border-ink/10">
+    <aside className="flex w-44 flex-shrink-0 flex-col border-r border-ink/10 bg-graphite-950 text-ink lg:w-52">
       <div className="border-b border-ink/10 p-4">
-        <span className="text-lg font-bold">ArchiAI</span>
+        <Link to="/" aria-label="ArchiAI home" className="flex items-baseline gap-px">
+          <span className="text-base font-black tracking-wide text-ink" style={{ fontStretch: '125%' }}>ARCHI</span>
+          <span className="text-base font-black tracking-wide text-accent" style={{ fontStretch: '125%' }}>·AI</span>
+        </Link>
       </div>
       <nav className="flex-1 space-y-1 p-3">
         <NavLink to="/projects" className={navClassName}>

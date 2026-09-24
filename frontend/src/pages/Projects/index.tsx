@@ -8,7 +8,7 @@ import { getApiErrorMessage } from '../../services/apiError'
 import projectService, { type Project } from '../../services/project.service'
 
 const newProjectClass =
-  'rounded-lg bg-ink px-4 py-2 text-sm font-semibold text-graphite-900 hover:bg-graphite-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/40'
+  'rounded-full bg-accent px-5 py-2 text-sm font-bold text-ink shadow-[0_6px_24px_rgba(255,59,31,0.3)] transition-transform hover:-translate-y-px focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50'
 
 function SkeletonCard() {
   return (
@@ -72,7 +72,7 @@ export default function ProjectsPage() {
 
       <main className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-8">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-bold tracking-tight text-ink">Your projects</h1>
+          <h1 className="text-3xl font-black uppercase leading-none tracking-tight text-ink" style={{ fontStretch: '125%' }}>Your projects</h1>
           <div className="flex items-center gap-2">
             {projects.length > 0 && (
               <input

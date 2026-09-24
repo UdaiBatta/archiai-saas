@@ -35,7 +35,7 @@ export function LevelMenu() {
           open ? 'bg-graphite-800/95' : 'bg-graphite-800/70 hover:bg-graphite-800/90'
         }`}
       >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7A6CD6" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="text-accent-bright" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
           <rect x="3" y="4" width="18" height="6" rx="1" />
           <rect x="3" y="14" width="18" height="6" rx="1" />
         </svg>
@@ -70,7 +70,7 @@ export function LevelMenu() {
           >
             <span className="flex w-4 flex-shrink-0 justify-center">
               {selectedFloor === 'all' && (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7A6CD6" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="text-accent-bright" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M20 6L9 17l-5-5" />
                 </svg>
               )}
@@ -92,7 +92,7 @@ export function LevelMenu() {
             >
               <span className="flex w-4 flex-shrink-0 justify-center">
                 {selectedFloor === floor.level && (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7A6CD6" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="text-accent-bright" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M20 6L9 17l-5-5" />
                   </svg>
                 )}

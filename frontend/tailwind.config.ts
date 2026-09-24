@@ -13,7 +13,7 @@ const config: Config = {
         // blue tint anywhere in the chrome; color only lives inside plans.
         graphite: {
           950: '#191919', // deepest — editor grid wells
-          900: '#212121', // app background
+          900: '#212121', // deep panels and wells
           850: '#262626', // page section alternation
           800: '#2B2B2C', // panels
           750: '#313132', // raised panels / hover surfaces
@@ -30,15 +30,17 @@ const config: Config = {
         // muted-light = tertiary/disabled, surface = app background.
         ink: '#F5F5F6',
         muted: { DEFAULT: '#A8A8AC', light: '#7C7C80' },
-        surface: '#212121',
+        // App background: the landing page's near-black, so every page
+        // (sign-in, projects, editor) sits on the same ground as the site.
+        surface: '#0B0A0A',
         // The single interactive/primary accent (selection, active tabs,
-        // primary buttons, focus rings). Previously hardcoded as #7663d7 /
-        // #8069df across ~9 components — now every consumer draws from here.
+        // primary buttons, focus rings): the landing page's ember, so the
+        // app and the site read as one product.
         accent: {
-          DEFAULT: '#7663D7',
-          bright: '#8069DF',
-          soft: 'rgba(118, 99, 215, 0.16)',
-          dim: '#5B4CB0',
+          DEFAULT: '#FF3B1F',
+          bright: '#FF7A45',
+          soft: 'rgba(255, 59, 31, 0.16)',
+          dim: '#C22E17',
         },
         // Status colors, deliberately muted per the approved direction.
         // Marketing accent: the sunset tint of the landing page's dot field.

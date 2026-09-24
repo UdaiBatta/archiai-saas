@@ -218,7 +218,7 @@ export function CommandBar({
             </div>
             <button
               aria-busy={generating}
-              className="rounded-lg bg-accent px-4 py-2 text-sm font-bold text-white shadow-[0_6px_22px_-4px_rgba(118,99,215,0.45)] hover:bg-accent-bright disabled:bg-graphite-500 disabled:shadow-none"
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-bold text-white shadow-[0_6px_22px_-4px_rgba(255,59,31,0.45)] hover:bg-accent-bright disabled:bg-graphite-500 disabled:shadow-none"
               onClick={onSubmit}
               disabled={generating || !prompt.trim()}
             >

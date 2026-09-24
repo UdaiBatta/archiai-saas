@@ -1,25 +1,26 @@
 /**
  * Shared editor-only palette for the graphite design system.
  *
- * The workspace is a dark ash-gray well; the drawing sheet is a slightly
+ * The workspace is a warm near-black well; the drawing sheet is a slightly
  * lighter graphite surface so the plan reads as a deliberate architectural
- * drawing. Walls and frames read white/gray; rooms use only the muted
- * architectural colors below.
+ * drawing. Walls and frames read white/gray; rooms use only the zone
+ * colors below, the same ember scheme as the landing page's drawing.
  *
  * Room colors are resolved at render time via `displayRoomColor` so layouts
  * saved with older bright palettes still render in the muted system without
  * rewriting any persisted layout data.
  */
 export const EDITOR_PALETTE = {
-  workspaceHighlight: '#242526',
-  workspaceStart: '#1D1E1F',
-  workspaceEnd: '#171819',
-  planSheetStart: '#242526',
-  planSheetEnd: '#202122',
+  // The canvas well fades to the landing page's near-black (tailwind `night`).
+  workspaceHighlight: '#221E1C',
+  workspaceStart: '#171413',
+  workspaceEnd: '#0B0A0A',
+  planSheetStart: '#252220',
+  planSheetEnd: '#201D1C',
   planGrid: '#353739',
   planFrame: '#D7D7D5',
-  selection: '#8069DF',
-  selectionSoft: '#A18EF0',
+  selection: '#FF5A36',
+  selectionSoft: '#FF9A7A',
   invalid: '#C97B70',
   dimension: '#A9AAAC',
   chrome: '#1C1D1E',
@@ -27,70 +28,75 @@ export const EDITOR_PALETTE = {
   measure: '#C9A96E',
   // Access graph: how two rooms meet.
   edgeDoor: '#BDBDC0',
-  edgeOpen: '#8069DF',
+  edgeOpen: '#FF7A45',
   edgeWall: '#6A6A6E',
   warning: '#C9A96E',
 } as const
 
 /**
- * Muted architectural room colors — the only colors allowed inside plans:
- * slate blue, sage green, graphite gray, plum, warm brown, sand, teal-gray.
+ * Room colors, keyed by zone the way the landing page's drawing is: living
+ * spaces glow ember, service rooms amber, private rooms stay warm and dark,
+ * wet rooms a touch cooler so they read apart, circulation darkest. Muted
+ * enough for walls, doors and selection to stay the brightest things.
  */
 export const MUTED_ROOM_COLORS = {
-  slateBlue: '#5F6E88',
-  sageGreen: '#6E7F68',
-  graphiteGray: '#4A4E56',
-  plum: '#71657E',
-  warmBrown: '#84705B',
-  sand: '#8A7D64',
-  tealGray: '#5E7876',
-  deepBlueGray: '#4E5B72',
-  charcoal: '#3A3E45',
+  ember: '#7A3325', // living, lounge, dining
+  terracotta: '#8A4A36', // entry, balcony, reception
+  amber: '#86573C', // kitchen, pantry
+  warmGray: '#4F4946', // bedrooms
+  warmGrayLight: '#5A524D', // master bedroom
+  mauve: '#5E5049', // study, pooja
+  coolGray: '#474D51', // bathrooms
+  charcoal: '#3E3936', // corridors, stairs
+  stone: '#48423E', // utility, storage, parking
 } as const
 
 const ROOM_COLOR_CYCLE: string[] = [
-  MUTED_ROOM_COLORS.slateBlue,
-  MUTED_ROOM_COLORS.sageGreen,
-  MUTED_ROOM_COLORS.plum,
-  MUTED_ROOM_COLORS.warmBrown,
-  MUTED_ROOM_COLORS.sand,
-  MUTED_ROOM_COLORS.tealGray,
-  MUTED_ROOM_COLORS.deepBlueGray,
+  MUTED_ROOM_COLORS.ember,
+  MUTED_ROOM_COLORS.warmGray,
+  MUTED_ROOM_COLORS.amber,
+  MUTED_ROOM_COLORS.mauve,
+  MUTED_ROOM_COLORS.terracotta,
+  MUTED_ROOM_COLORS.warmGrayLight,
+  MUTED_ROOM_COLORS.coolGray,
 ]
 
 /** Room-type identities stay stable so the same room type always reads the same. */
 const ROOM_TYPE_COLORS: Record<string, string> = {
-  living_room: MUTED_ROOM_COLORS.slateBlue,
-  lounge: MUTED_ROOM_COLORS.slateBlue,
-  bedroom: MUTED_ROOM_COLORS.sageGreen,
-  master_bedroom: MUTED_ROOM_COLORS.tealGray,
-  kids_bedroom: MUTED_ROOM_COLORS.sageGreen,
-  guest_bedroom: MUTED_ROOM_COLORS.sageGreen,
-  kitchen: MUTED_ROOM_COLORS.warmBrown,
-  dining_room: MUTED_ROOM_COLORS.sand,
-  bathroom: MUTED_ROOM_COLORS.deepBlueGray,
-  toilet: MUTED_ROOM_COLORS.deepBlueGray,
-  study: MUTED_ROOM_COLORS.plum,
-  office: MUTED_ROOM_COLORS.slateBlue,
-  open_workspace: MUTED_ROOM_COLORS.slateBlue,
-  meeting_room: MUTED_ROOM_COLORS.plum,
-  conference_room: MUTED_ROOM_COLORS.slateBlue,
-  reception: MUTED_ROOM_COLORS.sand,
-  waiting_room: MUTED_ROOM_COLORS.sand,
-  consultation_room: MUTED_ROOM_COLORS.sageGreen,
-  lobby: MUTED_ROOM_COLORS.graphiteGray,
+  living_room: MUTED_ROOM_COLORS.ember,
+  lounge: MUTED_ROOM_COLORS.ember,
+  dining: MUTED_ROOM_COLORS.ember, // what the layout engine emits
+  dining_room: MUTED_ROOM_COLORS.ember,
+  entry: MUTED_ROOM_COLORS.terracotta,
+  foyer: MUTED_ROOM_COLORS.terracotta,
+  balcony: MUTED_ROOM_COLORS.terracotta,
+  reception: MUTED_ROOM_COLORS.terracotta,
+  waiting_room: MUTED_ROOM_COLORS.terracotta,
+  lobby: MUTED_ROOM_COLORS.terracotta,
+  kitchen: MUTED_ROOM_COLORS.amber,
+  pantry: MUTED_ROOM_COLORS.amber,
+  bedroom: MUTED_ROOM_COLORS.warmGray,
+  kids_bedroom: MUTED_ROOM_COLORS.warmGray,
+  guest_bedroom: MUTED_ROOM_COLORS.warmGray,
+  master_bedroom: MUTED_ROOM_COLORS.warmGrayLight,
+  consultation_room: MUTED_ROOM_COLORS.warmGray,
+  study: MUTED_ROOM_COLORS.mauve,
+  pooja_room: MUTED_ROOM_COLORS.mauve,
+  office: MUTED_ROOM_COLORS.mauve,
+  open_workspace: MUTED_ROOM_COLORS.warmGrayLight,
+  meeting_room: MUTED_ROOM_COLORS.mauve,
+  conference_room: MUTED_ROOM_COLORS.mauve,
+  bathroom: MUTED_ROOM_COLORS.coolGray,
+  toilet: MUTED_ROOM_COLORS.coolGray,
   hallway: MUTED_ROOM_COLORS.charcoal,
   corridor: MUTED_ROOM_COLORS.charcoal,
-  balcony: MUTED_ROOM_COLORS.tealGray,
-  utility: MUTED_ROOM_COLORS.charcoal,
-  utility_room: MUTED_ROOM_COLORS.charcoal,
-  storage: MUTED_ROOM_COLORS.charcoal,
-  store_room: MUTED_ROOM_COLORS.charcoal,
-  pantry: MUTED_ROOM_COLORS.warmBrown,
-  pooja_room: MUTED_ROOM_COLORS.plum,
-  garage: MUTED_ROOM_COLORS.graphiteGray,
-  entry: MUTED_ROOM_COLORS.sand,
-  stairs: MUTED_ROOM_COLORS.sand,
+  stairs: MUTED_ROOM_COLORS.charcoal,
+  utility: MUTED_ROOM_COLORS.stone,
+  utility_room: MUTED_ROOM_COLORS.stone,
+  storage: MUTED_ROOM_COLORS.stone,
+  store_room: MUTED_ROOM_COLORS.stone,
+  garage: MUTED_ROOM_COLORS.stone,
+  parking: MUTED_ROOM_COLORS.stone,
 }
 
 /** Non-room object types keep structural, near-neutral colors. */
@@ -98,7 +104,7 @@ const OBJECT_TYPE_COLORS: Record<string, string> = {
   wall: '#BDBDC0',
   door: '#9C8468',
   window: '#7C93A6',
-  stair: MUTED_ROOM_COLORS.sand,
+  stair: MUTED_ROOM_COLORS.charcoal,
   floor: '#373738',
   open_space: '#3F444B',
   corridor: MUTED_ROOM_COLORS.charcoal,
@@ -106,7 +112,7 @@ const OBJECT_TYPE_COLORS: Record<string, string> = {
   shaft: '#48484A',
   furniture: '#6E6659',
   column: '#909094',
-  generic: MUTED_ROOM_COLORS.graphiteGray,
+  generic: MUTED_ROOM_COLORS.warmGray,
 }
 
 function hashString(value: string): number {
@@ -157,10 +163,10 @@ export const ZONE_ORDER: ZoneType[] = [
 ]
 
 export const ZONE_META: Record<ZoneType, { label: string; color: string }> = {
-  public: { label: 'Public', color: MUTED_ROOM_COLORS.slateBlue },
-  private: { label: 'Private', color: MUTED_ROOM_COLORS.sageGreen },
-  collaborative: { label: 'Collaborative', color: MUTED_ROOM_COLORS.plum },
-  service: { label: 'Service', color: MUTED_ROOM_COLORS.warmBrown },
-  circulation: { label: 'Circulation', color: MUTED_ROOM_COLORS.graphiteGray },
-  utility: { label: 'Utility', color: MUTED_ROOM_COLORS.charcoal },
+  public: { label: 'Public', color: MUTED_ROOM_COLORS.ember },
+  private: { label: 'Private', color: MUTED_ROOM_COLORS.warmGrayLight },
+  collaborative: { label: 'Collaborative', color: MUTED_ROOM_COLORS.mauve },
+  service: { label: 'Service', color: MUTED_ROOM_COLORS.amber },
+  circulation: { label: 'Circulation', color: MUTED_ROOM_COLORS.charcoal },
+  utility: { label: 'Utility', color: MUTED_ROOM_COLORS.stone },
 }

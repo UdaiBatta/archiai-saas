@@ -12,7 +12,7 @@ interface InspectorPropertiesProps {
 }
 
 const FIELD_CLASS =
-  'w-full rounded-md border border-ink/10 bg-[#1d1e1f] px-2 py-1.5 font-mono text-[11px] tabular-nums text-ink focus:border-[#8069df]/70 focus:outline-none disabled:cursor-not-allowed disabled:bg-ink/5'
+  'w-full rounded-md border border-ink/10 bg-[#1d1e1f] px-2 py-1.5 font-mono text-[11px] tabular-nums text-ink focus:border-accent-bright/70 focus:outline-none disabled:cursor-not-allowed disabled:bg-ink/5'
 
 const LABEL_CLASS = 'text-[9px] font-medium uppercase tracking-wide text-muted-light'
 

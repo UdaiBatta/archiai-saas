@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Project } from '../../services/project.service'
 import { PlaceholderThumbnail } from './PlaceholderThumbnail'
+import { panelClass } from '../website/FeatureBento'
 import { formatRelative } from '../../utils/time'
 
 interface ProjectCardProps {
@@ -27,7 +28,7 @@ export function ProjectCard({ project, onClick, onDuplicate }: ProjectCardProps)
   }
 
   return (
-    <div className="group relative overflow-hidden rounded-xl border border-ink/10 bg-graphite-800 transition-all focus-within:ring-2 focus-within:ring-ink/30 hover:border-ink/25 hover:shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+    <div className={`group relative overflow-hidden ${panelClass} transition-shadow focus-within:ring-accent/50 hover:ring-accent/40`}>
       <button
         onClick={onClick}
         className="block w-full text-left focus:outline-none"
@@ -67,7 +68,7 @@ export function ProjectCard({ project, onClick, onDuplicate }: ProjectCardProps)
         <button
           type="button"
           onClick={onClick}
-          className="rounded-lg bg-ink px-3 py-1.5 text-xs font-semibold text-graphite-900 shadow-lg hover:bg-graphite-100"
+          className="rounded-full bg-accent px-4 py-1.5 text-xs font-bold text-ink shadow-lg"
         >
           Open
         </button>
@@ -76,7 +77,7 @@ export function ProjectCard({ project, onClick, onDuplicate }: ProjectCardProps)
             type="button"
             onClick={handleDuplicate}
             disabled={duplicating}
-            className="rounded-lg border border-ink/20 bg-graphite-900/90 px-3 py-1.5 text-xs font-semibold text-ink shadow-lg backdrop-blur hover:bg-graphite-800 disabled:opacity-60"
+            className="rounded-full border border-ink/20 bg-graphite-900/90 px-4 py-1.5 text-xs font-semibold text-ink shadow-lg backdrop-blur hover:bg-graphite-800 disabled:opacity-60"
           >
             {duplicating ? 'Duplicating…' : 'Duplicate'}
           </button>

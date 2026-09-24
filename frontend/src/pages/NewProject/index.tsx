@@ -48,8 +48,8 @@ export default function NewProjectPage() {
       <Sidebar userName={user?.name} userEmail={user?.email} onLogout={logOut} />
       <main className="min-w-0 flex-1 overflow-y-auto px-4 py-10 sm:px-8">
         <div className="mx-auto w-full max-w-3xl">
-          <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted-light">New project</p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight text-ink">Describe the home</h1>
+          <p className="font-mono text-xs uppercase tracking-[0.2em] text-accent">New project</p>
+          <h1 className="mt-3 text-4xl font-black uppercase leading-none tracking-tight text-ink" style={{ fontStretch: '125%' }}>Describe the home</h1>
           <p className="mt-2 max-w-xl text-sm text-muted">
             Say the plot size, which way it faces, the rooms, and how they should connect. You’ll check what was
             understood before anything is drawn.

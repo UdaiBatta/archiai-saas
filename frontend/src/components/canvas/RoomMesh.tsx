@@ -256,7 +256,7 @@ export function RoomMesh({
       <boxGeometry args={[room.size.w, renderHeight, room.size.d]} />
       <meshStandardMaterial
         visible={!wallPieces && !modelFurniture}
-        color={modelStage && isSpace ? (isSelected ? '#d8d1ed' : '#eeeae1') : displayRoomColor(room)}
+        color={modelStage && isSpace ? (isSelected ? '#F3D5CB' : '#eeeae1') : displayRoomColor(room)}
         emissive={visual.emissive}
         emissiveIntensity={visual.emissiveIntensity}
         transparent={!solid3d && visual.opacity < 1}
@@ -268,14 +268,14 @@ export function RoomMesh({
       {wallPieces?.map((piece, index) => (
         <mesh key={index} position={piece.position} castShadow receiveShadow>
           <boxGeometry args={piece.size} />
-          <meshStandardMaterial color={isSelected ? '#cbbce8' : '#e2e1d7'} roughness={0.9} />
+          <meshStandardMaterial color={isSelected ? '#F0C4B6' : '#e2e1d7'} roughness={0.9} />
         </mesh>
       ))}
       {modelFurniture && (
         <>
           <mesh position={[0, room.size.h / 2 - 0.06, 0]} castShadow receiveShadow>
             <boxGeometry args={[room.size.w, Math.min(0.12, room.size.h), room.size.d]} />
-            <meshStandardMaterial color={isSelected ? '#ab94e0' : '#a894be'} roughness={0.8} />
+            <meshStandardMaterial color={isSelected ? '#C08A6C' : '#8C6A55'} roughness={0.8} />
           </mesh>
           {[-1, 1].flatMap((x) => [-1, 1].map((z) => (
             <mesh key={`${x}:${z}`} position={[x * room.size.w * 0.38, -0.06, z * room.size.d * 0.38]} castShadow>
