@@ -1,8 +1,10 @@
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
+from app.config.settings import Settings, settings
 from app.database.connection import Base, get_db
 from app.main import app
 from app.utils.rate_limit import rate_limiter
@@ -15,6 +17,17 @@ test_engine = create_async_engine(
     poolclass=StaticPool,
 )
 TestSessionLocal = async_sessionmaker(test_engine, expire_on_commit=False)
+
+
+_LLM_FIELDS = ("LLM_BASE_URL", "LLM_TIMEOUT_S", "LLM_MODEL", "LLM_API_KEY", "LLM_REASONING_EFFORT")
+
+
+@pytest.fixture(autouse=True)
+def default_llm_settings(monkeypatch):
+    """A developer's backend/.env (e.g. a Gemini key) must not change test
+    behaviour: every test starts from the code defaults for the LLM client."""
+    for name in _LLM_FIELDS:
+        monkeypatch.setattr(settings, name, Settings.model_fields[name].default)
 
 
 @pytest_asyncio.fixture(autouse=True)

@@ -122,10 +122,10 @@ Brief extraction runs through any OpenAI-compatible chat-completions endpoint. P
 | LM Studio (default, local) | `http://localhost:1234/v1` | *(blank — auto-detected)* | Free, uses your GPU |
 | AWS Bedrock | `https://bedrock-runtime.<region>.amazonaws.com/openai/v1` | `amazon.nova-micro-v1:0` | Pay per token (fractions of a cent per extraction) |
 | Groq | `https://api.groq.com/openai/v1` | `llama-3.3-70b-versatile` | Free tier (~1k requests/day) |
-| Google Gemini | `https://generativelanguage.googleapis.com/v1beta/openai` | `gemini-2.5-flash` | Free tier |
+| Google Gemini | `https://generativelanguage.googleapis.com/v1beta/openai` | `gemini-3.6-flash` | Free tier |
 | OpenRouter | `https://openrouter.ai/api/v1` | `meta-llama/llama-3.3-70b-instruct` | Free models / pay per token |
 
-Set `LLM_API_KEY` to the provider's bearer key and restart the backend. With a key set, the backend skips local-model discovery when `LLM_MODEL` is explicit and allows concurrent requests. Bedrock API keys come from the AWS Bedrock console (short- or long-term bearer keys — no SigV4 signing needed). Generation geometry never calls the provider; only brief extraction does.
+Set `LLM_API_KEY` to the provider's bearer key and restart the backend. With a key set, the backend skips local-model discovery when `LLM_MODEL` is explicit and allows concurrent requests. Bedrock API keys come from the AWS Bedrock console (short- or long-term bearer keys — no SigV4 signing needed). Generation geometry never calls the provider; only brief extraction does. For Gemini also set `LLM_REASONING_EFFORT=none`: its default thinking otherwise uses up the output budget and the JSON arrives cut off.
 
 ## Run Everything With Docker Compose
 
