@@ -86,6 +86,20 @@ _NARROW_DOOR_WIDTH = 0.7                # connectivity fallback on tight edges
 _NARROW_DOOR_EDGE = _NARROW_DOOR_WIDTH + 0.1
 _PRIVACY_THRESHOLD = 2  # matches quality.hard_constraints' own through_room_access threshold
 
+_SANITARY_TYPES = frozenset({"bathroom", "ensuite", "toilet", "washroom", "wc"})
+
+# Shared edges between two of these get no wall and no door (open plan).
+_OPEN_PLAN_TYPES = frozenset({
+    "living_room", "open_plan_living", "dining_room", "dining_area", "kitchen",
+    "foyer", "corridor", "hallway",
+})
+
+
+def _edge_kind(type_a: str, type_b: str) -> str:
+    def canon(t: str) -> str:
+        return catalog.resolve_alias(t) or t
+    return "open" if {canon(type_a), canon(type_b)} <= _OPEN_PLAN_TYPES else "wall"
+
 
 class DoesNotFitError(ValueError):
     """Structured 'plot too small' error. Phase 4 maps this to a 422
@@ -246,7 +260,7 @@ def _build_walls(
     walls: list[Wall] = []
     wall_rooms: dict[str, tuple[str, str | None]] = {}
 
-    def add(seg: Segment, a: str, b: str | None) -> str:
+    def add(seg: Segment, a: str, b: str | None, kind: str = "wall") -> str:
         wall_id = f"{id_prefix}w{len(walls) + 1}"
         walls.append(Wall(
             id=wall_id,
@@ -254,6 +268,7 @@ def _build_walls(
             x2=_round(seg.x2), y2=_round(seg.y2),
             thickness=WALL_THICKNESS_M,
             floor=floor,
+            kind=kind,
         ))
         wall_rooms[wall_id] = (a, b)
         return wall_id
@@ -262,7 +277,7 @@ def _build_walls(
         for need_b, rect_b in placed[i + 1:]:
             seg = rect_a.shared_edge(rect_b)
             if seg is not None:
-                add(seg, need_a.key, need_b.key)
+                add(seg, need_a.key, need_b.key, _edge_kind(need_a.type, need_b.type))
 
     for need, rect in placed:  # boundary portions belong to exactly one room
         if rect.x <= EPS:
@@ -298,7 +313,7 @@ def _build_walls_polygon(
     walls: list[Wall] = []
     wall_rooms: dict[str, tuple[str, str | None]] = {}
 
-    def add(seg: Segment, a: str, b: str | None) -> str:
+    def add(seg: Segment, a: str, b: str | None, kind: str = "wall") -> str:
         wall_id = f"{id_prefix}w{len(walls) + 1}"
         walls.append(Wall(
             id=wall_id,
@@ -306,6 +321,7 @@ def _build_walls_polygon(
             x2=_round(seg.x2), y2=_round(seg.y2),
             thickness=WALL_THICKNESS_M,
             floor=floor,
+            kind=kind,
         ))
         wall_rooms[wall_id] = (a, b)
         return wall_id
@@ -313,7 +329,7 @@ def _build_walls_polygon(
     for i, (need_a, poly_a) in enumerate(placed):
         for need_b, poly_b in placed[i + 1:]:
             for seg in polygon.shared_edges(poly_a, poly_b):
-                add(seg, need_a.key, need_b.key)
+                add(seg, need_a.key, need_b.key, _edge_kind(need_a.type, need_b.type))
 
     for need, poly in placed:  # boundary portions belong to exactly one room
         coords = list(poly.exterior.coords)
@@ -365,7 +381,6 @@ def _place_doors(
     zone_of: dict[str, str],
     *,
     allow_disconnected: bool = False,
-    add_convenience_doors: bool = True,
     id_prefix: str = "",
 ) -> list[Door]:
     doors: list[Door] = []
@@ -384,7 +399,10 @@ def _place_doors(
             floor=wall.floor,
         ))
 
-    interior = [w for w in walls if wall_rooms[w.id][1] is not None]
+    interior = [
+        w for w in walls if wall_rooms[w.id][1] is not None and w.kind != "open"
+    ]
+    open_links = [wall_rooms[w.id] for w in walls if w.kind == "open"]
     by_pair: dict[frozenset, list[Wall]] = {}
     for wall in interior:
         a, b = wall_rooms[wall.id]
@@ -491,28 +509,39 @@ def _place_doors(
         extended = True
         while extended:
             extended = False
-            for door in doors:
-                a, b = wall_rooms[door.wall_ref]
+            links = [wall_rooms[d.wall_ref] for d in doors] + open_links
+            for a, b in links:
                 if b is None or (a in connected) == (b in connected):
                     continue
                 connected.update((a, b))
                 extended = True
 
-    if not add_convenience_doors:
-        extend_through_existing_doors()
+    extend_through_existing_doors()
 
-    changed = True
-    while changed:
-        changed = False
-        ranked_pairs = sorted(
-            by_pair.items(),
-            key=lambda kv: (_pair_priority(kv[0], zone_of), sorted(kv[0])),
-        )
+    ranked_pairs = sorted(
+        by_pair.items(),
+        key=lambda kv: (_pair_priority(kv[0], zone_of), sorted(kv[0])),
+    )
+
+    def connect_one(tier: int) -> bool:
+        """Add one door from the reached set to an unreached room.
+
+        Tier 0 grows only out of public/circulation rooms; tier 1 may also
+        grow out of a bathroom; tier 2 out of anything. The caller always
+        retries the lowest tier first, so a room is only reached through a
+        bathroom, or last of all through a private room, when nothing better
+        reaches it (a room reachable only through a bedroom fails the
+        validator's through_room_access check)."""
         for pair, pair_walls in ranked_pairs:
             a, b = sorted(pair)
             if (a in connected) == (b in connected):
                 continue
             if is_avoided(pair):
+                continue
+            source = a if a in connected else b
+            private = catalog.privacy_level_for(types_by_key[source]) >= _PRIVACY_THRESHOLD
+            sanitary = canonical_type(types_by_key[source]) in _SANITARY_TYPES
+            if (tier == 0 and (private or sanitary)) or (tier == 1 and private):
                 continue
             best = max(pair_walls, key=_wall_length)
             if _wall_length(best) >= _MIN_DOOR_EDGE:
@@ -522,54 +551,21 @@ def _place_doors(
             else:
                 continue
             connected.update(pair)
-            if not add_convenience_doors:
-                # A newly reached room may already have a required/MUST door
-                # to its partner. Traverse that real opening before adding a
-                # redundant second door from the corridor.
-                extend_through_existing_doors()
-            changed = True
+            # A newly reached room may already be joined to others by a
+            # MUST door or an open-plan edge — follow those before adding a
+            # redundant door.
+            extend_through_existing_doors()
+            return True
+        return False
+
+    while connect_one(0) or connect_one(1) or connect_one(2):
+        pass
 
     unreachable = [n.label for n, _ in placed if n.key not in connected]
     if unreachable and not allow_disconnected:
         raise DoesNotFitError(
             f"no door-sized wall reaches: {', '.join(unreachable)} — increase plot size"
         )
-
-    # 3. Direct doors between every remaining adjacent pair. Step 2 only adds
-    #    the minimum doors needed for bare reachability (a spanning tree) —
-    #    a room can be fully "reachable" while a wall it visibly shares with
-    #    its next-door neighbour stays solid, which reads as broken
-    #    connectivity even though nothing is technically unreachable (e.g. a
-    #    dining room right next to the entry with no door between them,
-    #    routed instead through the living room). Skip a pair only when
-    #    there's a real reason not to connect them directly: both rooms are
-    #    genuinely private (bedroom-bedroom, bedroom-pooja_room — privacy,
-    #    not a defect) or the pair is explicitly avoided in the spec.
-    #
-    #    Uses catalog.privacy_level_for, NOT macro_zone — deliberately.
-    #    macro_zone folds "service" into the same "private" bucket as
-    #    genuinely private rooms (zoned_bands' banding wants that fold; see
-    #    its own docstring), so a bedroom-bathroom pair used to get skipped
-    #    here exactly like a bedroom-bedroom pair. That silently starved a
-    #    private room of its only non-private neighbour whenever its sole
-    #    other neighbour was a private-zoned room too — caught by workflow
-    #    4.5's own privacy-chain check going red on a live Hypothesis
-    #    counterexample (a pooja_room boxed in between a bedroom and a
-    #    bathroom, both skipped here, forcing the spanning tree to route it
-    #    through the bedroom). A bathroom at catalog privacy_level 1 is not
-    #    "private" by the same definition the new check uses, so it must be
-    #    allowed to bridge a private room to the rest of the house.
-    convenience_pairs = by_pair.items() if add_convenience_doors else ()
-    for pair, pair_walls in convenience_pairs:
-        if is_avoided(pair):
-            continue
-        if all(catalog.privacy_level_for(types_by_key[k]) >= _PRIVACY_THRESHOLD for k in pair):
-            continue
-        best = max(pair_walls, key=_wall_length)
-        if _wall_length(best) >= _MIN_DOOR_EDGE:
-            add_door(best, DOOR_WIDTH_M)
-        elif _wall_length(best) >= _NARROW_DOOR_EDGE:
-            add_door(best, _NARROW_DOOR_WIDTH)
 
     # 4. Front door on the entry's facing-side boundary wall (best effort).
     entry_key = next((n.key for n, _ in placed if n.type == RoomType.entry.value), None)
@@ -798,7 +794,6 @@ def plan_from_program(
         spec,
         facing,
         program.zone_of,
-        add_convenience_doors=not used_band_plan.regions,
         id_prefix=id_prefix,
     )
 

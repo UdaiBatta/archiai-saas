@@ -60,7 +60,9 @@ def test_fixture_produces_valid_plan(name):
         placed = [r for r in plan.rooms if r.type == spec_room.type]
         assert len(placed) == spec_room.count, spec_room.type
 
-    assert validate(plan) == []  # zero hard violations: overlap/bounds/min/reachability
+    # With the spec, so a MUST-attached ensuite reached through its own
+    # bedroom is exempt (it is the requested design, not a defect).
+    assert validate(plan, spec) == []  # zero hard violations: overlap/bounds/min/reachability
 
 
 @pytest.mark.parametrize("name", FIXTURE_NAMES)
@@ -146,7 +148,8 @@ def test_two_adjacent_private_rooms_do_not_get_a_redundant_direct_door():
     # 4bhk's real generated layout has multiple bedroom-bedroom /
     # bedroom-bathroom adjacencies that are already reachable via the
     # spanning tree — privacy says don't also punch a direct door there.
-    plan = generate_plan(_load("4bhk"))
+    spec = _load("4bhk")
+    plan = generate_plan(spec)
     private_types = {RoomType.bedroom.value, RoomType.master_bedroom.value, RoomType.bathroom.value}
     doored_walls = {d.wall_ref for d in plan.doors}
     types_by_id = {r.id: r.type for r in plan.rooms}
@@ -156,7 +159,7 @@ def test_two_adjacent_private_rooms_do_not_get_a_redundant_direct_door():
         if all(types_by_id[k] in private_types for k in pair)
     ]
     assert private_adjacent_pairs, "fixture must actually exercise this case"
-    assert validate(plan) == []  # still fully valid/reachable without the extra doors
+    assert validate(plan, spec) == []  # still fully valid/reachable without the extra doors
 
 
 def test_explicitly_avoided_adjacent_pair_gets_no_direct_door():
@@ -464,7 +467,7 @@ def test_corridor_door_prefers_a_public_neighbour_over_a_landlocked_service_room
 
     plan = generate_plan(spec)
 
-    assert validate(plan) == []
+    assert validate(plan, spec) == []
 
 
 @pytest.mark.parametrize("style", ["zoned_bands", "double_loaded_corridor", "hub_and_spoke", "open_core"])
@@ -584,3 +587,47 @@ def test_property_engine_output_never_violates_hard_constraints(spec):
     assert violations == [], [v.message for v in violations]
 
     assert len(plan.rooms) == _expected_room_count(spec)
+
+
+_OPEN_PLAN = {"living_room", "dining", "kitchen", "entry", "corridor"}
+
+
+@pytest.mark.parametrize("name", FIXTURE_NAMES)
+def test_open_plan_edges_have_no_wall_and_no_door(name):
+    spec = _load(name)
+    plan = generate_plan(spec)
+    types_by_id = {r.id: r.type for r in plan.rooms}
+    walls_by_id = {w.id: w for w in plan.walls}
+    doored = {d.wall_ref for d in plan.doors}
+
+    for pair, wall_id in _shared_wall_pairs(plan).items():
+        types = {types_by_id[k] for k in pair}
+        wall = walls_by_id[wall_id]
+        if types <= _OPEN_PLAN:
+            assert wall.kind == "open", types
+            assert wall_id not in doored
+        else:
+            assert wall.kind == "wall", types
+
+    assert validate(plan, spec) == []  # open edges count as connections
+
+
+def test_open_plan_rooms_need_no_door_between_them():
+    spec = _load("2bhk")
+    plan = generate_plan(spec)
+    open_walls = [w for w in plan.walls if w.kind == "open"]
+
+    assert open_walls, "fixture must have public rooms side by side"
+    # One door per room would be len(rooms); open-plan rooms reach each
+    # other through their open edges instead.
+    assert len(plan.doors) < len(plan.rooms)
+
+
+def test_saved_canvas_draws_no_wall_on_an_open_plan_edge():
+    from app.services.layout_adapter import layout_plan_to_canvas
+
+    plan = generate_plan(_load("2bhk"))
+    canvas = layout_plan_to_canvas(plan)
+    wall_ids = {obj["id"] for obj in canvas["rooms"] if obj["objectType"] == "wall"}
+
+    assert wall_ids == {w.id for w in plan.walls if w.kind == "wall"}

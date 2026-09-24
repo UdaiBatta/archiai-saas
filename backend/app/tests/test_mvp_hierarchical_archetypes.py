@@ -75,7 +75,9 @@ def test_school_composes_multiple_archetypes_around_one_shared_spine():
     )
     assert first.shared_edge(second) is not None
     assert west_classrooms[1].id not in adjacency[west_classrooms[0].id]
-    assert len(plan.doors) == len(plan.rooms)  # spanning tree + one front door
+    # Spanning tree + one front door; rooms joined by an open-plan edge need
+    # no door at all, so there can be fewer.
+    assert len(plan.doors) <= len(plan.rooms)
 
 
 def test_hierarchical_metadata_round_trips_in_the_canonical_contract():

@@ -93,17 +93,21 @@ def _inside_plot(room: PlanRoom, plan: LayoutPlan) -> bool:
 
 
 def _door_adjacency(plan: LayoutPlan) -> dict[str, set[str]]:
-    """room id -> set of room ids it directly shares a door with."""
+    """room id -> set of room ids it directly shares a door or open edge with."""
     walls_by_id = {w.id: w for w in plan.walls}
     adjacency: dict[str, set[str]] = {room.id: set() for room in plan.rooms}
-    for door in plan.doors:
-        wall = walls_by_id.get(door.wall_ref)
-        if wall is None:
-            continue
-        x, y = _door_point(door, wall)
+    passages = [
+        (_door_point(door, wall), door.floor)
+        for door in plan.doors
+        if (wall := walls_by_id.get(door.wall_ref)) is not None and wall.floor == door.floor
+    ] + [
+        (((w.x1 + w.x2) / 2, (w.y1 + w.y2) / 2), w.floor)
+        for w in plan.walls if w.kind == "open"
+    ]
+    for (x, y), floor in passages:
         touching = [
             room.id for room in plan.rooms
-            if room.floor == door.floor == wall.floor and _touches(room, x, y)
+            if room.floor == floor and _touches(room, x, y)
         ]
         for a in touching:
             for b in touching:

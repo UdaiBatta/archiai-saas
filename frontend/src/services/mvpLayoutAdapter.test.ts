@@ -109,6 +109,18 @@ describe('canonical MVP layout adapter', () => {
     })
   })
 
+  it('draws no wall object for an open-plan edge', () => {
+    const openPlan: LayoutPlan = {
+      ...layout,
+      walls: [{ ...layout.walls[0], kind: 'open' }],
+      doors: [],
+    }
+    const result = layoutPlanToCanvas(openPlan)
+
+    expect(result.rooms.some((object) => object.objectType === 'wall')).toBe(false)
+    expect(result.rooms.filter((object) => object.objectType === 'room')).toHaveLength(2)
+  })
+
   it('round-trips edited canvas geometry back to the canonical contract', () => {
     const canvas = layoutPlanToCanvas(layout)
     const restored = canvasObjectsToLayoutPlan(

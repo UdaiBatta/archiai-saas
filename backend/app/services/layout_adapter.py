@@ -170,6 +170,7 @@ def layout_plan_to_canvas(
     wall_objects = [
         _wall_object(wall, index)
         for index, wall in enumerate(plan.walls, start=1)
+        if wall.kind != "open"  # open-plan edge: no physical wall
     ]
     walls_by_id = {wall.id: wall for wall in plan.walls}
     door_objects = [

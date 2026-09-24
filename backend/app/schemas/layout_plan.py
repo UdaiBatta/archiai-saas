@@ -130,6 +130,10 @@ class Wall(BaseModel):
     y2: Coord
     thickness: float = Field(default=0.115, gt=0, lt=1)
     floor: StrictInt = Field(default=0, ge=0, le=20)
+    # "open" = the two rooms share this edge with no wall and no door (open
+    # plan). Kept in the list so the editor can toggle it and the validator
+    # can treat it as a connection; renderers must skip it.
+    kind: Literal["wall", "open"] = "wall"
 
 
 class Door(BaseModel):

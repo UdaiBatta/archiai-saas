@@ -25,8 +25,9 @@ def _load(name: str) -> RequirementsSpec:
 
 @pytest.mark.parametrize("name", FIXTURE_NAMES)
 def test_every_candidate_is_a_valid_plan(name):
-    for candidate in generate_candidates(_load(name), n=16, seed=0):
-        assert validate(candidate.plan) == []
+    spec = _load(name)
+    for candidate in generate_candidates(spec, n=16, seed=0):
+        assert validate(candidate.plan, spec) == []
 
 
 @pytest.mark.parametrize("name", FIXTURE_NAMES)
@@ -148,7 +149,7 @@ def test_annealing_never_scores_worse_than_best_of_n_alone(name):
     plain = generate_candidates(spec, n=64, seed=0)
     annealed = generate_candidates(spec, n=64, seed=0, anneal_iterations=50)
     assert annealed[0].energy <= plain[0].energy
-    assert validate(annealed[0].plan) == []
+    assert validate(annealed[0].plan, spec) == []
 
 
 def test_annealing_is_deterministic_for_a_fixed_seed():

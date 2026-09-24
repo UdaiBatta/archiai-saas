@@ -114,7 +114,9 @@ function doorObject(layout: LayoutPlan, index: number): Room | null {
 }
 
 export function layoutPlanDerivedObjects(layout: LayoutPlan): Room[] {
-  const wallObjects = layout.walls.map((_, index) => wallObject(layout, index))
+  const wallObjects = layout.walls.flatMap((wall, index) =>
+    wall.kind === 'open' ? [] : [wallObject(layout, index)],
+  )
   const doorObjects = layout.doors
     .map((_, index) => doorObject(layout, index))
     .filter((door): door is Room => door !== null)

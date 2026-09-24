@@ -95,6 +95,7 @@ export interface Wall {
   y2: number
   thickness: number
   floor?: number
+  kind?: 'wall' | 'open'
 }
 export interface Door {
   id: string
