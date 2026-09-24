@@ -46,7 +46,9 @@ function BriefGraphic() {
   const rules = EXAMPLE.understood.filter((line) => /^(Must connect|Keep apart)/.test(line))
   return (
     <div className="flex h-full flex-col justify-center gap-3 px-6">
-      <p className="line-clamp-2 rounded-xl border border-ink/10 bg-graphite-900 px-3 py-2 text-[12px] text-muted">“{EXAMPLE.brief}”</p>
+      <p className="rounded-xl border border-ink/10 bg-graphite-900 px-3 py-2 text-[12px] text-muted">
+        <span className="line-clamp-2">“{EXAMPLE.brief}”</span>
+      </p>
       <div className="flex flex-wrap gap-1.5">
         {['3 bedrooms', '2 bathrooms', '1 dining', '12 × 15 m', 'faces east'].map((c) => (
           <span key={c} className={chip}>{c}</span>
