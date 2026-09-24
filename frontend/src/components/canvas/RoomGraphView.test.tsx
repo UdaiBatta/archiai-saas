@@ -39,6 +39,14 @@ describe('RoomGraphView', () => {
     expect(screen.getByText("Bed can't be reached from the entrance: it has no door or opening.")).toBeInTheDocument()
   })
 
+  it('says it is checking, not that every room is unreachable, before edge data arrives', () => {
+    useCanvasStore.setState({ layoutMetadata: {}, selectedId: 'Bed' })
+    render(<RoomGraphView />)
+    const panel = screen.getByRole('complementary', { name: 'Access reasoning' })
+    expect(panel).toHaveTextContent('Checking how the rooms connect…')
+    expect(panel).not.toHaveTextContent(/can't be reached|has no route|Every room is reachable/)
+  })
+
   it('shows the route to the selected room', () => {
     useCanvasStore.setState({ selectedId: 'Bed' })
     render(<RoomGraphView />)

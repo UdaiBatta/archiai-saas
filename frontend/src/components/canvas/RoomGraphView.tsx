@@ -204,10 +204,12 @@ export function RoomGraphView({ className }: RoomGraphViewProps) {
             {route.map(labelOf).join(' → ')}
           </p>
         )}
-        {selectedId && !route && placed.has(selectedId) && (
+        {graph.hasConnectionData && selectedId && !route && placed.has(selectedId) && (
           <p className="mb-2 text-danger">{labelOf(selectedId)} has no route from the entrance.</p>
         )}
-        {graph.findings.length === 0 ? (
+        {!graph.hasConnectionData ? (
+          <p className="text-muted">Checking how the rooms connect…</p>
+        ) : graph.findings.length === 0 ? (
           <p className="text-ok">Every room is reachable, and none only through a bedroom.</p>
         ) : (
           <ul className="space-y-1.5">
@@ -238,11 +240,7 @@ export function RoomGraphView({ className }: RoomGraphViewProps) {
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-muted-light">
           Add rooms or generate a layout to see the room graph.
         </div>
-      ) : !graph.hasConnectionData && (
-        <div className="pointer-events-none absolute inset-x-0 top-20 flex justify-center text-xs text-muted-light">
-          Connections appear once the layout syncs: make any edit to refresh them.
-        </div>
-      )}
+      ) : null}
     </div>
   )
 }

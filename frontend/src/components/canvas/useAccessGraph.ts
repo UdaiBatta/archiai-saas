@@ -13,6 +13,10 @@ export function useAccessGraph(level: number) {
   const connections = useCanvasStore((s) => s.layoutMetadata.mvpConnections)
   return useMemo(() => {
     const edges = effectiveEdges(asArray<RoomEdge>(serverEdges), asArray<Connection>(connections))
-    return { ...buildRoomGraph(rooms, level, edges), hasConnectionData: Array.isArray(serverEdges) }
+    const graph = buildRoomGraph(rooms, level, edges)
+    const hasConnectionData = Array.isArray(serverEdges)
+    // Without edge data every room would look unreachable; say nothing
+    // rather than report a house with no doors.
+    return { ...graph, findings: hasConnectionData ? graph.findings : [], hasConnectionData }
   }, [rooms, level, serverEdges, connections])
 }

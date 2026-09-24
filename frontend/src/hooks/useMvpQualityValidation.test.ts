@@ -119,6 +119,23 @@ describe('useMvpQualityValidation', () => {
     expect(validateAndSyncMvpLayout).not.toHaveBeenCalled()
   })
 
+  it('re-derives connections at once for a plan saved without them', async () => {
+    // Older saves carry no edge data; waiting for an edit left the access
+    // graph reporting every room as unreachable.
+    useCanvasStore.setState((state) => {
+      const { mvpEdges: _dropped, ...metadata } = state.layoutMetadata
+      return { layoutMetadata: metadata }
+    })
+    renderHook(() => useMvpQualityValidation({ debounceMs: 100 }))
+
+    await advance(100)
+
+    expect(validateAndSyncMvpLayout).toHaveBeenCalledTimes(1)
+    expect(Array.isArray(useCanvasStore.getState().layoutMetadata.mvpEdges)).toBe(true)
+    await advance(100)
+    expect(validateAndSyncMvpLayout).toHaveBeenCalledTimes(1)
+  })
+
   it('debounces room edits and publishes the latest full quality report', async () => {
     renderHook(() => useMvpQualityValidation({ debounceMs: 100 }))
 

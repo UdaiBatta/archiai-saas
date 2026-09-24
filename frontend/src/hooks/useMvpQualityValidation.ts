@@ -71,6 +71,7 @@ export function useMvpQualityValidation({
   )
   const building = useCanvasStore((state) => state.layoutMetadata.mvpFootprint) as PlanZoneSpan | undefined
   const connectionsValue = useCanvasStore((state) => state.layoutMetadata.mvpConnections)
+  const hasEdges = useCanvasStore((state) => Array.isArray(state.layoutMetadata.mvpEdges))
   const connections = useMemo(() => parseConnections(connectionsValue), [connectionsValue])
   const fingerprint = useMemo(
     () => geometryFingerprint(objects, connections),
@@ -97,9 +98,13 @@ export function useMvpQualityValidation({
 
     if (previousFingerprint.current === null) {
       previousFingerprint.current = fingerprint
+      // A freshly generated plan is already in sync. One saved without edge
+      // data (older saves) is not: re-derive now, not on the first edit, or
+      // the access graph reads it as a house with no doors.
+      if (hasEdges) return
+    } else if (previousFingerprint.current === fingerprint) {
       return
     }
-    if (previousFingerprint.current === fingerprint) return
     previousFingerprint.current = fingerprint
 
     const requestId = ++requestSequence.current
@@ -157,5 +162,5 @@ export function useMvpQualityValidation({
       cancelled = true
       window.clearTimeout(timeoutId)
     }
-  }, [building, connections, debounceMs, fingerprint, floors, includeVastu, objects, pipeline, requirementsValue])
+  }, [building, connections, debounceMs, fingerprint, floors, hasEdges, includeVastu, objects, pipeline, requirementsValue])
 }
