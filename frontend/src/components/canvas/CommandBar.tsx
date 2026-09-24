@@ -1,13 +1,9 @@
-import { useRef, useState } from 'react'
 import { QUICK_STARTS } from '../../constants/quickStarts'
 
 type GenerationStage = 'idle' | 'extracting' | 'generating'
 
 interface CommandBarProps {
   roomCount: number
-  mode: 'generate' | 'refine'
-  onModeChange: (mode: 'generate' | 'refine') => void
-  designId: string | null
   showParams: boolean
   setShowParams: (value: boolean) => void
   plotWidthM: string
@@ -66,9 +62,6 @@ function StageTracker({ stage }: { stage: GenerationStage }) {
 
 export function CommandBar({
   roomCount,
-  mode,
-  onModeChange,
-  designId,
   showParams,
   setShowParams,
   plotWidthM,
@@ -87,68 +80,26 @@ export function CommandBar({
   onSubmit,
 }: CommandBarProps) {
   const heroMode = roomCount === 0
-  const [lockHint, setLockHint] = useState(false)
-  const lockHintTimer = useRef<number | null>(null)
-  const submitLabel = generating
-    ? busyLabel ?? (mode === 'refine' ? 'Refining…' : 'Generating…')
-    : mode === 'refine'
-      ? 'Refine'
-      : 'Generate'
-
-  const showLockHint = () => {
-    setLockHint(true)
-    if (lockHintTimer.current !== null) window.clearTimeout(lockHintTimer.current)
-    lockHintTimer.current = window.setTimeout(() => setLockHint(false), 2600)
-  }
+  const submitLabel = generating ? busyLabel ?? 'Generating…' : 'Generate'
 
   const tablist = (
     <div className="flex flex-col gap-1">
       <div
-        role="tablist"
-        aria-label="Prompt mode"
         className="inline-flex w-fit overflow-hidden rounded-md border border-ink/10 bg-graphite-900 text-[11px]"
       >
         <button
-          role="tab"
-          aria-selected={mode === 'generate'}
-          className={`px-3 py-1.5 ${mode === 'generate' ? 'bg-accent text-white' : 'text-muted hover:text-ink'}`}
-          onClick={() => onModeChange('generate')}
+          type="button"
+          className="px-3 py-1.5 text-muted hover:bg-ink/5 hover:text-ink"
+          onClick={() => setShowParams(!showParams)}
+          aria-expanded={showParams}
         >
-          Generate
+          {showParams ? 'Hide params' : 'Plot params'}
         </button>
-        <button
-          role="tab"
-          aria-selected={mode === 'refine'}
-          disabled={!designId}
-          title={designId ? '' : 'Generate a layout first'}
-          className={`px-3 py-1.5 ${mode === 'refine' ? 'bg-accent text-white' : 'text-muted hover:text-ink'} disabled:opacity-50 disabled:cursor-not-allowed`}
-          onClick={() => {
-            if (!designId) showLockHint()
-            else onModeChange('refine')
-          }}
-        >
-          Refine
-        </button>
-        {mode === 'generate' && (
-          <button
-            type="button"
-            className="border-l border-ink/10 px-3 py-1.5 text-muted hover:bg-ink/5 hover:text-ink"
-            onClick={() => setShowParams(!showParams)}
-            aria-expanded={showParams}
-          >
-            {showParams ? 'Hide params' : 'Plot params'}
-          </button>
-        )}
       </div>
-      {lockHint && (
-        <p className="text-[10.5px] text-warn motion-safe:animate-fade-in" role="note">
-          Refine unlocks after your first generated layout.
-        </p>
-      )}
     </div>
   )
 
-  const paramsRow = mode === 'generate' && showParams && (
+  const paramsRow = showParams && (
     <div className="flex flex-wrap gap-3 items-end text-xs text-muted">
       <label className="flex flex-col gap-1">
         Plot width (m)
@@ -313,11 +264,7 @@ export function CommandBar({
           aria-label="Layout prompt"
           className="min-w-[10rem] flex-1 resize-none rounded-md border border-ink/10 bg-graphite-800 px-3 py-2 text-xs text-ink placeholder:text-muted-light focus:outline-none focus:ring-1 focus:ring-accent-bright"
           rows={1}
-          placeholder={
-            mode === 'refine'
-              ? "Refine your layout… e.g. 'add a bedroom', 'remove the office', 'make the kitchen bigger'"
-              : 'Describe your layout… e.g. 3 bedroom apartment with open kitchen and living room'
-          }
+          placeholder="Describe your layout… e.g. 3 bedroom apartment with open kitchen and living room"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           disabled={generating}

@@ -12,13 +12,12 @@ interface WorkspacePanelProps {
   reviewChanges: boolean
   onReviewChanges: (value: boolean) => void
   onCreateModel: () => void
-  onRefine: () => void
   open: boolean
   onClose: () => void
   busy: boolean
 }
 
-export function WorkspacePanel({ modelStage, reviewChanges, onReviewChanges, onCreateModel, onRefine, open, onClose, busy }: WorkspacePanelProps) {
+export function WorkspacePanel({ modelStage, reviewChanges, onReviewChanges, onCreateModel, open, onClose, busy }: WorkspacePanelProps) {
   const [search, setSearch] = useState('')
   const rooms = useCanvasStore((s) => s.rooms)
   const selectedId = useCanvasStore((s) => s.selectedId)
@@ -45,7 +44,7 @@ export function WorkspacePanel({ modelStage, reviewChanges, onReviewChanges, onC
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {reviewChanges ? (
           <>
-            <p className="mb-3 text-xs leading-relaxed text-muted">Review your edits, or describe another change below. Refinement uses the layout currently on screen.</p>
+            <p className="mb-3 text-xs leading-relaxed text-muted">Review your edits made this session.</p>
             {activityLog.length ? (
               <ol className="space-y-2" aria-label="Session changes">
                 {activityLog.map((entry) => (
@@ -56,7 +55,6 @@ export function WorkspacePanel({ modelStage, reviewChanges, onReviewChanges, onC
                 ))}
               </ol>
             ) : <p className="rounded-lg bg-ink/5 p-3 text-xs text-muted">No manual changes in this session yet.</p>}
-            <button type="button" onClick={onRefine} disabled={busy} className="mt-3 w-full rounded-lg border border-accent/50 px-3 py-2 text-xs font-semibold text-accent-bright">Describe a refinement</button>
             <button type="button" onClick={() => onReviewChanges(false)} className="mt-2 w-full py-2 text-xs text-muted">Back to rooms</button>
           </>
         ) : selected ? (

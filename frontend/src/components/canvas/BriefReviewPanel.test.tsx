@@ -29,7 +29,6 @@ describe('BriefReviewPanel', () => {
     render(
       <BriefReviewPanel
         review={review}
-        engine="mvp"
         busy={false}
         onGenerate={onGenerate}
         onClarify={vi.fn()}
@@ -54,7 +53,6 @@ describe('BriefReviewPanel', () => {
           questions: ['How many bedrooms?', 'How many bathrooms?'],
           optional_missing: [],
         }}
-        engine="mvp"
         busy={false}
         onGenerate={vi.fn()}
         onClarify={onClarify}
@@ -74,7 +72,6 @@ describe('BriefReviewPanel', () => {
     render(
       <BriefReviewPanel
         review={{ ...review, optional_missing: [] }}
-        engine="established"
         busy={false}
         onGenerate={vi.fn()}
         onClarify={vi.fn()}
@@ -91,7 +88,6 @@ describe('BriefReviewPanel', () => {
     render(
       <BriefReviewPanel
         review={review}
-        engine="mvp"
         busy={false}
         onGenerate={onGenerate}
         onClarify={vi.fn()}

@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 
 import {
   applyGenerationOverrides,
-  generationEngineFor,
   reviewWithOverrides,
 } from './mvpGenerationPolicy'
 import type { ExtractResponse, RequirementsSpec } from '../types/contracts'
@@ -19,25 +18,6 @@ const requirements: RequirementsSpec = {
 }
 
 describe('MVP generation selection policy', () => {
-  it('uses canonical geometry for supported single- and multi-floor briefs', () => {
-    expect(generationEngineFor(requirements)).toBe('mvp')
-    expect(generationEngineFor({ ...requirements, floors: 2 })).toBe('mvp')
-    expect(
-      generationEngineFor({ ...requirements, building_type: 'office' }),
-    ).toBe('mvp')
-    expect(
-      generationEngineFor({ ...requirements, building_type: 'duplex' }),
-    ).toBe('mvp')
-    expect(
-      generationEngineFor({
-        ...requirements,
-        building_type: 'other',
-        rooms: [],
-        spaces: [{ space_type: 'recording_studio', count: 1 }],
-      }),
-    ).toBe('mvp')
-  })
-
   it('applies valid editor overrides without mutating extraction output', () => {
     const result = applyGenerationOverrides(requirements, {
       plotWidthM: '10',

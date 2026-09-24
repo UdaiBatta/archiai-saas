@@ -53,26 +53,6 @@ export interface DesignDraftResponse extends Omit<GenerateResponse, 'metadata'> 
   metadata: Record<string, unknown>
 }
 
-export interface DesignParams {
-  plotWidthM?: number
-  floors?: number
-  orientation?: 'N' | 'S' | 'E' | 'W'
-}
-
-export async function generateLayout(
-  prompt: string,
-  projectId?: string,
-  designParams?: DesignParams,
-  signal?: AbortSignal,
-): Promise<GenerateResponse> {
-  const { data } = await api.post<GenerateResponse>('/api/design/generate', {
-    prompt,
-    projectId,
-    designParams,
-  }, { signal })
-  return data
-}
-
 export async function getLatestProjectDesign(projectId: string): Promise<GenerateResponse> {
   const { data } = await api.get<GenerateResponse>(`/api/design/project/${projectId}/latest`)
   return data
@@ -116,33 +96,6 @@ export async function fetchDesignDraft(
     if (isNotFoundResponse(error)) return null
     throw error
   }
-}
-
-export interface RefineResponse extends GenerateResponse {
-  refinementSummary: string
-  refinementChanges?: RefinementChange[]
-}
-
-export interface RefinementChange {
-  action: 'resize' | 'remove' | 'add'
-  objectId: string
-  roomType: string
-  label: string
-  floorLevel: number
-  description: string
-}
-
-export async function refineLayout(
-  designId: string,
-  prompt: string,
-  currentLayout?: CanvasLayout,
-): Promise<RefineResponse> {
-  const { data } = await api.post<RefineResponse>('/api/design/refine', {
-    designId,
-    prompt,
-    currentLayout,
-  })
-  return data
 }
 
 export async function fetchVersion(versionId: string): Promise<GenerateResponse> {
