@@ -54,14 +54,15 @@ export function PricingCard({ plan, cycle, compact = false, onSelect }: PricingC
       </ul>
       <button
         type="button"
+        disabled={!plan.available}
         onClick={() => onSelect(plan)}
-        className={`mt-6 w-full rounded-lg px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/40 active:translate-y-px ${
-          plan.highlighted
+        className={`mt-6 w-full rounded-lg px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/40 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60 disabled:active:translate-y-0 ${
+          plan.highlighted && plan.available
             ? 'bg-ink text-graphite-900 hover:bg-graphite-100'
-            : 'border border-ink/15 text-ink hover:bg-ink/5'
+            : 'border border-ink/15 text-ink enabled:hover:bg-ink/5'
         }`}
       >
-        {plan.cta}
+        {plan.available ? plan.cta : 'Coming soon'}
       </button>
     </div>
   )

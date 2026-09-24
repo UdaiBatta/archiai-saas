@@ -5,7 +5,6 @@ import ProjectPage from './pages/Project'
 import Landing from './pages/Landing'
 import Login from './pages/Login'
 import PricingPage from './pages/Pricing'
-import CheckoutPage from './pages/Checkout'
 import Register from './pages/Register'
 import SharedProjectPage from './pages/SharedProject'
 import WorkspacePage from './pages/Workspace'
@@ -28,7 +27,6 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/pricing" element={<PricingPage />} />
-        <Route path="/checkout" element={<CheckoutPage />} />
         <Route path="/share/:token" element={<SharedProjectPage />} />
         <Route element={<PublicOnlyRoute />}>
           <Route path="/login" element={<Login />} />

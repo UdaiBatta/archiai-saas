@@ -1,7 +1,6 @@
-// Pricing catalogue for the marketing pages and the demo checkout flow.
-// Static config for now — when the billing backend (Sprint 17+ phase3
-// branch) lands, this should be replaced by `GET /api/billing/plans` and
-// the ids kept in sync with the backend Plan rows.
+// Pricing catalogue for the marketing pages. Only Starter can be used today;
+// paid plans are listed but not on sale until payments are connected
+// (backend: /api/billing). Features listed are ones the app actually has.
 
 export type BillingCycle = 'monthly' | 'annual'
 
@@ -16,6 +15,8 @@ export interface PlanDefinition {
   features: string[]
   highlighted?: boolean
   cta: string
+  /** Can someone start on this plan today? */
+  available: boolean
 }
 
 export const PLANS: PlanDefinition[] = [
@@ -34,6 +35,7 @@ export const PLANS: PlanDefinition[] = [
       'Community support',
     ],
     cta: 'Start free',
+    available: true,
   },
   {
     id: 'pro',
@@ -44,14 +46,14 @@ export const PLANS: PlanDefinition[] = [
     features: [
       'Unlimited projects',
       'Advanced 3D editing',
-      'Parametric room blocks',
-      'Zoning & room graph views',
+      'Zoning & access graph views',
       'Version history',
       'PNG + PDF exports',
       'Priority support',
     ],
     highlighted: true,
     cta: 'Start Pro trial',
+    available: false,
   },
   {
     id: 'team',
@@ -63,11 +65,11 @@ export const PLANS: PlanDefinition[] = [
       'Everything in Pro',
       'Team workspaces',
       'Role-based access',
-      'Shared project libraries',
       'Activity & audit logs',
       '5 seats included',
     ],
     cta: 'Start Team trial',
+    available: false,
   },
   {
     id: 'enterprise',
@@ -76,13 +78,13 @@ export const PLANS: PlanDefinition[] = [
     priceMonthly: null,
     priceAnnual: null,
     features: [
-      'Custom deployment',
-      'SSO & security review',
-      'Custom integrations',
+      'Everything in Team',
+      'More seats',
       'Dedicated support',
       'Onboarding & training',
     ],
     cta: 'Contact sales',
+    available: false,
   },
 ]
 

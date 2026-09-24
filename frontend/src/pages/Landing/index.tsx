@@ -1,38 +1,43 @@
-import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
-import { WebsiteNavbar } from '../../components/website/WebsiteNavbar'
+import { WebsiteNavbar, useStartDesigningTarget } from '../../components/website/WebsiteNavbar'
 import { WebsiteFooter } from '../../components/website/WebsiteFooter'
-import { EditorPreviewCard } from '../../components/website/EditorPreviewCard'
+import { ExamplePlanDrawing } from '../../components/website/ExamplePlanDrawing'
 import { FeatureCard } from '../../components/website/FeatureCard'
 import { PricingCard } from '../../components/website/PricingCard'
-import { DemoModal } from '../../components/website/DemoModal'
-import { PLANS, type PlanDefinition } from '../../constants/plans'
+import { EXAMPLE } from '../../constants/examplePlan'
+import { PLANS } from '../../constants/plans'
 import { useHashScroll } from '../../hooks/useHashScroll'
 
-const TRUST_ITEMS = [
-  'AI-assisted design',
-  'Smart constraints',
-  'Built for teams',
-  'Cloud-native',
+// The real sequence a project goes through, in order.
+const STEPS = [
+  {
+    title: 'Write the brief',
+    description: 'Plot size, facing, rooms, and how they should relate, in plain language.',
+  },
+  {
+    title: 'Check what was understood',
+    description: 'Every room, count and rule is read back before anything is drawn. Fix it or add to it.',
+  },
+  {
+    title: 'Get a checked plan',
+    description: 'The plan must meet every “must connect”, keep every room reachable, and respect privacy.',
+  },
+  {
+    title: 'Shape it in 2D and 3D',
+    description: 'Move rooms, choose wall, door or opening between them, and save versions as you go.',
+  },
 ]
 
 const FEATURES = [
   {
-    title: 'AI-Powered Design',
-    description:
-      'Describe the building in plain language — ArchiAI extracts the program and generates an editable, deterministic layout in seconds.',
-    icon: (
-      <>
-        <path d="M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15.5l-1.9-4.6L5.5 9l4.6-1.4z" />
-        <path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z" />
-      </>
-    ),
+    title: 'Your brief, read back to you',
+    description: 'Rooms, counts, must-connect and keep-apart rules are shown for review before a plan is drawn.',
+    icon: <path d="M4 5h16M4 10h16M4 15h10M16 18l2 2 4-4" />,
   },
   {
-    title: 'Built-in Compliance',
-    description:
-      'Hard geometric validation on every plan: no overlaps, minimum room sizes, and a walkable door graph — checked before you ever see it.',
+    title: 'Plans checked against the brief',
+    description: 'A broken “must connect”, an unreachable room or a bathroom only reachable through a bedroom is never shown as valid.',
     icon: (
       <>
         <path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6z" />
@@ -41,208 +46,204 @@ const FEATURES = [
     ),
   },
   {
-    title: 'Team Collaboration',
-    description:
-      'Shared workspaces with owner, admin, editor, and viewer roles, plus version history and a full activity trail on every project.',
+    title: 'Walls, doors and openings you choose',
+    description: 'Between any two rooms: a solid wall, a door you can slide along it, or open plan. Edits stay put.',
+    icon: <path d="M4 20V4h16v16M4 12h7M15 12h5M11 12a4 4 0 0 1 4-4" />,
+  },
+  {
+    title: 'Access graph and zoning',
+    description: 'See how you walk from the entrance to every room, and how each zone is entered, updated on every change.',
     icon: (
       <>
-        <circle cx="9" cy="8" r="3" />
-        <path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" />
-        <circle cx="17.5" cy="9.5" r="2.5" />
-        <path d="M21 19c0-2.5-1.6-4.6-3.8-5.4" />
+        <circle cx="5" cy="12" r="2" />
+        <circle cx="19" cy="6" r="2" />
+        <circle cx="19" cy="18" r="2" />
+        <path d="M7 12h5l5-5M12 12l5 5" />
       </>
     ),
   },
   {
-    title: 'Cloud-Native',
-    description:
-      'Projects, versions, drafts, and share links live in the cloud — open the same layout from anywhere and pick up where you left off.',
-    icon: (
-      <>
-        <path d="M7 18a4.5 4.5 0 1 1 .6-8.96 6 6 0 0 1 11.4 1.7A4 4 0 0 1 18 18z" />
-      </>
-    ),
+    title: '2D plan and 3D model',
+    description: 'One plan in both views: real walls with door openings in 3D, and open-plan areas that read as one space.',
+    icon: <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12v9M12 12L4 7.5" />,
+  },
+  {
+    title: 'Versions, sharing and export',
+    description: 'Named versions and auto-saved drafts, PNG and PDF export, read-only share links, and team workspaces.',
+    icon: <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />,
   },
 ]
 
-const SOLUTIONS = [
-  {
-    title: 'Architecture studios',
-    description: 'Concept massing and space programs before committing CAD hours.',
-  },
-  {
-    title: 'Interior & space planners',
-    description: 'Zoning, adjacency, and circulation reasoning on real footprints.',
-  },
-  {
-    title: 'Real-estate & developers',
-    description: 'Fast, presentable layout options for plots and briefs that change daily.',
-  },
-]
+const rules = EXAMPLE.understood.filter((line) => /^(Must connect|Prefer nearby|Keep apart)/.test(line))
+const program = EXAMPLE.understood.filter((line) => !rules.includes(line))
 
 export default function Landing() {
   const navigate = useNavigate()
+  const startTarget = useStartDesigningTarget()
   useHashScroll()
-  const [demoModal, setDemoModal] = useState<'watch' | 'book' | null>(null)
-
-  const goToPricing = (plan?: PlanDefinition) => {
-    navigate(plan ? `/pricing?plan=${plan.id}` : '/pricing')
-  }
 
   return (
     <div className="min-h-screen bg-surface text-ink">
-      <WebsiteNavbar onBookDemo={() => setDemoModal('book')} />
+      <WebsiteNavbar />
 
-      {/* Hero */}
-      <section className="mx-auto grid w-full max-w-6xl items-center gap-12 px-4 pb-20 pt-14 sm:px-6 lg:grid-cols-[1.05fr_1.2fr] lg:pt-24">
-        <div>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-ink/15 bg-ink/5 px-3 py-1 text-xs font-medium text-muted">
-            <span className="h-1.5 w-1.5 rounded-full bg-ok" aria-hidden="true" />
-            AI-powered architectural design
-          </span>
-          <h1 className="mt-5 text-4xl font-extrabold leading-tight tracking-tight text-ink sm:text-5xl">
-            Design better spaces, faster.
-          </h1>
-          <p className="mt-4 max-w-lg text-base leading-relaxed text-muted">
-            ArchiAI helps architects and designers create, refine, and optimize
-            floor plans with AI-powered tools built for real-world projects.
-          </p>
-          <div className="mt-7 flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={() => goToPricing()}
-              className="rounded-lg bg-ink px-5 py-2.5 text-sm font-semibold text-graphite-900 transition-colors hover:bg-graphite-100"
-            >
-              Start Free Trial
-            </button>
-            <button
-              type="button"
-              onClick={() => setDemoModal('watch')}
-              className="flex items-center gap-2 rounded-lg border border-ink/15 px-5 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-ink/5"
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-              Watch Demo
-            </button>
-          </div>
-          <p className="mt-4 text-xs text-muted-light">
-            Free plan available · No credit card required
-          </p>
-        </div>
-
-        <div className="relative">
-          <div
-            aria-hidden="true"
-            className="absolute -inset-8 rounded-[2rem] bg-gradient-to-tr from-transparent via-ink/5 to-ink/10 blur-2xl"
-          />
-          <div className="relative">
-            <EditorPreviewCard />
-          </div>
-        </div>
-      </section>
-
-      {/* Trust / value row */}
-      <section className="border-y border-ink/5 bg-graphite-850">
-        <div className="mx-auto grid w-full max-w-6xl grid-cols-2 gap-4 px-4 py-6 sm:px-6 md:grid-cols-4">
-          {TRUST_ITEMS.map((item) => (
-            <div key={item} className="flex items-center justify-center gap-2 text-sm font-medium text-muted">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-ink/50" aria-hidden="true">
-                <path d="M20 6L9 17l-5-5" />
-              </svg>
-              {item}
+      <main>
+        {/* Hero */}
+        <section className="mx-auto grid w-full max-w-6xl items-center gap-12 px-4 pb-16 pt-12 sm:px-6 lg:grid-cols-[1fr_1.1fr] lg:pt-20">
+          <div>
+            <p className="font-mono text-xs uppercase tracking-[0.14em] text-muted-light">
+              Brief → checked floor plan
+            </p>
+            <h1 className="mt-4 text-4xl font-extrabold leading-[1.1] tracking-tight text-ink [text-wrap:balance] sm:text-5xl">
+              Write the brief. Get a plan that follows it.
+            </h1>
+            <p className="mt-5 max-w-lg text-base leading-relaxed text-muted">
+              ArchiAI reads your brief back to you, lays out the rooms, and checks the plan
+              against every rule you gave before you see it. Then you edit it in 2D and 3D.
+            </p>
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <Link
+                to={startTarget}
+                className="rounded-lg bg-ink px-5 py-2.5 text-sm font-semibold text-graphite-900 transition-colors hover:bg-graphite-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/40"
+              >
+                Start designing — free
+              </Link>
+              <Link
+                to="/#example"
+                className="rounded-lg border border-ink/15 px-5 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-ink/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/40"
+              >
+                See a real example
+              </Link>
             </div>
-          ))}
-        </div>
-      </section>
+            <p className="mt-4 text-xs text-muted-light">Free to start · No card needed</p>
+          </div>
 
-      {/* Features */}
-      <section id="product" className="mx-auto w-full max-w-6xl scroll-mt-20 px-4 py-16 sm:px-6">
-        <h2 className="text-2xl font-bold text-ink">Everything from brief to building</h2>
-        <p className="mt-2 max-w-2xl text-sm text-muted">
-          One workspace covering the whole early-design loop: generate, edit in 2D
-          and 3D, reason about zoning and adjacency, then export and share.
-        </p>
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {FEATURES.map((feature) => (
-            <FeatureCard key={feature.title} {...feature} />
-          ))}
-        </div>
-      </section>
+          <div className="rounded-2xl border border-ink/10 bg-graphite-850 p-4 shadow-[0_24px_60px_rgba(0,0,0,0.35)] sm:p-5">
+            <p className="text-[13px] leading-relaxed text-muted">
+              <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted-light">Brief · </span>
+              “{EXAMPLE.brief}”
+            </p>
+            <div className="mt-4 rounded-xl bg-graphite-900 p-3">
+              <ExamplePlanDrawing plan={EXAMPLE.plan} />
+            </div>
+          </div>
+        </section>
 
-      {/* Solutions */}
-      <section id="solutions" className="border-y border-ink/5 bg-graphite-850">
-        <div className="mx-auto w-full max-w-6xl scroll-mt-20 px-4 py-14 sm:px-6">
-          <h2 className="text-2xl font-bold text-ink">Made for teams that plan space</h2>
-          <div className="mt-7 grid gap-4 md:grid-cols-3">
-            {SOLUTIONS.map((solution) => (
-              <div key={solution.title} className="rounded-2xl border border-ink/10 bg-graphite-800/60 p-5">
-                <h3 className="text-sm font-semibold text-ink">{solution.title}</h3>
-                <p className="mt-1.5 text-sm leading-relaxed text-muted">{solution.description}</p>
-              </div>
+        {/* How it works */}
+        <section id="how-it-works" className="scroll-mt-20 border-y border-ink/5 bg-graphite-850">
+          <div className="mx-auto w-full max-w-6xl px-4 py-14 sm:px-6">
+            <h2 className="text-2xl font-bold text-ink">How it works</h2>
+            <ol className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {STEPS.map((step, index) => (
+                <li key={step.title} className="flex flex-col gap-2 rounded-2xl border border-ink/10 bg-graphite-800/70 p-5">
+                  <span className="font-mono text-xs text-accent-bright">Step {index + 1}</span>
+                  <h3 className="text-sm font-semibold text-ink">{step.title}</h3>
+                  <p className="text-sm leading-relaxed text-muted">{step.description}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
+
+        {/* The example, in full */}
+        <section id="example" className="mx-auto w-full max-w-6xl scroll-mt-20 px-4 py-16 sm:px-6">
+          <h2 className="text-2xl font-bold text-ink">The example above, step by step</h2>
+          <p className="mt-2 max-w-2xl text-sm text-muted">
+            This is real output from ArchiAI for the brief shown, not a mock-up.
+          </p>
+          <div className="mt-8 grid gap-6 lg:grid-cols-3">
+            <div className="rounded-2xl border border-ink/10 bg-graphite-800/70 p-5">
+              <h3 className="text-sm font-semibold text-ink">1 · What was understood</h3>
+              <ul className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-[13px] text-muted">
+                {program.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="rounded-2xl border border-ink/10 bg-graphite-800/70 p-5">
+              <h3 className="text-sm font-semibold text-ink">2 · Rules from the brief</h3>
+              <ul className="mt-3 flex flex-col gap-1.5 text-[13px] text-muted">
+                {rules.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="rounded-2xl border border-ink/10 bg-graphite-800/70 p-5">
+              <h3 className="text-sm font-semibold text-ink">3 · What the plan was checked for</h3>
+              <ul className="mt-3 flex flex-col gap-1.5 text-[13px] text-muted">
+                {[
+                  'Every room and count from the brief is present',
+                  'Every “must connect” is met',
+                  'Every room is reachable from the entrance',
+                  'No room is reachable only through a bedroom',
+                  'No overlaps, rooms at least their minimum size',
+                ].map((check) => (
+                  <li key={check} className="flex gap-2">
+                    <span aria-hidden="true" className="text-ok">✓</span>
+                    <span>{check}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-3 font-mono text-[11px] text-muted-light">
+                Passed all · quality score {EXAMPLE.score}/100
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Features */}
+        <section id="features" className="scroll-mt-20 border-y border-ink/5 bg-graphite-850">
+          <div className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6">
+            <h2 className="text-2xl font-bold text-ink">What you get</h2>
+            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {FEATURES.map((feature) => (
+                <FeatureCard key={feature.title} {...feature} />
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Pricing preview */}
+        <section className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-2xl font-bold text-ink">Pricing</h2>
+              <p className="mt-2 text-sm text-muted">Start on Starter for free. Paid plans are not on sale yet.</p>
+            </div>
+            <Link to="/pricing" className="text-sm font-semibold text-ink underline-offset-4 hover:underline">
+              Compare plans →
+            </Link>
+          </div>
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {PLANS.map((plan) => (
+              <PricingCard
+                key={plan.id}
+                plan={plan}
+                cycle="monthly"
+                compact
+                onSelect={() => navigate(startTarget)}
+              />
             ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Pricing preview */}
-      <section className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 className="text-2xl font-bold text-ink">Simple pricing</h2>
-            <p className="mt-2 text-sm text-muted">Start free, upgrade when the work gets real.</p>
-          </div>
-          <Link to="/pricing" className="text-sm font-semibold text-ink underline-offset-4 hover:underline">
-            See full pricing →
-          </Link>
-        </div>
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {PLANS.map((plan) => (
-            <PricingCard
-              key={plan.id}
-              plan={plan}
-              cycle="monthly"
-              compact
-              onSelect={goToPricing}
-            />
-          ))}
-        </div>
-      </section>
-
-      {/* Final CTA */}
-      <section className="border-t border-ink/5 bg-graphite-850">
-        <div className="mx-auto flex w-full max-w-6xl flex-col items-center gap-4 px-4 py-14 text-center sm:px-6">
-          <h2 className="text-2xl font-bold text-ink">Start designing in minutes</h2>
-          <p className="max-w-md text-sm text-muted">
-            Type a brief, get a plan, and shape it in the editor — 2D, 3D, zoning,
-            and room graph on one canvas.
-          </p>
-          <div className="mt-2 flex gap-3">
-            <button
-              type="button"
-              onClick={() => goToPricing()}
-              className="rounded-lg bg-ink px-5 py-2.5 text-sm font-semibold text-graphite-900 hover:bg-graphite-100"
+        {/* Final CTA */}
+        <section className="border-t border-ink/5 bg-graphite-850">
+          <div className="mx-auto flex w-full max-w-6xl flex-col items-center gap-4 px-4 py-14 text-center sm:px-6">
+            <h2 className="text-2xl font-bold text-ink">Try it with your own brief</h2>
+            <p className="max-w-md text-sm text-muted">
+              Describe a plot and the rooms you need. You’ll see what was understood before any plan is drawn.
+            </p>
+            <Link
+              to={startTarget}
+              className="mt-2 rounded-lg bg-ink px-5 py-2.5 text-sm font-semibold text-graphite-900 hover:bg-graphite-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/40"
             >
-              Start Free Trial
-            </button>
-            <button
-              type="button"
-              onClick={() => setDemoModal('book')}
-              className="rounded-lg border border-ink/15 px-5 py-2.5 text-sm font-semibold text-ink hover:bg-ink/5"
-            >
-              Book a Demo
-            </button>
+              Start designing — free
+            </Link>
           </div>
-        </div>
-      </section>
+        </section>
+      </main>
 
       <WebsiteFooter />
-
-      <DemoModal
-        open={demoModal !== null}
-        variant={demoModal ?? 'watch'}
-        onClose={() => setDemoModal(null)}
-      />
     </div>
   )
 }
