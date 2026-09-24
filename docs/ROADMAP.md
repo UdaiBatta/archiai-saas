@@ -4,7 +4,7 @@ At most three things are "now". Finished items are deleted, not archived.
 
 ## Now
 
-1. **Remaining stretched rooms (22% of home-fixture rooms, down from 40%).** Left:
+1. **Remaining stretched rooms (22% of home-fixture rooms, down from 32%).** Left:
    the pooja room in a bedroom wing (4.6 × 1.2 m), a lone common bathroom with no
    attached one to stack against, upstairs wings in multi-storey homes (villa
    bedrooms ~3 × 11 m), and rooms along long office corridors. Next: a
