@@ -3,10 +3,11 @@ import { useEffect, useMemo, useRef } from 'react'
 import { validateAndSyncMvpLayout } from '../services/mvp.service'
 import {
   canvasObjectsToLayoutPlan,
+  edgesFromLayout,
   replaceDerivedCanvasObjects,
 } from '../services/mvpLayoutAdapter'
 import { useCanvasStore } from '../store/canvasStore'
-import type { Facing, RequirementsSpec } from '../types/contracts'
+import type { Connection, Facing, RequirementsSpec } from '../types/contracts'
 
 const DEFAULT_DEBOUNCE_MS = 300
 
@@ -23,8 +24,16 @@ function parseRequirements(value: unknown): RequirementsSpec | null {
   return value as unknown as RequirementsSpec
 }
 
-function geometryFingerprint(objects: ReturnType<typeof useCanvasStore.getState>['rooms']) {
-  return JSON.stringify(
+function parseConnections(value: unknown): Connection[] {
+  return Array.isArray(value) ? (value as Connection[]) : []
+}
+
+function geometryFingerprint(
+  objects: ReturnType<typeof useCanvasStore.getState>['rooms'],
+  connections: unknown = [],
+) {
+  return JSON.stringify([
+    connections,
     objects
       .filter((object) => ['room', 'wall', 'door'].includes(object.objectType))
       .map((object) => [
@@ -40,7 +49,7 @@ function geometryFingerprint(objects: ReturnType<typeof useCanvasStore.getState>
         object.rotation.y,
       ])
       .sort((left, right) => String(left[0]).localeCompare(String(right[0]))),
-  )
+  ])
 }
 
 interface UseMvpQualityValidationOptions {
@@ -60,7 +69,12 @@ export function useMvpQualityValidation({
   const includeVastu = useCanvasStore(
     (state) => state.layoutMetadata.mvpVastuEnabled === true,
   )
-  const fingerprint = useMemo(() => geometryFingerprint(objects), [objects])
+  const connectionsValue = useCanvasStore((state) => state.layoutMetadata.mvpConnections)
+  const connections = useMemo(() => parseConnections(connectionsValue), [connectionsValue])
+  const fingerprint = useMemo(
+    () => geometryFingerprint(objects, connections),
+    [objects, connections],
+  )
   const previousFingerprint = useRef<string | null>(null)
   const requestSequence = useRef(0)
 
@@ -94,6 +108,7 @@ export function useMvpQualityValidation({
         objects,
         footprint,
         (facing ?? 'east') as Facing,
+        connections,
       )
       void validateAndSyncMvpLayout(plan, { requirements, includeVastu })
         .then(({ layout, quality }) => {
@@ -101,13 +116,18 @@ export function useMvpQualityValidation({
           useCanvasStore.setState((state) => {
             // A newer edit may land before React runs this effect's cleanup.
             // Never paint derived geometry from an older room snapshot.
-            if (geometryFingerprint(state.rooms) !== fingerprint) return state
+            if (
+              geometryFingerprint(state.rooms, parseConnections(state.layoutMetadata.mvpConnections))
+              !== fingerprint
+            ) return state
 
             const rooms = replaceDerivedCanvasObjects(state.rooms, layout)
+            // The server drops connections whose rooms no longer touch.
+            const syncedConnections = layout.connections ?? []
             // The wall/door replacement changes the fingerprint. Advance the
             // baseline now so derived-state repaint does not enqueue a second
             // validation request.
-            previousFingerprint.current = geometryFingerprint(rooms)
+            previousFingerprint.current = geometryFingerprint(rooms, syncedConnections)
             return {
               rooms,
               selectedId:
@@ -120,6 +140,8 @@ export function useMvpQualityValidation({
               layoutMetadata: {
                 ...state.layoutMetadata,
                 mvpQuality: quality,
+                mvpEdges: edgesFromLayout(layout),
+                mvpConnections: syncedConnections,
               },
             }
           })
@@ -133,5 +155,5 @@ export function useMvpQualityValidation({
       cancelled = true
       window.clearTimeout(timeoutId)
     }
-  }, [debounceMs, fingerprint, floors, includeVastu, objects, pipeline, requirementsValue])
+  }, [connections, debounceMs, fingerprint, floors, includeVastu, objects, pipeline, requirementsValue])
 }

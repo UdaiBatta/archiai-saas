@@ -631,3 +631,88 @@ def test_saved_canvas_draws_no_wall_on_an_open_plan_edge():
     wall_ids = {obj["id"] for obj in canvas["rooms"] if obj["objectType"] == "wall"}
 
     assert wall_ids == {w.id for w in plan.walls if w.kind == "wall"}
+
+
+# ── User connection overrides (wall / door / open per room pair) ─────────────
+
+
+def _rebuilt_with(plan, spec, *connections):
+    from app.schemas.layout_plan import Connection
+    from app.services.layout_engine import rebuild_derived_geometry
+
+    stale = plan.model_copy(update={
+        "walls": [], "doors": [], "connections": [Connection(**c) for c in connections],
+    })
+    return rebuild_derived_geometry(stale, spec)
+
+
+def _pair_walls(plan, a, b):
+    return [w for w in plan.walls if w.rooms and set(w.rooms) == {a, b}]
+
+
+def _first_pair(plan, want_a, want_b):
+    """Ids of the first adjacent pair whose types are {want_a, want_b}."""
+    types = {r.id: r.type for r in plan.rooms}
+    for w in plan.walls:
+        if w.rooms and {types[w.rooms[0]], types[w.rooms[1]]} == {want_a, want_b}:
+            return w.rooms
+    raise AssertionError(f"no adjacent {want_a}/{want_b} pair in fixture")
+
+
+def test_interior_walls_name_the_two_rooms_they_separate():
+    plan = generate_plan(_load("2bhk"))
+    ids = {r.id for r in plan.rooms}
+    for wall in plan.walls:
+        assert wall.rooms is None or (len(wall.rooms) == 2 and set(wall.rooms) <= ids)
+    assert any(w.rooms for w in plan.walls)
+
+
+def test_open_connection_removes_the_wall_between_two_private_rooms():
+    spec = _load("4bhk")
+    plan = generate_plan(spec)
+    a, b = _first_pair(plan, "bedroom", "bedroom")
+
+    rebuilt = _rebuilt_with(plan, spec, {"room_a": a, "room_b": b, "kind": "open"})
+
+    assert {w.kind for w in _pair_walls(rebuilt, a, b)} == {"open"}
+    assert [c.kind for c in rebuilt.connections] == ["open"]
+
+
+def test_wall_connection_closes_an_open_plan_edge_without_a_door():
+    spec = _load("2bhk")
+    plan = generate_plan(spec)
+    open_wall = next(w for w in plan.walls if w.kind == "open")
+    a, b = open_wall.rooms
+
+    rebuilt = _rebuilt_with(plan, spec, {"room_a": a, "room_b": b, "kind": "wall"})
+
+    pair_walls = _pair_walls(rebuilt, a, b)
+    assert {w.kind for w in pair_walls} == {"wall"}
+    assert not {d.wall_ref for d in rebuilt.doors} & {w.id for w in pair_walls}
+
+
+def test_door_connection_places_the_door_where_the_user_dragged_it():
+    spec = _load("4bhk")
+    plan = generate_plan(spec)
+    a, b = _first_pair(plan, "bedroom", "bedroom")
+
+    rebuilt = _rebuilt_with(plan, spec, {"room_a": a, "room_b": b, "kind": "door", "at": 0.0})
+
+    wall = max(_pair_walls(rebuilt, a, b), key=lambda w: abs(w.x2 - w.x1) + abs(w.y2 - w.y1))
+    door = next(d for d in rebuilt.doors if d.wall_ref == wall.id)
+    assert door.offset == 0.0  # clamped to the wall start, not centred
+
+
+def test_connection_between_rooms_that_no_longer_touch_is_dropped():
+    spec = _load("2bhk")
+    plan = generate_plan(spec)
+    ids = [r.id for r in plan.rooms]
+    touching = {frozenset(w.rooms) for w in plan.walls if w.rooms}
+    a, b = next(
+        (x, y) for i, x in enumerate(ids) for y in ids[i + 1:]
+        if frozenset((x, y)) not in touching
+    )
+
+    rebuilt = _rebuilt_with(plan, spec, {"room_a": a, "room_b": b, "kind": "open"})
+
+    assert rebuilt.connections == []

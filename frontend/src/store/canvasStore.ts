@@ -9,6 +9,8 @@ import {
 } from './componentRegistry'
 import type { InteractionMode, PointerIntent } from './interactionModel'
 import { quarterTurnPlanSize } from '../utils/quarterTurn'
+import { snapDoorToWall, upsertConnection } from './connections'
+import type { Connection, ConnectionKind } from '../types/contracts'
 
 export type { CanvasObjectType } from './componentRegistry'
 export type { InteractionMode, PointerIntent } from './interactionModel'
@@ -167,6 +169,8 @@ interface CanvasState {
   setLastSavedAt: (timestamp: string | null) => void
   setRecoveredDraftAvailable: (available: boolean) => void
   updateRoom: (id: string, patch: Partial<Omit<Room, 'id'>>, options?: UpdateOptions) => void
+  /** Choose how two adjacent rooms meet: solid wall, door, or open. */
+  setConnection: (roomA: string, roomB: string, kind: ConnectionKind) => void
   resizeRoom: (
     id: string,
     size: ComponentSize,
@@ -305,6 +309,10 @@ function snapshotOf(
     selectedFloor: state.selectedFloor,
     floorHeight: state.floorHeight,
   }
+}
+
+function connectionsOf(metadata: Record<string, unknown>): Connection[] {
+  return Array.isArray(metadata.mvpConnections) ? (metadata.mvpConnections as Connection[]) : []
 }
 
 function pushHistory(state: CanvasState, snapshot?: CanvasHistorySnapshot) {
@@ -671,6 +679,30 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         )
       }
 
+      // A hosted door slides along its wall; between two rooms, where it
+      // stops becomes the user's door connection for that pair.
+      let layoutMetadata = state.layoutMetadata
+      if (objectType === 'door' && typeof room.hostWallId === 'string' && patchPosition) {
+        const wall = state.rooms.find((object) => object.id === room.hostWallId)
+        if (wall) {
+          const snapped = snapDoorToWall(updated, wall, patchPosition)
+          updated.position = snapped.position
+          const between = wall.betweenRooms
+          if (Array.isArray(between) && between.length === 2) {
+            layoutMetadata = {
+              ...state.layoutMetadata,
+              mvpConnections: upsertConnection(
+                connectionsOf(state.layoutMetadata),
+                String(between[0]),
+                String(between[1]),
+                'door',
+                snapped.at,
+              ),
+            }
+          }
+        }
+      }
+
       const shouldLog = options?.log ?? true
       const action = options?.action ?? inferAction(patch)
       const logEntry: CanvasActivityLogEntry | null = shouldLog
@@ -687,9 +719,34 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
       return {
         rooms: state.rooms.map((r) => (r.id === id ? updated : r)),
+        layoutMetadata,
         activityLog: logEntry ? [logEntry, ...state.activityLog] : state.activityLog,
         ...(shouldLog ? pushHistory(state, options?.historySnapshot) : {}),
         ...(shouldLog ? markUnsaved() : {}),
+      }
+    }),
+  setConnection: (roomA, roomB, kind) =>
+    set((state) => {
+      const labelOf = (id: string) => state.rooms.find((r) => r.id === id)?.label ?? id
+      return {
+        layoutMetadata: {
+          ...state.layoutMetadata,
+          mvpConnections: upsertConnection(connectionsOf(state.layoutMetadata), roomA, roomB, kind),
+        },
+        activityLog: [
+          {
+            id: nextId('activity'),
+            action: 'object.updated' as CanvasEditAction,
+            objectId: roomA,
+            objectLabel: `${labelOf(roomA)} ↔ ${labelOf(roomB)}`,
+            previousValue: null,
+            newValue: kind,
+            createdAt: new Date().toISOString(),
+          },
+          ...state.activityLog,
+        ],
+        ...pushHistory(state),
+        ...markUnsaved(),
       }
     }),
   resizeRoom: (id, size, position) =>

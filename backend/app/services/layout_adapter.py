@@ -100,7 +100,25 @@ def _wall_object(wall: Wall, index: int) -> dict:
         },
         "rotation": _rotation(),
         "color": ROOM_COLORS["wall"],
+        **({"betweenRooms": list(wall.rooms)} if wall.rooms else {}),
     }
+
+
+def room_edges(plan: LayoutPlan) -> list[dict]:
+    """Every adjacent room pair and how it meets: open / door / wall.
+    Mirrors ``edgesFromLayout`` in the frontend adapter."""
+    doored = {door.wall_ref for door in plan.doors}
+    by_pair: dict[tuple[str, str], str] = {}
+    for wall in plan.walls:
+        if not wall.rooms:
+            continue
+        pair = tuple(sorted(wall.rooms))
+        kind = "open" if wall.kind == "open" else ("door" if wall.id in doored else "wall")
+        previous = by_pair.get(pair)
+        # A pair can share several wall segments; any door wins over solid wall.
+        if previous is None or (previous == "wall" and kind == "door"):
+            by_pair[pair] = kind
+    return [{"rooms": list(pair), "kind": kind} for pair, kind in by_pair.items()]
 
 
 def _door_object(door: Door, wall: Wall, index: int) -> dict:
@@ -205,6 +223,8 @@ def layout_plan_to_canvas(
         # The frontend needs the original opt-in intent when it re-scores an
         # edited plan after save/reload. Never infer Vastu from room content.
         "mvpVastuEnabled": is_vastu_requested(prompt or ""),
+        "mvpEdges": room_edges(plan),
+        "mvpConnections": [c.model_dump(mode="json") for c in plan.connections],
     }
     if requirements is not None:
         metadata["mvpRequirements"] = requirements

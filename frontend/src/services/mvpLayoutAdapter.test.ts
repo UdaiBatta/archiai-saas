@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   canvasObjectsToLayoutPlan,
+  edgesFromLayout,
   generateResponseToCanvas,
   layoutPlanToCanvas,
   replaceDerivedCanvasObjects,
@@ -107,6 +108,19 @@ describe('canonical MVP layout adapter', () => {
       hostWallId: 'wall-1',
       position: { x: 4.5, y: 1.05, z: 2.45 },
     })
+  })
+
+  it('lists each adjacent pair once, a door winning over a solid segment', () => {
+    const plan: LayoutPlan = {
+      ...layout,
+      walls: [
+        { id: 'w1', x1: 4.5, y1: 0, x2: 4.5, y2: 6, thickness: 0.115, rooms: ['room-2', 'room-1'] },
+        { id: 'w2', x1: 4.5, y1: 6, x2: 4.5, y2: 12, thickness: 0.115, rooms: ['room-1', 'room-2'] },
+        { id: 'w3', x1: 0, y1: 0, x2: 0, y2: 12, thickness: 0.115 },
+      ],
+      doors: [{ id: 'd1', wall_ref: 'w2', offset: 1, width: 0.9 }],
+    }
+    expect(edgesFromLayout(plan)).toEqual([{ rooms: ['room-1', 'room-2'], kind: 'door' }])
   })
 
   it('draws no wall object for an open-plan edge', () => {

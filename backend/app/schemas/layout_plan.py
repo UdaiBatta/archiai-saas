@@ -134,6 +134,15 @@ class Wall(BaseModel):
     # plan). Kept in the list so the editor can toggle it and the validator
     # can treat it as a connection; renderers must skip it.
     kind: Literal["wall", "open"] = "wall"
+    # The two room ids an interior wall separates; None on the boundary.
+    rooms: list[str] | None = Field(default=None, min_length=2, max_length=2)
+
+    @model_serializer(mode="wrap")
+    def _omit_boundary_rooms(self, handler):
+        payload = handler(self)
+        if self.rooms is None:
+            payload.pop("rooms", None)
+        return payload
 
 
 class Door(BaseModel):
@@ -144,6 +153,26 @@ class Door(BaseModel):
     offset: float = Field(ge=0)  # meters from the wall's (x1, y1) end
     width: float = Field(default=0.9, gt=0, lt=3)
     floor: StrictInt = Field(default=0, ge=0, le=20)
+
+
+class Connection(BaseModel):
+    """A user's choice for how two adjacent rooms meet, overriding the
+    engine's default when walls/doors are re-derived: a solid wall, a wall
+    with a door (``at`` = door centre as a 0..1 fraction along the shared
+    edge, None = centred), or fully open."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    room_a: str = Field(min_length=1, max_length=96)
+    room_b: str = Field(min_length=1, max_length=96)
+    kind: Literal["wall", "door", "open"]
+    at: float | None = Field(default=None, ge=0, le=1)
+
+    @model_validator(mode="after")
+    def _distinct_rooms(self) -> "Connection":
+        if self.room_a == self.room_b:
+            raise ValueError("a connection needs two different rooms")
+        return self
 
 
 class LayoutPlan(BaseModel):
@@ -160,10 +189,13 @@ class LayoutPlan(BaseModel):
     walls: list[Wall] = Field(default_factory=list, max_length=2000)
     doors: list[Door] = Field(default_factory=list, max_length=2000)
     archetype_reasons: list[ArchetypeReason] | None = None
+    connections: list[Connection] = Field(default_factory=list, max_length=2000)
 
     @model_serializer(mode="wrap")
-    def _omit_legacy_archetype_reasons(self, handler):
+    def _omit_optional_fields(self, handler):
         payload = handler(self)
         if self.archetype_reasons is None:
             payload.pop("archetype_reasons", None)
+        if not self.connections:
+            payload.pop("connections", None)
         return payload

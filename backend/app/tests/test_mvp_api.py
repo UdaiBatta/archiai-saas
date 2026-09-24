@@ -516,6 +516,27 @@ async def test_full_validation_can_return_the_exact_rebuilt_editor_layout(
     assert all(door["wall_ref"] in wall_ids for door in payload["layout"]["doors"])
 
 
+async def test_layout_sync_honours_a_user_open_connection(client: AsyncClient):
+    token = await _register(client, "mvp-connection-sync@example.com")
+    spec = _spec("3bhk_adjacencies")
+    plan = generate_plan(RequirementsSpec.model_validate(spec)).model_dump(mode="json")
+    bedrooms = {r["id"] for r in plan["rooms"] if r["type"] in ("bedroom", "master_bedroom")}
+    wall = next(w for w in plan["walls"] if w.get("rooms") and set(w["rooms"]) <= bedrooms)
+    plan["connections"] = [{"room_a": wall["rooms"][0], "room_b": wall["rooms"][1], "kind": "open"}]
+
+    response = await client.post(
+        "/api/validate?full=true&includeLayout=true",
+        json={"layout": plan, "requirements": spec},
+        headers=_auth(token),
+    )
+
+    assert response.status_code == 200
+    layout = response.json()["layout"]
+    assert layout["connections"] == [{**plan["connections"][0], "at": None}]
+    rebuilt = [w for w in layout["walls"] if w.get("rooms") and set(w["rooms"]) == set(wall["rooms"])]
+    assert {w["kind"] for w in rebuilt} == {"open"}
+
+
 async def test_validation_layout_sync_requires_full_scoring(client: AsyncClient):
     token = await _register(client, "mvp-derived-sync-fast@example.com")
     plan = generate_plan(

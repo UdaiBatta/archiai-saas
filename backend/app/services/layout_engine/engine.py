@@ -47,6 +47,7 @@ from app.config.mvp_defaults import (
 )
 from app.schemas.layout_plan import (
     ArchetypeReason,
+    Connection,
     Door,
     LayoutPlan,
     PlanPlot,
@@ -99,6 +100,18 @@ def _edge_kind(type_a: str, type_b: str) -> str:
     def canon(t: str) -> str:
         return catalog.resolve_alias(t) or t
     return "open" if {canon(type_a), canon(type_b)} <= _OPEN_PLAN_TYPES else "wall"
+
+
+def _pair_kind(
+    need_a: RoomNeed, need_b: RoomNeed, overrides: dict[frozenset, Connection] | None
+) -> str:
+    """Edge kind for two adjacent rooms: the user's override if any (a
+    "door" connection still needs a physical wall to host it), else the
+    open-plan default."""
+    chosen = (overrides or {}).get(frozenset((need_a.key, need_b.key)))
+    if chosen is not None:
+        return "open" if chosen.kind == "open" else "wall"
+    return _edge_kind(need_a.type, need_b.type)
 
 
 class DoesNotFitError(ValueError):
@@ -250,6 +263,7 @@ def _build_walls(
     *,
     floor: int = 0,
     id_prefix: str = "",
+    overrides: dict[frozenset, Connection] | None = None,
 ):
     """One wall per shared edge (never two overlapping ones) + boundary walls.
 
@@ -269,6 +283,7 @@ def _build_walls(
             thickness=WALL_THICKNESS_M,
             floor=floor,
             kind=kind,
+            rooms=[a, b] if b is not None else None,
         ))
         wall_rooms[wall_id] = (a, b)
         return wall_id
@@ -277,7 +292,7 @@ def _build_walls(
         for need_b, rect_b in placed[i + 1:]:
             seg = rect_a.shared_edge(rect_b)
             if seg is not None:
-                add(seg, need_a.key, need_b.key, _edge_kind(need_a.type, need_b.type))
+                add(seg, need_a.key, need_b.key, _pair_kind(need_a, need_b, overrides))
 
     for need, rect in placed:  # boundary portions belong to exactly one room
         if rect.x <= EPS:
@@ -306,6 +321,7 @@ def _build_walls_polygon(
     *,
     floor: int = 0,
     id_prefix: str = "",
+    overrides: dict[frozenset, Connection] | None = None,
 ):
     """Polygon counterpart of `_build_walls` — same one-wall-per-shared-edge
     contract, computed via `polygon.shared_edges`/`polygon.is_on_boundary`
@@ -322,6 +338,7 @@ def _build_walls_polygon(
             thickness=WALL_THICKNESS_M,
             floor=floor,
             kind=kind,
+            rooms=[a, b] if b is not None else None,
         ))
         wall_rooms[wall_id] = (a, b)
         return wall_id
@@ -329,7 +346,7 @@ def _build_walls_polygon(
     for i, (need_a, poly_a) in enumerate(placed):
         for need_b, poly_b in placed[i + 1:]:
             for seg in polygon.shared_edges(poly_a, poly_b):
-                add(seg, need_a.key, need_b.key, _edge_kind(need_a.type, need_b.type))
+                add(seg, need_a.key, need_b.key, _pair_kind(need_a, need_b, overrides))
 
     for need, poly in placed:  # boundary portions belong to exactly one room
         coords = list(poly.exterior.coords)
@@ -382,15 +399,20 @@ def _place_doors(
     *,
     allow_disconnected: bool = False,
     id_prefix: str = "",
+    overrides: dict[frozenset, Connection] | None = None,
 ) -> list[Door]:
     doors: list[Door] = []
     doored_walls: set[str] = set()
+    overrides = overrides or {}
 
-    def add_door(wall: Wall, width: float) -> None:
+    def add_door(wall: Wall, width: float, at: float | None = None) -> None:
         if wall.id in doored_walls:
             return
         doored_walls.add(wall.id)
-        offset = max(0.0, (_wall_length(wall) - width) / 2)
+        length = _wall_length(wall)
+        # `at` = door centre as a fraction along the wall; None = centred.
+        centre = length / 2 if at is None else at * length
+        offset = min(max(0.0, centre - width / 2), max(0.0, length - width))
         doors.append(Door(
             id=f"{id_prefix}d{len(doors) + 1}",
             wall_ref=wall.id,
@@ -423,9 +445,30 @@ def _place_doors(
         for p in spec.avoid_adjacency
     }
 
+    # A user's "wall" connection vetoes a door exactly like an AVOID pair.
+    forced_walls = {pair for pair, c in overrides.items() if c.kind == "wall"}
+
     def is_avoided(pair: frozenset) -> bool:
+        if pair in forced_walls:
+            return True
         pair_types = frozenset(canonical_type(types_by_key[k]) for k in pair)
         return pair_types in avoid_type_pairs
+
+    def door_width_for(wall: Wall) -> float | None:
+        if _wall_length(wall) >= _MIN_DOOR_EDGE:
+            return DOOR_WIDTH_M
+        if _wall_length(wall) >= _NARROW_DOOR_EDGE:
+            return _NARROW_DOOR_WIDTH
+        return None
+
+    # 0. Doors the user placed explicitly, where they put them.
+    for pair, chosen in overrides.items():
+        if chosen.kind != "door" or pair not in by_pair:
+            continue
+        best = max(by_pair[pair], key=_wall_length)
+        width = door_width_for(best)
+        if width is not None:
+            add_door(best, width, chosen.at)
 
     # 1. `must`-adjacency doors (attached bathroom onto its bedroom, etc.).
     for pref in spec.adjacency:
@@ -435,6 +478,8 @@ def _place_doors(
             pair_types = {canonical_type(types_by_key[k]) for k in pair}
             pref_a = canonical_type(pref.room_a)
             pref_b = canonical_type(pref.room_b)
+            if pair in forced_walls:
+                continue
             if pair_types == {pref_a, pref_b} or (
                 pref_a == pref_b
                 and len(pair_types) == 1
@@ -597,7 +642,8 @@ def rebuild_derived_geometry(
     plan: LayoutPlan,
     spec: RequirementsSpec,
 ) -> LayoutPlan:
-    """Recreate walls and doors from the plan's current room rectangles.
+    """Recreate walls and doors from the plan's current room rectangles,
+    honouring the user's ``plan.connections`` (wall / door / open per pair).
 
     Walls and doors are derived artifacts in the canonical ``LayoutPlan``
     contract. Editor geometry changes therefore invalidate any supplied copies.
@@ -607,7 +653,10 @@ def rebuild_derived_geometry(
     """
 
     if not plan.rooms:
-        return plan.model_copy(update={"walls": [], "doors": []})
+        return plan.model_copy(update={"walls": [], "doors": [], "connections": []})
+
+    overrides = {frozenset((c.room_a, c.room_b)): c for c in plan.connections}
+    adjacent_pairs: set[frozenset] = set()
 
     floors = sorted({room.floor for room in plan.rooms})
     multi_floor = len(floors) > 1 or floors != [0]
@@ -641,7 +690,7 @@ def rebuild_derived_geometry(
         prefix = f"f{floor}-" if multi_floor else ""
         if polygon_mode:
             walls, wall_rooms = _build_walls_polygon(
-                placed, plot_polygon, floor=floor, id_prefix=prefix
+                placed, plot_polygon, floor=floor, id_prefix=prefix, overrides=overrides
             )
         else:
             walls, wall_rooms = _build_walls(
@@ -650,6 +699,7 @@ def rebuild_derived_geometry(
                 plan.plot.depth_m,
                 floor=floor,
                 id_prefix=prefix,
+                overrides=overrides,
             )
         zone_of = {need.key: catalog.zone_for(need.type) for need, _ in placed}
         doors = _place_doors(
@@ -661,10 +711,19 @@ def rebuild_derived_geometry(
             zone_of,
             allow_disconnected=True,
             id_prefix=prefix,
+            overrides=overrides,
         )
+        adjacent_pairs.update(frozenset(pair) for pair in wall_rooms.values() if pair[1] is not None)
         all_walls.extend(walls)
         all_doors.extend(doors)
-    return plan.model_copy(update={"walls": all_walls, "doors": all_doors})
+    # A connection whose rooms no longer touch (the user moved one away) is
+    # dropped rather than carried as a stale instruction.
+    connections = [
+        c for c in plan.connections if frozenset((c.room_a, c.room_b)) in adjacent_pairs
+    ]
+    return plan.model_copy(
+        update={"walls": all_walls, "doors": all_doors, "connections": connections}
+    )
 
 
 def plan_from_program(

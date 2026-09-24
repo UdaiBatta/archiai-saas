@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useCanvasStore } from '../../store/canvasStore'
 import { COMPONENT_REGISTRY } from '../../store/componentRegistry'
 import { InspectorProperties } from './Inspector'
+import { RoomConnections } from './RoomConnections'
 import { QualityPanel } from './QualityPanel'
 import { parseMvpQuality } from './qualityModel'
 import { displayRoomColor } from './editorPalette'
@@ -62,6 +63,7 @@ export function WorkspacePanel({ modelStage, reviewChanges, onReviewChanges, onC
             <button type="button" onClick={deselectAll} className="mb-3 text-xs text-muted hover:text-ink">← {modelStage ? 'Model overview' : 'All rooms'}</button>
             <h3 className="mb-3 truncate text-sm font-semibold text-ink">{selected.label}</h3>
             <fieldset disabled={busy} className="min-w-0"><InspectorProperties room={selected} /></fieldset>
+            {selected.objectType === 'room' && <RoomConnections roomId={selected.id} disabled={busy} />}
           </>
         ) : (
           <>
