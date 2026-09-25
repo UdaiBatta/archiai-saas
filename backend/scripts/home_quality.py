@@ -93,6 +93,24 @@ class Row:
     no_daylight: int
     ms: int
     note: str = ""
+    entry_off_street: bool = False
+
+
+def _entry_on_street(plan, facing) -> bool:
+    """Does a ground-floor entry touch the street side of the building?
+    (The brief's "entry faces east" means the front door is on that side.)"""
+    frame = plan.footprint
+    x0, y0 = (frame.x, frame.y) if frame else (0.0, 0.0)
+    x1 = frame.x + frame.w if frame else plan.plot.width_m
+    y1 = frame.y + frame.h if frame else plan.plot.depth_m
+    for room in plan.rooms:
+        if (catalog.resolve_alias(room.type) or room.type) != "foyer" or room.floor != 0:
+            continue
+        side = {"north": abs(room.y - y0), "south": abs(room.y + room.h - y1),
+                "west": abs(room.x - x0), "east": abs(room.x + room.w - x1)}[facing]
+        if side <= 1e-3:
+            return True
+    return False
 
 
 def _aspect(room) -> float:
@@ -122,7 +140,8 @@ def measure(name: str, spec: RequirementsSpec) -> Row:
             no_daylight += 1
     violations = validate(plan, spec)
     note = "; ".join(v.code for v in violations)
-    return Row(name, True, round(score(plan, spec).score), len(plan.rooms), stretched, no_daylight, ms, note)
+    off_street = plan.plot.boundary is None and not _entry_on_street(plan, (spec.facing or "east") if isinstance(spec.facing, str) else (spec.facing.value if spec.facing else "east"))
+    return Row(name, True, round(score(plan, spec).score), len(plan.rooms), stretched, no_daylight, ms, note, off_street)
 
 
 def run() -> list[Row]:
@@ -139,6 +158,7 @@ def totals(rows: list[Row]) -> dict[str, float]:
         "stretched_pct": round(100 * sum(r.stretched for r in fitted) / rooms, 1),
         "no_daylight": sum(r.no_daylight for r in fitted),
         "invalid": sum(1 for r in fitted if r.note),
+        "entry_off_street": sum(1 for r in fitted if r.entry_off_street),
     }
 
 
@@ -156,7 +176,7 @@ def render(rows: list[Row]) -> str:
     lines += ["", (
         f"Fits {t['fits']}/{t['briefs']} · mean score {t['mean_score']} · "
         f"stretched rooms {t['stretched_pct']}% · rooms without daylight {t['no_daylight']} · "
-        f"invalid {t['invalid']}"
+        f"entry off the street {t['entry_off_street']} · invalid {t['invalid']}"
     )]
     return "\n".join(lines)
 
@@ -171,7 +191,7 @@ def main() -> int:
         return 0
     if BASELINE.exists():
         base = json.loads(BASELINE.read_text(encoding="utf-8"))["totals"]
-        print("\nvs baseline: " + ", ".join(f"{k} {base[k]} -> {current[k]}" for k in current))
+        print("\nvs baseline: " + ", ".join(f"{k} {base.get(k, '-')} -> {current[k]}" for k in current))
     return 0
 
 

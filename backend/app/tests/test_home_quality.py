@@ -37,3 +37,7 @@ def test_no_more_rooms_lose_their_daylight(current, baseline):
 
 def test_scores_do_not_drop(current, baseline):
     assert current["mean_score"] >= baseline["mean_score"] - 0.5
+
+
+def test_front_doors_stay_on_the_street(current, baseline):
+    assert current["entry_off_street"] <= baseline.get("entry_off_street", current["entry_off_street"])

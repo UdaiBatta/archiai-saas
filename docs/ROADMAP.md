@@ -19,6 +19,9 @@ At most three things are "now". Finished items are deleted, not archived.
 
 ## Next
 
+- Multi-storey homes: lay the upper floor so its bathrooms sit over the ground
+  floor's wet rooms. Putting the foyer on the street side (as the brief's
+  facing says) cost three templates their stacking (score 100/97/95 -> 91).
 - Polygon plots try the original room order and up to 63 single swaps; broader
   order search is still deferred, so some valid arrangements may be missed.
 - A Playwright test of the core loop: brief → generate → drag a room → save → reload.

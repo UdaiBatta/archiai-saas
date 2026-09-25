@@ -2,10 +2,11 @@
  "totals": {
   "briefs": 26,
   "fits": 26,
-  "mean_score": 98.9,
-  "stretched_pct": 21.6,
-  "no_daylight": 7,
-  "invalid": 0
+  "mean_score": 98.0,
+  "stretched_pct": 22.7,
+  "no_daylight": 3,
+  "invalid": 0,
+  "entry_off_street": 0
  },
  "rows": [
   {
@@ -16,7 +17,8 @@
    "stretched": 2,
    "no_daylight": 0,
    "ms": 73,
-   "note": ""
+   "note": "",
+   "entry_off_street": false
   },
   {
    "brief": "1bhk_7.5x9_east",
@@ -25,8 +27,9 @@
    "rooms": 5,
    "stretched": 1,
    "no_daylight": 0,
-   "ms": 54,
-   "note": ""
+   "ms": 57,
+   "note": "",
+   "entry_off_street": false
   },
   {
    "brief": "1bhk_9x12_south",
@@ -35,8 +38,9 @@
    "rooms": 5,
    "stretched": 2,
    "no_daylight": 0,
-   "ms": 72,
-   "note": ""
+   "ms": 76,
+   "note": "",
+   "entry_off_street": false
   },
   {
    "brief": "1bhk_9x12_west",
@@ -45,8 +49,9 @@
    "rooms": 5,
    "stretched": 1,
    "no_daylight": 0,
-   "ms": 86,
-   "note": ""
+   "ms": 120,
+   "note": "",
+   "entry_off_street": false
   },
   {
    "brief": "2bhk_9x12_north",
@@ -55,8 +60,9 @@
    "rooms": 9,
    "stretched": 1,
    "no_daylight": 0,
-   "ms": 180,
-   "note": ""
+   "ms": 173,
+   "note": "",
+   "entry_off_street": false
   },
   {
    "brief": "2bhk_9x12_east",
@@ -65,8 +71,9 @@
    "rooms": 9,
    "stretched": 1,
    "no_daylight": 0,
-   "ms": 152,
-   "note": ""
+   "ms": 167,
+   "note": "",
+   "entry_off_street": false
   },
   {
    "brief": "2bhk_9x15_south",
@@ -75,8 +82,9 @@
    "rooms": 9,
    "stretched": 0,
    "no_daylight": 0,
-   "ms": 150,
-   "note": ""
+   "ms": 199,
+   "note": "",
+   "entry_off_street": false
   },
   {
    "brief": "2bhk_9x15_west",
@@ -85,8 +93,9 @@
    "rooms": 9,
    "stretched": 1,
    "no_daylight": 0,
-   "ms": 174,
-   "note": ""
+   "ms": 178,
+   "note": "",
+   "entry_off_street": false
   },
   {
    "brief": "3bhk_12x15_north",
@@ -95,8 +104,9 @@
    "rooms": 12,
    "stretched": 1,
    "no_daylight": 0,
-   "ms": 204,
-   "note": ""
+   "ms": 211,
+   "note": "",
+   "entry_off_street": false
   },
   {
    "brief": "3bhk_12x15_east",
@@ -105,8 +115,9 @@
    "rooms": 12,
    "stretched": 1,
    "no_daylight": 0,
-   "ms": 284,
-   "note": ""
+   "ms": 307,
+   "note": "",
+   "entry_off_street": false
   },
   {
    "brief": "3bhk_12x18_south",
@@ -115,8 +126,9 @@
    "rooms": 12,
    "stretched": 8,
    "no_daylight": 0,
-   "ms": 213,
-   "note": ""
+   "ms": 206,
+   "note": "",
+   "entry_off_street": false
   },
   {
    "brief": "3bhk_12x18_west",
@@ -125,18 +137,20 @@
    "rooms": 12,
    "stretched": 3,
    "no_daylight": 0,
-   "ms": 312,
-   "note": ""
+   "ms": 298,
+   "note": "",
+   "entry_off_street": false
   },
   {
    "brief": "4bhk_15x18_north",
    "fits": true,
-   "score": 91,
+   "score": 87,
    "rooms": 15,
    "stretched": 2,
    "no_daylight": 1,
-   "ms": 208,
-   "note": ""
+   "ms": 230,
+   "note": "",
+   "entry_off_street": false
   },
   {
    "brief": "4bhk_15x18_east",
@@ -145,8 +159,9 @@
    "rooms": 15,
    "stretched": 3,
    "no_daylight": 0,
-   "ms": 573,
-   "note": ""
+   "ms": 670,
+   "note": "",
+   "entry_off_street": false
   },
   {
    "brief": "4bhk_15x24_south",
@@ -155,8 +170,9 @@
    "rooms": 15,
    "stretched": 1,
    "no_daylight": 0,
-   "ms": 841,
-   "note": ""
+   "ms": 886,
+   "note": "",
+   "entry_off_street": false
   },
   {
    "brief": "4bhk_15x24_west",
@@ -165,8 +181,9 @@
    "rooms": 15,
    "stretched": 6,
    "no_daylight": 0,
-   "ms": 1170,
-   "note": ""
+   "ms": 1196,
+   "note": "",
+   "entry_off_street": false
   },
   {
    "brief": "1bhk",
@@ -175,8 +192,9 @@
    "rooms": 5,
    "stretched": 1,
    "no_daylight": 0,
-   "ms": 115,
-   "note": ""
+   "ms": 131,
+   "note": "",
+   "entry_off_street": false
   },
   {
    "brief": "2bhk",
@@ -185,8 +203,9 @@
    "rooms": 9,
    "stretched": 2,
    "no_daylight": 0,
-   "ms": 192,
-   "note": ""
+   "ms": 221,
+   "note": "",
+   "entry_off_street": false
   },
   {
    "brief": "3bhk_adjacencies",
@@ -195,8 +214,9 @@
    "rooms": 12,
    "stretched": 1,
    "no_daylight": 0,
-   "ms": 368,
-   "note": ""
+   "ms": 371,
+   "note": "",
+   "entry_off_street": false
   },
   {
    "brief": "4bhk",
@@ -205,8 +225,9 @@
    "rooms": 15,
    "stretched": 2,
    "no_daylight": 1,
-   "ms": 231,
-   "note": ""
+   "ms": 254,
+   "note": "",
+   "entry_off_street": false
   },
   {
    "brief": "template_family_home",
@@ -215,8 +236,9 @@
    "rooms": 10,
    "stretched": 3,
    "no_daylight": 0,
-   "ms": 327,
-   "note": ""
+   "ms": 231,
+   "note": "",
+   "entry_off_street": false
   },
   {
    "brief": "template_apartment",
@@ -225,38 +247,42 @@
    "rooms": 7,
    "stretched": 1,
    "no_daylight": 0,
-   "ms": 150,
-   "note": ""
+   "ms": 157,
+   "note": "",
+   "entry_off_street": false
   },
   {
    "brief": "template_villa",
    "fits": true,
-   "score": 97,
+   "score": 91,
    "rooms": 17,
-   "stretched": 7,
-   "no_daylight": 1,
+   "stretched": 9,
+   "no_daylight": 0,
    "ms": 5,
-   "note": ""
+   "note": "",
+   "entry_off_street": false
   },
   {
    "brief": "template_townhouse",
    "fits": true,
-   "score": 95,
+   "score": 91,
    "rooms": 13,
    "stretched": 2,
-   "no_daylight": 1,
-   "ms": 4,
-   "note": ""
+   "no_daylight": 0,
+   "ms": 3,
+   "note": "",
+   "entry_off_street": false
   },
   {
    "brief": "template_two_storey_home",
    "fits": true,
-   "score": 100,
+   "score": 91,
    "rooms": 13,
-   "stretched": 1,
-   "no_daylight": 1,
+   "stretched": 2,
+   "no_daylight": 0,
    "ms": 2,
-   "note": ""
+   "note": "",
+   "entry_off_street": false
   },
   {
    "brief": "villa_from_app",
@@ -264,9 +290,10 @@
    "score": 89,
    "rooms": 17,
    "stretched": 7,
-   "no_daylight": 2,
-   "ms": 304,
-   "note": ""
+   "no_daylight": 1,
+   "ms": 327,
+   "note": "",
+   "entry_off_street": false
   }
  ]
 }

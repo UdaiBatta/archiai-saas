@@ -923,8 +923,9 @@ def plan_from_program(
     ) -> tuple[list[tuple[RoomNeed, Rect]], BandPlan]:
         used_band_plan = archetype_fn(prog, plot_w, plot_d, facing)
         result: list[tuple[RoomNeed, Rect]] = []
+        outline = Rect(0.0, 0.0, plot_w, plot_d)  # the building, in placement coordinates
         for band_rect, group in used_band_plan.bands:
-            result.extend(subdivide(group, band_rect, facing))
+            result.extend(subdivide(group, band_rect, facing, outline))
         return result, used_band_plan
 
     if band_plan is None:
@@ -1202,7 +1203,7 @@ def _generate_plan_polygon(
         )
 
     try:
-        placed = subdivide_polygon(needs, plot_polygon, facing)
+        placed = subdivide_polygon(needs, plot_polygon, facing, plot_polygon)
     except SubdivisionError as exc:
         raise DoesNotFitError(f"{exc} — increase plot size") from exc
 

@@ -91,59 +91,120 @@ def facing_first(axis: str, facing: Facing) -> bool:
     return facing == Facing.south
 
 
-def subdivide(needs: list[RoomNeed], rect: Rect, facing: Facing) -> list[tuple[RoomNeed, Rect]]:
+# Rooms that need an outside wall: a window (hard rule for homes, see
+# quality.hard_constraints._NEEDS_WINDOW), or an outdoor room that is
+# only a balcony if it's on the outline. Mirrored here as raw engine types
+# (subdivision can't import quality without an import cycle).
+_OUTSIDE_WALL_TYPES = frozenset({
+    "bedroom", "master_bedroom", "kids_room", "kids_bedroom", "guest_bedroom",
+    "living_room", "open_plan_living", "kitchen",
+    "balcony", "terrace", "porch", "veranda",
+})
+_FACING_SIDE = {Facing.north: "N", Facing.south: "S", Facing.east: "E", Facing.west: "W"}
+_ENTRY_TYPES = frozenset({"entry", "foyer"})  # templates call the entry "foyer"
+
+
+def _outline_sides(rect: Rect, frame: Rect | None) -> frozenset[str]:
+    """Which sides of `rect` lie on the building outline `frame`."""
+    if frame is None:
+        return frozenset()
+    sides = set()
+    if abs(rect.x - frame.x) <= EPS:
+        sides.add("W")
+    if abs(rect.x + rect.w - (frame.x + frame.w)) <= EPS:
+        sides.add("E")
+    if abs(rect.y - frame.y) <= EPS:
+        sides.add("N")
+    if abs(rect.y + rect.d - (frame.y + frame.d)) <= EPS:
+        sides.add("S")
+    return frozenset(sides)
+
+
+def _cut_off_penalty(group: list[RoomNeed], half: Rect, parent_sides: frozenset[str], frame: Rect | None, facing: Facing) -> int:
+    """What this half loses by being cut off from the outline: the entry away
+    from the street, or a room that needs a window left with no outside side."""
+    if frame is None or not parent_sides:
+        return 0
+    sides = _outline_sides(half, frame)
+    street = _FACING_SIDE[facing]
+    penalty = 0
+    for need in group:
+        if need.type in _ENTRY_TYPES and street in parent_sides and street not in sides:
+            penalty += 100
+        # Only hard needs move rooms around: chasing a nice-to-have (a dining
+        # room window) cost other rules (bathrooms stacked across floors).
+        if not sides and need.type in _OUTSIDE_WALL_TYPES:
+            penalty += 10
+    return penalty
+
+
+def subdivide(
+    needs: list[RoomNeed], rect: Rect, facing: Facing, frame: Rect | None = None,
+) -> list[tuple[RoomNeed, Rect]]:
+    """Cut `rect` among `needs`. With `frame` (the building outline), each cut
+    also weighs which rooms keep an outside wall: of the valid cuts, the one
+    that cuts the fewest window-needing rooms (and never the entry) off the
+    outline wins; ties keep the plain preference order below."""
     if not needs:
         return []
     if len(needs) == 1:
         return [(needs[0], rect)]
 
     i = split_index(needs)
-    group_a, group_b = needs[:i], needs[i:]
-    entry_in_b = any(n.type == "entry" for n in group_b)
+    entry_in_b = any(n.type in _ENTRY_TYPES for n in needs[i:])
     facing_axis = "x" if facing in (Facing.east, Facing.west) else "y"
+    parent_sides = _outline_sides(rect, frame)
 
-    # Prefer cutting the longer side (keeps cells square-ish); fall back to the
-    # other axis when the preferred one cannot honour minimum areas.
+    # Preference order (the tie-break): cut the longer side (keeps cells
+    # square-ish); with the entry in the second group, cut parallel to the
+    # street first so both halves keep it; across the facing axis, the
+    # entry's group takes the street side. Each axis's other assignment is
+    # tried after, so the outline penalty can pick it when it matters.
     axes = ("x", "y") if rect.w >= rect.d else ("y", "x")
     if entry_in_b:
-        # A cut across the facing axis gives the street side to group A only,
-        # which would box the entry in. Cut parallel to the street first so
-        # both halves keep it (the entry becomes a passage from the street
-        # in, and its neighbour keeps its window).
         axes = tuple(sorted(axes, key=lambda axis: axis == facing_axis))
+    options = []
     for axis in axes:
-        # Still across the facing axis: swap so the entry takes the street side.
-        swapped = axis == facing_axis and entry_in_b
+        preferred_swap = axis == facing_axis and entry_in_b
+        options += [(axis, preferred_swap), (axis, not preferred_swap)]
+
+    best = None
+    for rank, (axis, swapped) in enumerate(options):
         group_a, group_b = (needs[i:], needs[:i]) if swapped else (needs[:i], needs[i:])
         span, other = (rect.w, rect.d) if axis == "x" else (rect.d, rect.w)
         t = clamped_cut(span, other, group_a, group_b)
         if t is None:
             continue
-        a_high = facing_first(axis, facing)
-        if axis == "x":
-            low = Rect(rect.x, rect.y, t, rect.d)
-            high = Rect(rect.x + t, rect.y, rect.w - t, rect.d)
-        else:
-            low = Rect(rect.x, rect.y, rect.w, t)
-            high = Rect(rect.x, rect.y + t, rect.w, rect.d - t)
-        # `t` was computed as group A's share, so A must receive the low child
-        # unless it is being anchored to the facing (high-coordinate) side — in
-        # that case mirror the cut so A's rect still has A's area.
-        if a_high:
+        # `t` is group A's share. A takes the facing-side child on the facing
+        # axis (the high child when facing east/south), the low child otherwise.
+        if facing_first(axis, facing):
             if axis == "x":
-                high = Rect(rect.x + rect.w - t, rect.y, t, rect.d)
-                low = Rect(rect.x, rect.y, rect.w - t, rect.d)
+                rect_a = Rect(rect.x + rect.w - t, rect.y, t, rect.d)
+                rect_b = Rect(rect.x, rect.y, rect.w - t, rect.d)
             else:
-                high = Rect(rect.x, rect.y + rect.d - t, rect.w, t)
-                low = Rect(rect.x, rect.y, rect.w, rect.d - t)
-            rect_a, rect_b = high, low
+                rect_a = Rect(rect.x, rect.y + rect.d - t, rect.w, t)
+                rect_b = Rect(rect.x, rect.y, rect.w, rect.d - t)
+        elif axis == "x":
+            rect_a = Rect(rect.x, rect.y, t, rect.d)
+            rect_b = Rect(rect.x + t, rect.y, rect.w - t, rect.d)
         else:
-            rect_a, rect_b = low, high
-        parts_a = subdivide(group_a, rect_a, facing)
-        parts_b = subdivide(group_b, rect_b, facing)
-        # Keep the caller's room order in the output either way.
-        return parts_b + parts_a if swapped else parts_a + parts_b
+            rect_a = Rect(rect.x, rect.y, rect.w, t)
+            rect_b = Rect(rect.x, rect.y + t, rect.w, rect.d - t)
+        penalty = (
+            _cut_off_penalty(group_a, rect_a, parent_sides, frame, facing)
+            + _cut_off_penalty(group_b, rect_b, parent_sides, frame, facing)
+        )
+        if best is None or (penalty, rank) < best[0]:
+            best = ((penalty, rank), swapped, group_a, rect_a, group_b, rect_b)
+        if penalty == 0:
+            break  # nothing better than the first cut that costs nothing
 
-    raise SubdivisionError(
-        f"cannot cut {rect.w:.1f}x{rect.d:.1f}m for {len(group_a)}+{len(group_b)} rooms"
-    )
+    if best is None:
+        raise SubdivisionError(
+            f"cannot cut {rect.w:.1f}x{rect.d:.1f}m for {i}+{len(needs) - i} rooms"
+        )
+    _, swapped, group_a, rect_a, group_b, rect_b = best
+    parts_a = subdivide(group_a, rect_a, facing, frame)
+    parts_b = subdivide(group_b, rect_b, facing, frame)
+    # Keep the caller's room order in the output either way.
+    return parts_b + parts_a if swapped else parts_a + parts_b
