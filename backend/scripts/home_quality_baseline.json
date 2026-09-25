@@ -1,0 +1,272 @@
+{
+ "totals": {
+  "briefs": 26,
+  "fits": 26,
+  "mean_score": 98.9,
+  "stretched_pct": 21.6,
+  "no_daylight": 7,
+  "invalid": 0
+ },
+ "rows": [
+  {
+   "brief": "1bhk_7.5x9_north",
+   "fits": true,
+   "score": 100,
+   "rooms": 5,
+   "stretched": 2,
+   "no_daylight": 0,
+   "ms": 73,
+   "note": ""
+  },
+  {
+   "brief": "1bhk_7.5x9_east",
+   "fits": true,
+   "score": 100,
+   "rooms": 5,
+   "stretched": 1,
+   "no_daylight": 0,
+   "ms": 54,
+   "note": ""
+  },
+  {
+   "brief": "1bhk_9x12_south",
+   "fits": true,
+   "score": 100,
+   "rooms": 5,
+   "stretched": 2,
+   "no_daylight": 0,
+   "ms": 72,
+   "note": ""
+  },
+  {
+   "brief": "1bhk_9x12_west",
+   "fits": true,
+   "score": 100,
+   "rooms": 5,
+   "stretched": 1,
+   "no_daylight": 0,
+   "ms": 86,
+   "note": ""
+  },
+  {
+   "brief": "2bhk_9x12_north",
+   "fits": true,
+   "score": 100,
+   "rooms": 9,
+   "stretched": 1,
+   "no_daylight": 0,
+   "ms": 180,
+   "note": ""
+  },
+  {
+   "brief": "2bhk_9x12_east",
+   "fits": true,
+   "score": 100,
+   "rooms": 9,
+   "stretched": 1,
+   "no_daylight": 0,
+   "ms": 152,
+   "note": ""
+  },
+  {
+   "brief": "2bhk_9x15_south",
+   "fits": true,
+   "score": 100,
+   "rooms": 9,
+   "stretched": 0,
+   "no_daylight": 0,
+   "ms": 150,
+   "note": ""
+  },
+  {
+   "brief": "2bhk_9x15_west",
+   "fits": true,
+   "score": 100,
+   "rooms": 9,
+   "stretched": 1,
+   "no_daylight": 0,
+   "ms": 174,
+   "note": ""
+  },
+  {
+   "brief": "3bhk_12x15_north",
+   "fits": true,
+   "score": 100,
+   "rooms": 12,
+   "stretched": 1,
+   "no_daylight": 0,
+   "ms": 204,
+   "note": ""
+  },
+  {
+   "brief": "3bhk_12x15_east",
+   "fits": true,
+   "score": 100,
+   "rooms": 12,
+   "stretched": 1,
+   "no_daylight": 0,
+   "ms": 284,
+   "note": ""
+  },
+  {
+   "brief": "3bhk_12x18_south",
+   "fits": true,
+   "score": 100,
+   "rooms": 12,
+   "stretched": 8,
+   "no_daylight": 0,
+   "ms": 213,
+   "note": ""
+  },
+  {
+   "brief": "3bhk_12x18_west",
+   "fits": true,
+   "score": 100,
+   "rooms": 12,
+   "stretched": 3,
+   "no_daylight": 0,
+   "ms": 312,
+   "note": ""
+  },
+  {
+   "brief": "4bhk_15x18_north",
+   "fits": true,
+   "score": 91,
+   "rooms": 15,
+   "stretched": 2,
+   "no_daylight": 1,
+   "ms": 208,
+   "note": ""
+  },
+  {
+   "brief": "4bhk_15x18_east",
+   "fits": true,
+   "score": 100,
+   "rooms": 15,
+   "stretched": 3,
+   "no_daylight": 0,
+   "ms": 573,
+   "note": ""
+  },
+  {
+   "brief": "4bhk_15x24_south",
+   "fits": true,
+   "score": 100,
+   "rooms": 15,
+   "stretched": 1,
+   "no_daylight": 0,
+   "ms": 841,
+   "note": ""
+  },
+  {
+   "brief": "4bhk_15x24_west",
+   "fits": true,
+   "score": 100,
+   "rooms": 15,
+   "stretched": 6,
+   "no_daylight": 0,
+   "ms": 1170,
+   "note": ""
+  },
+  {
+   "brief": "1bhk",
+   "fits": true,
+   "score": 100,
+   "rooms": 5,
+   "stretched": 1,
+   "no_daylight": 0,
+   "ms": 115,
+   "note": ""
+  },
+  {
+   "brief": "2bhk",
+   "fits": true,
+   "score": 100,
+   "rooms": 9,
+   "stretched": 2,
+   "no_daylight": 0,
+   "ms": 192,
+   "note": ""
+  },
+  {
+   "brief": "3bhk_adjacencies",
+   "fits": true,
+   "score": 100,
+   "rooms": 12,
+   "stretched": 1,
+   "no_daylight": 0,
+   "ms": 368,
+   "note": ""
+  },
+  {
+   "brief": "4bhk",
+   "fits": true,
+   "score": 100,
+   "rooms": 15,
+   "stretched": 2,
+   "no_daylight": 1,
+   "ms": 231,
+   "note": ""
+  },
+  {
+   "brief": "template_family_home",
+   "fits": true,
+   "score": 100,
+   "rooms": 10,
+   "stretched": 3,
+   "no_daylight": 0,
+   "ms": 327,
+   "note": ""
+  },
+  {
+   "brief": "template_apartment",
+   "fits": true,
+   "score": 100,
+   "rooms": 7,
+   "stretched": 1,
+   "no_daylight": 0,
+   "ms": 150,
+   "note": ""
+  },
+  {
+   "brief": "template_villa",
+   "fits": true,
+   "score": 97,
+   "rooms": 17,
+   "stretched": 7,
+   "no_daylight": 1,
+   "ms": 5,
+   "note": ""
+  },
+  {
+   "brief": "template_townhouse",
+   "fits": true,
+   "score": 95,
+   "rooms": 13,
+   "stretched": 2,
+   "no_daylight": 1,
+   "ms": 4,
+   "note": ""
+  },
+  {
+   "brief": "template_two_storey_home",
+   "fits": true,
+   "score": 100,
+   "rooms": 13,
+   "stretched": 1,
+   "no_daylight": 1,
+   "ms": 2,
+   "note": ""
+  },
+  {
+   "brief": "villa_from_app",
+   "fits": true,
+   "score": 89,
+   "rooms": 17,
+   "stretched": 7,
+   "no_daylight": 2,
+   "ms": 304,
+   "note": ""
+  }
+ ]
+}
