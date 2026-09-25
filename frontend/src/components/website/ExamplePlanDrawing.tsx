@@ -15,7 +15,7 @@ const ZONE_FILL: Record<ZoneType, string> = {
 }
 
 /**
- * Draws a real generated plan (not a mock-up), blueprint style: rooms tinted by zone,
+ * Draws a real generated plan (not a mock-up), blueprint style: rooms tinted by zone, windows as glazing lines,
  * solid walls, open-plan edges left open, doors as gaps, and the yard
  * around the house. Hovering a room names it with its size.
  */
@@ -83,6 +83,25 @@ export function ExamplePlanDrawing({ plan, compact = false }: { plan: ExamplePla
             pointerEvents="none"
           />
         ))}
+        {/* Windows, drawn the way plans show glazing: a gap in the wall with
+            a thin line through it. */}
+        {(plan.windows ?? []).map((opening) => {
+          const wall = walls.get(opening.wall_ref)
+          if (!wall) return null
+          const length = Math.hypot(wall.x2 - wall.x1, wall.y2 - wall.y1) || 1
+          const ux = (wall.x2 - wall.x1) / length
+          const uy = (wall.y2 - wall.y1) / length
+          const x1 = wall.x1 + ux * opening.offset
+          const y1 = wall.y1 + uy * opening.offset
+          const x2 = x1 + ux * opening.width
+          const y2 = y1 + uy * opening.width
+          return (
+            <g key={opening.id} pointerEvents="none">
+              <line x1={x1} y1={y1} x2={x2} y2={y2} className="stroke-night" strokeWidth={0.1} />
+              <line x1={x1} y1={y1} x2={x2} y2={y2} className="stroke-ink/80" strokeWidth={0.03} />
+            </g>
+          )
+        })}
         {plan.doors.map((door) => {
           const wall = walls.get(door.wall_ref)
           if (!wall) return null
