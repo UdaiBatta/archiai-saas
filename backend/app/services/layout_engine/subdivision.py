@@ -19,6 +19,7 @@ facing edge (and so an outside wall for the front door).
 from dataclasses import dataclass
 
 from app.schemas.requirements import Facing
+from app.services import catalog
 from app.services.layout_engine.geometry import EPS, Rect
 
 _MIN_SPAN = 1.2  # never cut a strip thinner than this (meters)
@@ -102,6 +103,25 @@ _OUTSIDE_WALL_TYPES = frozenset({
 })
 _FACING_SIDE = {Facing.north: "N", Facing.south: "S", Facing.east: "E", Facing.west: "W"}
 _ENTRY_TYPES = frozenset({"entry", "foyer"})  # templates call the entry "foyer"
+# Passages: long by design, never judged on shape.
+_LONG_BY_DESIGN = frozenset({"corridor", "hallway", "passage", "stairs", "staircase", "landing", "entry", "foyer"})
+
+
+def _shape_penalty(group: list[RoomNeed], half: Rect) -> float:
+    """A cut that leaves one room in a long thin slice (a 1.2 x 7 m pooja
+    room) costs up to 5: less than a lost window (10), so shape never beats
+    daylight, but enough to pick the squarer of two otherwise-equal cuts."""
+    if len(group) != 1 or group[0].type in _LONG_BY_DESIGN:
+        return 0.0
+    short, long_ = sorted((half.w, half.d))
+    if short <= 0:
+        return 5.0
+    try:
+        limit = catalog.get(catalog.resolve_alias(group[0].type) or group[0].type).max_aspect
+    except catalog.UnknownSpaceType:
+        limit = 2.5
+    excess = long_ / short - limit
+    return 5.0 * min(1.0, excess / limit) if excess > 0 else 0.0
 
 
 def _outline_sides(rect: Rect, frame: Rect | None) -> frozenset[str]:
@@ -139,7 +159,7 @@ def _cut_off_penalty(group: list[RoomNeed], half: Rect, parent_sides: frozenset[
 
 
 def subdivide(
-    needs: list[RoomNeed], rect: Rect, facing: Facing, frame: Rect | None = None,
+    needs: list[RoomNeed], rect: Rect, facing: Facing, frame: Rect | None = None, shape: bool = True,
 ) -> list[tuple[RoomNeed, Rect]]:
     """Cut `rect` among `needs`. With `frame` (the building outline), each cut
     also weighs which rooms keep an outside wall: of the valid cuts, the one
@@ -193,6 +213,7 @@ def subdivide(
         penalty = (
             _cut_off_penalty(group_a, rect_a, parent_sides, frame, facing)
             + _cut_off_penalty(group_b, rect_b, parent_sides, frame, facing)
+            + (_shape_penalty(group_a, rect_a) + _shape_penalty(group_b, rect_b) if shape else 0.0)
         )
         if best is None or (penalty, rank) < best[0]:
             best = ((penalty, rank), swapped, group_a, rect_a, group_b, rect_b)
@@ -204,7 +225,7 @@ def subdivide(
             f"cannot cut {rect.w:.1f}x{rect.d:.1f}m for {i}+{len(needs) - i} rooms"
         )
     _, swapped, group_a, rect_a, group_b, rect_b = best
-    parts_a = subdivide(group_a, rect_a, facing, frame)
-    parts_b = subdivide(group_b, rect_b, facing, frame)
+    parts_a = subdivide(group_a, rect_a, facing, frame, shape)
+    parts_b = subdivide(group_b, rect_b, facing, frame, shape)
     # Keep the caller's room order in the output either way.
     return parts_b + parts_a if swapped else parts_a + parts_b

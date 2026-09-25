@@ -19,6 +19,7 @@ _RESULT_ORDER = {
     "wet_stack": 7,
     "floor_area_balance": 8,
     "vastu": 9,
+    "proportion": 10,
 }
 
 

@@ -890,6 +890,7 @@ def plan_from_program(
     band_plan: BandPlan | None = None,
     floor: int = 0,
     id_prefix: str = "",
+    shape_aware: bool = True,
 ) -> LayoutPlan:
     """The placement -> doors -> PlanRoom-assembly tail of ``generate_plan``,
     parameterized by an already-built ``EngineProgram`` instead of deriving
@@ -925,7 +926,7 @@ def plan_from_program(
         result: list[tuple[RoomNeed, Rect]] = []
         outline = Rect(0.0, 0.0, plot_w, plot_d)  # the building, in placement coordinates
         for band_rect, group in used_band_plan.bands:
-            result.extend(subdivide(group, band_rect, facing, outline))
+            result.extend(subdivide(group, band_rect, facing, outline, shape_aware))
         return result, used_band_plan
 
     if band_plan is None:
@@ -1082,6 +1083,16 @@ def plan_from_program(
         violations = validate(plan, spec)
         if violations:
             messages = "; ".join(violation.message for violation in violations)
+            # Squarer rooms are a preference, never worth a broken rule: the
+            # same layout cut without the shape preference comes first.
+            if shape_aware:
+                try:
+                    return plan_from_program(
+                        spec, program, plot_w, plot_d, facing,
+                        band_plan=band_plan, floor=floor, id_prefix=id_prefix, shape_aware=False,
+                    )
+                except DoesNotFitError:
+                    pass
             if band_plan is None and archetype_key != "zoned_bands":
                 try:
                     safe_bands = zoned_bands(program, plot_w, plot_d, facing)
@@ -1117,9 +1128,14 @@ def _generate_plan_multifloor(spec: RequirementsSpec) -> LayoutPlan:
     for fw, fd in _footprint_candidates(area, plot_w, plot_d):
         try:
             plan = _stack_floors(spec, programs, fw, fd, facing)
-        except DoesNotFitError as exc:
-            last_error = exc
-            continue
+        except DoesNotFitError:
+            # One layout per storey, no search: when the shape preference
+            # cost a hard rule, cut the same storeys without it.
+            try:
+                plan = _stack_floors(spec, programs, fw, fd, facing, shape_aware=False)
+            except DoesNotFitError as exc:
+                last_error = exc
+                continue
         dx, dy = _footprint_origin(fw, fd, plot_w, plot_d, facing)
         return _placed_on_plot(plan, dx, dy, plot_w, plot_d)
     assert last_error is not None
@@ -1128,6 +1144,7 @@ def _generate_plan_multifloor(spec: RequirementsSpec) -> LayoutPlan:
 
 def _stack_floors(
     spec: RequirementsSpec, programs: list[EngineProgram], plot_w: float, plot_d: float, facing: Facing,
+    shape_aware: bool = True,
 ) -> LayoutPlan:
     rooms: list[PlanRoom] = []
     walls: list[Wall] = []
@@ -1148,6 +1165,7 @@ def _stack_floors(
             band_plan=bands,
             floor=floor,
             id_prefix=f"f{floor}-",
+            shape_aware=shape_aware,
         )
         rooms.extend(floor_plan.rooms)
         walls.extend(floor_plan.walls)

@@ -48,10 +48,10 @@ def _room(
     [
         ("1bhk", 100),
         ("2bhk", 100),
-        ("3bhk_adjacencies", 90),  # was 72: stacked wet core + footprint
+        ("3bhk_adjacencies", 91),  # was 72: stacked wet core + footprint; 90->91 squarer rooms (proportion rule)
         # Stronger sanitary circulation changed this layout: all three baths
         # now open to the corridor instead of one relying on a bedroom route.
-        ("4bhk", 92),  # was 87: stacked wet core
+        ("4bhk", 93),  # was 87: stacked wet core; 92->93 squarer rooms (proportion rule)
     ],
 )
 def test_residential_scores_are_unchanged_from_the_pre_pack_baseline(
@@ -73,7 +73,8 @@ def test_clinic_uses_generic_and_healthcare_without_residential_or_vastu():
     report = score(plan, spec)
 
     assert keys == ["generic", "healthcare"]
-    assert report.score == 100
+    # 98, not 100: the proportion rule reports its 1.6 x 11.1 m utility room.
+    assert report.score == 98
     assert all(warning.rule not in {"residential", "vastu"} for warning in report.warnings)
     assert not any("bath_kitchen" in warning.code for warning in report.warnings)
 

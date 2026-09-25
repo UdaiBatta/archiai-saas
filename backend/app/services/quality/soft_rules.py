@@ -142,6 +142,39 @@ def privacy_rule(plan: LayoutPlan, _requirements: RequirementsSpec) -> SoftRuleR
     )
 
 
+# Passages (an entrance hall included) are long by design.
+_LONG_BY_DESIGN = frozenset({"corridor", "hallway", "passage", "passageway", "stairs", "staircase", "landing", "foyer", "entry"})
+
+
+def proportion_rule(plan: LayoutPlan, _requirements: RequirementsSpec) -> SoftRuleResult:
+    """Rooms should be usable shapes: each room loses credit in proportion to
+    how far it is stretched past its type's aspect limit (a 4.6 x 1.2 m pooja
+    room, a 3 x 11 m bedroom). Corridors are long by design and skipped."""
+    rooms = []
+    for room in plan.rooms:
+        kind = _canonical(room.type)
+        if kind in _LONG_BY_DESIGN or min(room.w, room.h) <= 0:
+            continue
+        try:
+            limit = catalog.get(kind).max_aspect
+        except catalog.UnknownSpaceType:
+            continue
+        rooms.append((room, max(room.w, room.h) / min(room.w, room.h), limit))
+    if not rooms:
+        return SoftRuleResult(name="proportion", score=1.0)
+    excess = [min(1.0, (aspect - limit) / limit) if aspect > limit else 0.0 for _, aspect, limit in rooms]
+    warnings = [
+        QualityWarning(
+            code="generic.proportion",
+            message=f"{room.label} is {room.w:.1f} x {room.h:.1f} m, long and narrow ({aspect:.1f}:1).",
+            severity="info",
+        )
+        for room, aspect, limit in rooms
+        if aspect > limit
+    ]
+    return SoftRuleResult(name="proportion", score=1 - sum(excess) / len(rooms), warnings=warnings)
+
+
 def natural_light_rule(plan: LayoutPlan, _requirements: RequirementsSpec) -> SoftRuleResult:
     daylight_rooms = [
         room

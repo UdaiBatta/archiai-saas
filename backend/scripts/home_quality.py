@@ -33,7 +33,7 @@ TESTS = Path(__file__).parents[1] / "app" / "tests"
 FIXTURES = TESTS / "fixtures" / "requirements"
 BASELINE = Path(__file__).with_name("home_quality_baseline.json")
 
-_LONG_BY_DESIGN = {"corridor", "hallway", "passage", "stairs", "staircase"}
+_LONG_BY_DESIGN = {"corridor", "hallway", "passage", "stairs", "staircase", "landing", "foyer"}  # passages, entrance hall included
 _NEEDS_DAYLIGHT_EXTRA = {"kitchen"}  # the catalog doesn't mark kitchens; homes need one
 
 _PROGRAMS = {
