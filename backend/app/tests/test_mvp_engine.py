@@ -3,6 +3,7 @@ project's main go/no-go gate: the Hypothesis property suite (zero hard
 violations over the random spec space; DoesNotFitError is the only permitted
 alternative outcome, per the workflow's structured "plot too small" contract).
 """
+import json
 from pathlib import Path
 
 import pytest
@@ -60,14 +61,35 @@ def test_fixture_produces_valid_plan(name):
         placed = [r for r in plan.rooms if r.type == spec_room.type]
         assert len(placed) == spec_room.count, spec_room.type
 
-    assert validate(plan) == []  # zero hard violations: overlap/bounds/min/reachability
+    # With the spec, so a MUST-attached ensuite reached through its own
+    # bedroom is exempt (it is the requested design, not a defect).
+    assert validate(plan, spec) == []  # zero hard violations: overlap/bounds/min/reachability
 
 
 @pytest.mark.parametrize("name", FIXTURE_NAMES)
-def test_fixture_plan_fills_plot_exactly(name):
+def test_fixture_plan_tiles_its_building_exactly_inside_the_plot(name):
     plan = generate_plan(_load(name))
-    total = sum(r.w * r.h for r in plan.rooms)
-    assert total == pytest.approx(plan.plot.width_m * plan.plot.depth_m, rel=0.01)
+    min_x, min_y = min(r.x for r in plan.rooms), min(r.y for r in plan.rooms)
+    max_x, max_y = max(r.x + r.w for r in plan.rooms), max(r.y + r.h for r in plan.rooms)
+    # No gaps: the rooms exactly fill the building's rectangle ...
+    assert sum(r.w * r.h for r in plan.rooms) == pytest.approx((max_x - min_x) * (max_y - min_y), rel=0.01)
+    # ... which sits inside the plot (with yards when the plot has room).
+    assert min_x >= 0 and min_y >= 0
+    assert max_x <= plan.plot.width_m + 1e-6 and max_y <= plan.plot.depth_m + 1e-6
+
+
+def test_a_generous_plot_gets_a_house_sized_to_its_rooms_not_the_plot():
+    spec = _load("2bhk").model_copy(update={"plot": _load("2bhk").plot.model_copy(update={"width_m": 30.0, "depth_m": 40.0})})
+    plan = generate_plan(spec)
+    built = (max(r.x + r.w for r in plan.rooms) - min(r.x for r in plan.rooms)) * (
+        max(r.y + r.h for r in plan.rooms) - min(r.y for r in plan.rooms)
+    )
+    assert built < 0.25 * 30 * 40  # not stretched over the 1,200 m² plot
+    # Street side (east) keeps the deeper yard.
+    east_yard = 30 - max(r.x + r.w for r in plan.rooms)
+    west_yard = min(r.x for r in plan.rooms)
+    assert east_yard > west_yard
+    assert validate(plan, spec) == []
 
 
 def test_entry_lands_on_the_facing_side():
@@ -146,7 +168,8 @@ def test_two_adjacent_private_rooms_do_not_get_a_redundant_direct_door():
     # 4bhk's real generated layout has multiple bedroom-bedroom /
     # bedroom-bathroom adjacencies that are already reachable via the
     # spanning tree — privacy says don't also punch a direct door there.
-    plan = generate_plan(_load("4bhk"))
+    spec = _load("4bhk")
+    plan = generate_plan(spec)
     private_types = {RoomType.bedroom.value, RoomType.master_bedroom.value, RoomType.bathroom.value}
     doored_walls = {d.wall_ref for d in plan.doors}
     types_by_id = {r.id: r.type for r in plan.rooms}
@@ -156,7 +179,7 @@ def test_two_adjacent_private_rooms_do_not_get_a_redundant_direct_door():
         if all(types_by_id[k] in private_types for k in pair)
     ]
     assert private_adjacent_pairs, "fixture must actually exercise this case"
-    assert validate(plan) == []  # still fully valid/reachable without the extra doors
+    assert validate(plan, spec) == []  # still fully valid/reachable without the extra doors
 
 
 def test_explicitly_avoided_adjacent_pair_gets_no_direct_door():
@@ -215,7 +238,7 @@ def test_avoid_pair_vetoes_a_door_even_when_it_is_the_only_bridge():
         (need("b", "bathroom"), Rect(3, 0, 3, 3)),
         (need("c", "entry"), Rect(6, 0, 3, 3)),
     ]
-    walls, wall_rooms = _build_walls(placed, 9.0, 3.0)
+    walls, wall_rooms = _build_walls(placed)
     spec = RequirementsSpec.model_validate({
         "rooms": [
             {"type": "kitchen", "count": 1},
@@ -464,7 +487,7 @@ def test_corridor_door_prefers_a_public_neighbour_over_a_landlocked_service_room
 
     plan = generate_plan(spec)
 
-    assert validate(plan) == []
+    assert validate(plan, spec) == []
 
 
 @pytest.mark.parametrize("style", ["zoned_bands", "double_loaded_corridor", "hub_and_spoke", "open_core"])
@@ -584,3 +607,372 @@ def test_property_engine_output_never_violates_hard_constraints(spec):
     assert violations == [], [v.message for v in violations]
 
     assert len(plan.rooms) == _expected_room_count(spec)
+
+
+_OPEN_PLAN = {"living_room", "dining", "kitchen", "entry", "corridor"}
+
+
+@pytest.mark.parametrize("name", FIXTURE_NAMES)
+def test_open_plan_edges_have_no_wall_and_no_door(name):
+    spec = _load(name)
+    plan = generate_plan(spec)
+    types_by_id = {r.id: r.type for r in plan.rooms}
+    walls_by_id = {w.id: w for w in plan.walls}
+    doored = {d.wall_ref for d in plan.doors}
+
+    for pair, wall_id in _shared_wall_pairs(plan).items():
+        types = {types_by_id[k] for k in pair}
+        wall = walls_by_id[wall_id]
+        if types <= _OPEN_PLAN:
+            assert wall.kind == "open", types
+            assert wall_id not in doored
+        else:
+            assert wall.kind == "wall", types
+
+    assert validate(plan, spec) == []  # open edges count as connections
+
+
+def test_open_plan_rooms_need_no_door_between_them():
+    spec = _load("2bhk")
+    plan = generate_plan(spec)
+    open_walls = [w for w in plan.walls if w.kind == "open"]
+
+    assert open_walls, "fixture must have public rooms side by side"
+    # One door per room would be len(rooms); open-plan rooms reach each
+    # other through their open edges instead.
+    assert len(plan.doors) < len(plan.rooms)
+
+
+def test_saved_canvas_draws_no_wall_on_an_open_plan_edge():
+    from app.services.layout_adapter import layout_plan_to_canvas
+
+    plan = generate_plan(_load("2bhk"))
+    canvas = layout_plan_to_canvas(plan)
+    wall_ids = {obj["id"] for obj in canvas["rooms"] if obj["objectType"] == "wall"}
+
+    assert wall_ids == {w.id for w in plan.walls if w.kind == "wall"}
+
+
+# ── User connection overrides (wall / door / open per room pair) ─────────────
+
+
+def _rebuilt_with(plan, spec, *connections):
+    from app.schemas.layout_plan import Connection
+    from app.services.layout_engine import rebuild_derived_geometry
+
+    stale = plan.model_copy(update={
+        "walls": [], "doors": [], "connections": [Connection(**c) for c in connections],
+    })
+    return rebuild_derived_geometry(stale, spec)
+
+
+def _pair_walls(plan, a, b):
+    return [w for w in plan.walls if w.rooms and set(w.rooms) == {a, b}]
+
+
+def _first_pair(plan, want_a, want_b):
+    """Ids of the first adjacent pair whose types are {want_a, want_b}."""
+    types = {r.id: r.type for r in plan.rooms}
+    for w in plan.walls:
+        if w.rooms and {types[w.rooms[0]], types[w.rooms[1]]} == {want_a, want_b}:
+            return w.rooms
+    raise AssertionError(f"no adjacent {want_a}/{want_b} pair in fixture")
+
+
+def test_interior_walls_name_the_two_rooms_they_separate():
+    plan = generate_plan(_load("2bhk"))
+    ids = {r.id for r in plan.rooms}
+    for wall in plan.walls:
+        assert wall.rooms is None or (len(wall.rooms) == 2 and set(wall.rooms) <= ids)
+    assert any(w.rooms for w in plan.walls)
+
+
+def test_open_connection_removes_the_wall_between_two_private_rooms():
+    spec = _load("4bhk")
+    plan = generate_plan(spec)
+    a, b = _first_pair(plan, "bedroom", "bedroom")
+
+    rebuilt = _rebuilt_with(plan, spec, {"room_a": a, "room_b": b, "kind": "open"})
+
+    assert {w.kind for w in _pair_walls(rebuilt, a, b)} == {"open"}
+    assert [c.kind for c in rebuilt.connections] == ["open"]
+
+
+def test_wall_connection_closes_an_open_plan_edge_without_a_door():
+    spec = _load("2bhk")
+    plan = generate_plan(spec)
+    open_wall = next(w for w in plan.walls if w.kind == "open")
+    a, b = open_wall.rooms
+
+    rebuilt = _rebuilt_with(plan, spec, {"room_a": a, "room_b": b, "kind": "wall"})
+
+    pair_walls = _pair_walls(rebuilt, a, b)
+    assert {w.kind for w in pair_walls} == {"wall"}
+    assert not {d.wall_ref for d in rebuilt.doors} & {w.id for w in pair_walls}
+
+
+def test_door_connection_places_the_door_where_the_user_dragged_it():
+    spec = _load("4bhk")
+    plan = generate_plan(spec)
+    a, b = _first_pair(plan, "bedroom", "bedroom")
+
+    rebuilt = _rebuilt_with(plan, spec, {"room_a": a, "room_b": b, "kind": "door", "at": 0.0})
+
+    wall = max(_pair_walls(rebuilt, a, b), key=lambda w: abs(w.x2 - w.x1) + abs(w.y2 - w.y1))
+    door = next(d for d in rebuilt.doors if d.wall_ref == wall.id)
+    assert door.offset == 0.0  # clamped to the wall start, not centred
+
+
+def test_connection_between_rooms_that_no_longer_touch_is_dropped():
+    spec = _load("2bhk")
+    plan = generate_plan(spec)
+    ids = [r.id for r in plan.rooms]
+    touching = {frozenset(w.rooms) for w in plan.walls if w.rooms}
+    a, b = next(
+        (x, y) for i, x in enumerate(ids) for y in ids[i + 1:]
+        if frozenset((x, y)) not in touching
+    )
+
+    rebuilt = _rebuilt_with(plan, spec, {"room_a": a, "room_b": b, "kind": "open"})
+
+    assert rebuilt.connections == []
+
+
+_TEMPLATES = sorted(p.stem for p in FIXTURES.glob("template_*.json"))
+
+
+@pytest.mark.parametrize("name", FIXTURE_NAMES + _TEMPLATES)
+def test_every_plan_has_exactly_one_front_door(name):
+    # Templates call the entry "foyer" and some place it inland; both used
+    # to leave the plan with no way in.
+    plan = generate_plan(_load(name))
+    outside = {w.id for w in plan.walls if w.rooms is None}
+
+    assert len([d for d in plan.doors if d.wall_ref in outside]) == 1
+
+
+# The landing page's brief (rooms in the order the extractor lists them).
+# Its entry used to land on the corridor side of the street band, boxed in
+# by dining/kitchen, so the front door went on the living room instead.
+_EAST_3BHK = {
+    "building_type": "house", "floors": 1, "plot": {"width_m": 12, "depth_m": 15},
+    "rooms": [
+        {"type": "master_bedroom", "count": 1}, {"type": "bedroom", "count": 2},
+        {"type": "pooja_room", "count": 1}, {"type": "kitchen", "count": 1},
+        {"type": "living_room", "count": 1}, {"type": "balcony", "count": 1},
+        {"type": "bathroom", "count": 2}, {"type": "dining", "count": 1},
+    ],
+    "adjacency": [
+        {"room_a": "balcony", "room_b": "living_room", "strength": "must"},
+        {"room_a": "master_bedroom", "room_b": "bathroom", "strength": "must"},
+        {"room_a": "bedroom", "room_b": "bathroom", "strength": "should"},
+        {"room_a": "kitchen", "room_b": "dining", "strength": "should"},
+        {"room_a": "kitchen", "room_b": "living_room", "strength": "should"},
+    ],
+    "avoid_adjacency": [{"room_a": "kitchen", "room_b": "bathroom"}],
+}
+
+
+def _front_door_room(plan):
+    """The room whose outside wall holds the front door."""
+    walls = {w.id: w for w in plan.walls}
+    (door,) = [d for d in plan.doors if walls[d.wall_ref].rooms is None]
+    w = walls[door.wall_ref]
+    mx, my = (w.x1 + w.x2) / 2, (w.y1 + w.y2) / 2
+    for room in plan.rooms:
+        r = _room_rect(room)
+        on_x = abs(mx - r.x) < 1e-6 or abs(mx - (r.x + r.w)) < 1e-6
+        on_y = abs(my - r.y) < 1e-6 or abs(my - (r.y + r.d)) < 1e-6
+        if (on_x and r.y - 1e-6 <= my <= r.y + r.d + 1e-6) or (on_y and r.x - 1e-6 <= mx <= r.x + r.w + 1e-6):
+            return room
+    raise AssertionError("front door wall touches no room")
+
+
+@pytest.mark.parametrize("facing", ["north", "south", "east", "west"])
+def test_entry_reaches_the_street_and_holds_the_front_door(facing):
+    plan = generate_plan(RequirementsSpec.model_validate({**_EAST_3BHK, "facing": facing}))
+    assert _front_door_room(plan).type == "entry"
+
+
+@pytest.mark.parametrize("name", FIXTURE_NAMES)
+def test_front_door_opens_into_the_entry(name):
+    plan = generate_plan(_load(name))
+    if any(r.type == "entry" for r in plan.rooms):
+        assert _front_door_room(plan).type == "entry"
+
+
+@pytest.mark.parametrize("facing", ["east", "west"])
+def test_no_search_candidate_puts_the_front_door_off_the_entry(facing):
+    # The web app shows the best of these candidates; before the fix, 9 of
+    # 64 had the entry boxed in and the winner's front door was in the living room.
+    from app.services.layout_engine.search import generate_candidates
+
+    spec = RequirementsSpec.model_validate({**_EAST_3BHK, "facing": facing})
+    assert all(_front_door_room(c.plan).type == "entry" for c in generate_candidates(spec))
+
+
+# A real plan from the app (South-facing 4BHK villa example brief) that scored
+# 100 with its balcony and entry boxed in by other rooms, no outside wall.
+_VILLA = json.loads(
+    (Path(__file__).parent / "fixtures" / "golden" / "villa_inland_balcony.json").read_text(encoding="utf-8")
+)
+
+
+def test_boxed_in_balcony_and_entry_are_hard_violations():
+    plan = LayoutPlan.model_validate(_VILLA["layout"])
+    spec = RequirementsSpec.model_validate(_VILLA["requirements"])
+    codes = {v.code for v in validate(plan, spec)}
+    assert {"outdoor_room_inland", "entry_inland"} <= codes
+
+
+def test_villa_brief_gets_balcony_and_entry_on_outside_walls():
+    from app.services.layout_engine.search import generate_candidates
+    from app.services.quality.hard_constraints import touches_outside
+
+    spec = RequirementsSpec.model_validate(_VILLA["requirements"])
+    plan = generate_candidates(spec)[0].plan
+    assert validate(plan, spec) == []
+    for room in plan.rooms:
+        if room.type in ("balcony", "entry"):
+            assert touches_outside(room, plan), room.label
+
+
+def _row_plan(types: list[str], building: str = "house", must: list[tuple[str, str]] = ()):
+    """Rooms 3 m wide side by side along x (4 m deep), doored in a chain:
+    a door on every shared edge, the front door on the first room's west wall.
+    The simplest plan where the only way to room N runs through rooms 1..N-1."""
+    rooms = [
+        {"id": f"r{i}", "type": t, "label": t.replace("_", " ").title(), "x": 3.0 * i, "y": 0.0, "w": 3.0, "h": 4.0}
+        for i, t in enumerate(types)
+    ]
+    walls = [{"id": "w_front", "x1": 0.0, "y1": 0.0, "x2": 0.0, "y2": 4.0}] + [
+        {"id": f"w{i}", "x1": 3.0 * i, "y1": 0.0, "x2": 3.0 * i, "y2": 4.0, "rooms": [f"r{i - 1}", f"r{i}"]}
+        for i in range(1, len(types))
+    ]
+    doors = [{"id": "d_front", "wall_ref": "w_front", "offset": 1.5}] + [
+        {"id": f"d{i}", "wall_ref": f"w{i}", "offset": 1.5} for i in range(1, len(types))
+    ]
+    plan = LayoutPlan.model_validate({
+        "plot": {"width_m": 3.0 * len(types), "depth_m": 4.0, "facing": "west"},
+        "rooms": rooms, "walls": walls, "doors": doors,
+    })
+    spec = RequirementsSpec.model_validate({
+        "building_type": building, "floors": 1, "plot": {"width_m": 3.0 * len(types), "depth_m": 4.0},
+        "facing": "west", "rooms": [], "spaces": [{"space_type": t, "count": 1} for t in types],
+        "adjacency": [{"room_a": a, "room_b": b, "strength": "must"} for a, b in must],
+        "avoid_adjacency": [],
+    })
+    return plan, spec
+
+
+def _walk_through(plan, spec):
+    return [v.message for v in validate(plan, spec) if v.code == "walk_through_room"]
+
+
+def test_walking_through_a_kitchen_to_the_living_room_is_rejected_in_a_home():
+    plan, spec = _row_plan(["entry", "kitchen", "living_room"])
+    assert _walk_through(plan, spec) == ["Living Room can only be reached by walking through the Kitchen"]
+
+
+def test_a_bedroom_behind_its_own_bathroom_is_rejected_even_when_attached():
+    # "Must connect" lets the en-suite sit behind its bedroom, never the reverse.
+    plan, spec = _row_plan(["entry", "bathroom", "bedroom"], must=[("bedroom", "bathroom")])
+    assert _walk_through(plan, spec) == ["Bedroom can only be reached by walking through the Bathroom"]
+
+
+def test_a_garage_behind_a_bedroom_is_rejected():
+    plan, spec = _row_plan(["entry", "bedroom", "garage"])
+    assert _walk_through(plan, spec) == ["Garage can only be reached by walking through the Bedroom"]
+
+
+@pytest.mark.parametrize("public_room", ["living_room", "dining_room"])
+def test_a_garage_must_not_open_directly_into_living_or_dining(public_room):
+    plan, spec = _row_plan(["entry", public_room, "garage"])
+
+    violations = [v for v in validate(plan, spec) if v.code == "garage_access"]
+
+    assert len(violations) == 1
+    assert "must not open directly" in violations[0].message
+
+
+@pytest.mark.parametrize("types", [["entry", "garage"], ["entry", "utility", "garage"]])
+def test_a_garage_may_connect_to_entry_or_utility(types):
+    plan, spec = _row_plan(types)
+
+    assert "garage_access" not in {v.code for v in validate(plan, spec)}
+
+
+def test_a_garage_may_have_direct_exterior_access():
+    from app.schemas.layout_plan import Door, Wall
+
+    plan, spec = _row_plan(["entry", "corridor", "garage"])
+    plan.walls.append(Wall(id="garage_exterior", x1=9, y1=0, x2=9, y2=4))
+    plan.doors.append(Door(id="garage_exterior_door", wall_ref="garage_exterior", offset=1))
+
+    assert "garage_access" not in {v.code for v in validate(plan, spec)}
+
+
+def test_home_generation_connects_a_garage_to_the_entry_by_default():
+    from app.services.quality.hard_constraints import _door_adjacency
+    from app.services.catalog import resolve_alias
+
+    plan = generate_plan(_load("4bhk"))
+    adjacency = _door_adjacency(plan)
+    entries = {r.id for r in plan.rooms if (resolve_alias(r.type) or r.type) == "foyer"}
+    garages = {r.id for r in plan.rooms if (resolve_alias(r.type) or r.type) == "garage"}
+
+    assert garages
+    assert all(adjacency[garage] & entries for garage in garages)
+
+
+def test_home_garage_utility_must_edge_takes_precedence_over_default_entry_edge():
+    from app.schemas.requirements import AdjacencyPref
+    from app.services.catalog import resolve_alias
+    from app.services.layout_engine.engine import _build_program
+
+    spec = _load("4bhk")
+    spec = spec.model_copy(update={
+        "adjacency": [
+            *spec.adjacency,
+            AdjacencyPref(room_a="garage", room_b="utility", strength="must"),
+        ]
+    })
+    program = _build_program(spec)
+    pairs = {frozenset(pair) for pair in program.must_adjacent}
+    garage = next(n.key for n in program.needs if (resolve_alias(n.type) or n.type) == "garage")
+    utility = next(n.key for n in program.needs if (resolve_alias(n.type) or n.type) in {"utility", "laundry"})
+
+    assert frozenset((garage, utility)) in pairs
+    assert frozenset((garage, program.entry_node)) not in pairs
+
+
+def test_closets_and_attached_rooms_may_sit_behind_the_room_they_serve():
+    plan, spec = _row_plan(["entry", "kitchen", "pantry"])
+    assert _walk_through(plan, spec) == []
+    plan, spec = _row_plan(["entry", "bedroom", "bathroom"], must=[("bedroom", "bathroom")])
+    assert validate(plan, spec) == []
+
+
+def test_service_rooms_are_not_blockers_outside_homes():
+    # A warehouse office is reached across its storage floor.
+    plan, spec = _row_plan(["entry", "storage", "office"], building="other")
+    assert _walk_through(plan, spec) == []
+
+
+def test_villa_brief_gives_every_bedroom_its_own_bathroom_and_a_corridor_door():
+    from app.services.layout_engine.search import generate_candidates
+    from app.services.quality.hard_constraints import _door_adjacency
+
+    spec = RequirementsSpec.model_validate(_VILLA["requirements"])
+    plan = generate_candidates(spec)[0].plan
+    assert validate(plan, spec) == []
+    adjacency = _door_adjacency(plan)
+    kind = {r.id: r.type for r in plan.rooms}
+    bedrooms = [r.id for r in plan.rooms if r.type == "bedroom"]
+    # Each bedroom opens onto the corridor itself, not via a bathroom...
+    assert all(any(kind[n] == "corridor" for n in adjacency[b]) for b in bedrooms)
+    # ...and has a bathroom of its own: four bedrooms, four distinct en-suites.
+    ensuites = {n for b in bedrooms for n in adjacency[b] if kind[n] == "bathroom"}
+    assert len(ensuites) == len(bedrooms) == 4
+    for b in bedrooms:
+        assert any(kind[n] == "bathroom" for n in adjacency[b])

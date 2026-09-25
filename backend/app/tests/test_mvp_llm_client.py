@@ -36,7 +36,7 @@ async def test_chat_structured_uses_loaded_model_and_json_schema(monkeypatch):
         assert payload["model"] == "qwen-test-model"
         assert payload["temperature"] == 0
         assert payload["reasoning_effort"] == "none"
-        assert payload["max_tokens"] == 1024
+        assert payload["max_tokens"] == 2048
         assert payload["response_format"] == {
             "type": "json_schema",
             "json_schema": {
@@ -178,6 +178,23 @@ async def test_hosted_mode_sends_bearer_token_and_drops_reasoning_effort(monkeyp
     assert payload["response_format"]["type"] == "json_schema"
     # hosted mode without an explicit model still discovers from /models
     assert [r.url.path for r in requests] == ["/v1/models", "/v1/chat/completions"]
+
+
+async def test_hosted_mode_sends_a_configured_reasoning_effort(monkeypatch):
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json={"choices": [{"message": {"content": "{}"}}]})
+
+    _use_transport(monkeypatch, handler)
+    monkeypatch.setattr(llm_client.settings, "LLM_API_KEY", "test-key")
+    monkeypatch.setattr(llm_client.settings, "LLM_MODEL", "gemini-3.6-flash")
+    monkeypatch.setattr(llm_client.settings, "LLM_REASONING_EFFORT", "none")
+
+    await llm_client.chat_structured("system", "user", {"type": "object"})
+
+    assert json.loads(requests[0].content)["reasoning_effort"] == "none"
 
 
 async def test_hosted_mode_with_explicit_model_skips_discovery(monkeypatch):

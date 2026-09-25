@@ -60,7 +60,7 @@ _hosted_semaphore = asyncio.Semaphore(4)
 # another dependency such as respx.
 _client_factory: Callable[..., httpx.AsyncClient] = httpx.AsyncClient
 
-_MAX_STRUCTURED_OUTPUT_TOKENS = 1024
+_MAX_STRUCTURED_OUTPUT_TOKENS = 2048
 
 
 def _is_hosted() -> bool:
@@ -168,11 +168,12 @@ async def chat_structured(
             },
         },
     }
-    if not _is_hosted():
-        # Extraction is schema filling, not a reasoning task. Qwen 3.5
-        # otherwise spends the entire latency budget on hidden reasoning
-        # before emitting any JSON content. Hosted APIs reject "none".
-        body["reasoning_effort"] = "none"
+    # Extraction is schema filling, not a reasoning task: thinking models
+    # otherwise spend the budget on hidden reasoning before any JSON. Local
+    # servers take "none"; hosted ones only when configured (some reject it).
+    effort = settings.LLM_REASONING_EFFORT or ("" if _is_hosted() else "none")
+    if effort:
+        body["reasoning_effort"] = effort
 
     async with _semaphore():
         try:

@@ -18,27 +18,21 @@ import { WorkspacePanel } from '../../components/canvas/WorkspacePanel'
 import { CommandBar } from '../../components/canvas/CommandBar'
 import { BriefReviewPanel } from '../../components/canvas/BriefReviewPanel'
 import { DraftToast } from '../../components/canvas/DraftToast'
-import { RefinementPlaybackPanel } from '../../components/canvas/RefinementPlaybackPanel'
 import {
   DesignDraftResponse,
   fetchDesignDraft,
-  generateLayout,
   getLatestProjectDesign,
   LayoutOption,
-  refineLayout,
   saveDesignLayout,
-  type RefinementChange,
-  type RefineResponse,
 } from '../../services/design.service'
-import { buildRefinementPlaybackFrames } from '../../services/refinementPlayback'
 import { extractBrief, generateMvpLayout } from '../../services/mvp.service'
 import { generateResponseToCanvas } from '../../services/mvpLayoutAdapter'
 import {
-  generationEngineFor,
   reviewWithOverrides,
   type GenerationOverrides,
 } from '../../services/mvpGenerationPolicy'
 import { useCanvasStore, type CanvasViewMode } from '../../store/canvasStore'
+import { layoutThumbnailDataUrl } from '../../components/canvas/LayoutThumbnail'
 import { VersionHistoryDrawer } from '../../components/canvas/VersionHistoryDrawer'
 import { ActivityDrawer } from '../../components/canvas/ActivityDrawer'
 import { useAutoSave } from '../../hooks/useAutoSave'
@@ -48,20 +42,11 @@ import { ShareProjectDialog } from '../../components/projects/ShareProjectDialog
 import type { CanvasLayout } from '../../store/canvasStore'
 import type { ExtractResponse } from '../../types/contracts'
 
+// The card preview is drawn from the plan data. A screenshot of the first
+// <canvas> came out black whenever the 2D (SVG) view was the one on screen.
 function captureCanvasThumbnail() {
-  const canvas = document.querySelector('canvas')
-  if (!canvas) return null
-  try {
-    return canvas.toDataURL('image/png')
-  } catch {
-    return null
-  }
-}
-
-function waitForNextPaint() {
-  return new Promise<void>((resolve) => {
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-  })
+  const { rooms, floors } = useCanvasStore.getState()
+  return layoutThumbnailDataUrl(rooms, floors)
 }
 
 function exportFileName(projectTitle: string, extension: string) {
@@ -172,16 +157,6 @@ function hasRecoverableDraft(
   return layoutSnapshotKey(savedLayout) !== layoutSnapshotKey(draftLayout)
 }
 
-function waitForRefinementMoment(durationMs: number, skip: boolean) {
-  const reduceMotion =
-    typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  return new Promise<void>((resolve) =>
-    window.setTimeout(resolve, skip || reduceMotion ? 0 : durationMs),
-  )
-}
-
 // URL <-> store mapping for the editor view switcher, so 2D/3D/Zoning/Graph
 // are deep-linkable (?view=2d|3d|zoning|graph) and survive reload/back.
 const VIEW_PARAM_TO_MODE: Record<string, CanvasViewMode> = {
@@ -269,6 +244,9 @@ export default function ProjectPage() {
   >('idle')
   const [generateError, setGenerateError] = useState<string | null>(null)
   const [briefReview, setBriefReview] = useState<ExtractResponse | null>(null)
+  // Brief step over an existing plan (Edit ▸ Edit brief). Without a plan the
+  // brief step is simply what the page shows.
+  const [editingBrief, setEditingBrief] = useState(false)
   const [reviewPrompt, setReviewPrompt] = useState('')
   const [generationNotice, setGenerationNotice] = useState<string | null>(null)
   const [layoutSaving, setLayoutSaving] = useState(false)
@@ -277,18 +255,8 @@ export default function ProjectPage() {
   const [changeSummary, setChangeSummary] = useState('')
   const [duplicating, setDuplicating] = useState(false)
   const [duplicateError, setDuplicateError] = useState<string | null>(null)
-  const [mode, setMode] = useState<'generate' | 'refine'>('generate')
-  const [refinementSummary, setRefinementSummary] = useState<string | null>(null)
-  const [refinementPlayback, setRefinementPlayback] = useState<{
-    changes: RefinementChange[]
-    activeIndex: number
-    completedCount: number
-  } | null>(null)
-  const refinementRunRef = useRef(0)
   const generateAbortRef = useRef<AbortController | null>(null)
-  const playbackSkipRef = useRef(false)
   const [draftToRecover, setDraftToRecover] = useState<DesignDraftResponse | null>(null)
-  const userPickedModeRef = useRef(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [activityOpen, setActivityOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
@@ -309,86 +277,19 @@ export default function ProjectPage() {
 
   useEffect(
     () => () => {
-      refinementRunRef.current += 1
       generateAbortRef.current?.abort()
     },
     [],
   )
 
-  const playRefinement = async (
-    currentLayout: CanvasLayout,
-    result: RefineResponse,
-    runId: number,
-  ) => {
-    const frames = buildRefinementPlaybackFrames(currentLayout, result)
-    const preservedView = useCanvasStore.getState().viewMode
-    if (frames.length === 0) {
-      loadLayout(result)
-      useCanvasStore.getState().setViewMode(preservedView)
-      return
-    }
-
-    setRefinementPlayback({
-      changes: result.refinementChanges ?? [],
-      activeIndex: 0,
-      completedCount: 0,
-    })
-
-    for (let index = 0; index < frames.length; index += 1) {
-      if (runId !== refinementRunRef.current) return
-      const frame = frames[index]
-      setRefinementPlayback({
-        changes: result.refinementChanges ?? [],
-        activeIndex: index,
-        completedCount: index,
-      })
-
-      const beforeState = useCanvasStore.getState()
-      beforeState.setSelectedFloor(frame.change.floorLevel)
-      if (beforeState.rooms.some((room) => room.id === frame.change.objectId)) {
-        beforeState.selectRoom(frame.change.objectId)
-      }
-      await waitForRefinementMoment(420, playbackSkipRef.current)
-      if (runId !== refinementRunRef.current) return
-
-      loadLayout(frame.layout)
-      const afterState = useCanvasStore.getState()
-      afterState.setViewMode(preservedView)
-      afterState.setSelectedFloor(frame.change.floorLevel)
-      if (afterState.rooms.some((room) => room.id === frame.change.objectId)) {
-        afterState.selectRoom(frame.change.objectId)
-      }
-      setRefinementPlayback({
-        changes: result.refinementChanges ?? [],
-        activeIndex: index,
-        completedCount: index + 1,
-      })
-      await waitForRefinementMoment(260, playbackSkipRef.current)
-    }
-
-    if (runId !== refinementRunRef.current) return
-    loadLayout(result)
-    const finalState = useCanvasStore.getState()
-    finalState.setViewMode(preservedView)
-    const lastChange = frames[frames.length - 1]?.change
-    if (lastChange) {
-      finalState.setSelectedFloor(lastChange.floorLevel)
-      if (finalState.rooms.some((room) => room.id === lastChange.objectId)) {
-        finalState.selectRoom(lastChange.objectId)
-      }
-    }
-  }
-
-  // Refreshes the Dashboard-card thumbnail right after Generate/Refine, not
+  // Refreshes the project-card thumbnail right after Generate, not
   // just on manual Save Layout — Generate already persists a Design behind
   // the scenes, so a project can otherwise sit with no real preview
-  // indefinitely if the user never clicks Save. Fire-and-forget: waits one
-  // paint for the new layout to actually render, then best-effort uploads
-  // it without blocking or failing the generation flow.
+  // indefinitely if the user never clicks Save. Fire-and-forget: a
+  // best-effort upload that never blocks or fails the generation flow.
   const refreshThumbnailAfterGenerate = () => {
     if (!id) return
     void (async () => {
-      await waitForNextPaint()
       const thumbnailUrl = captureCanvasThumbnail()
       if (!thumbnailUrl) return
       try {
@@ -440,41 +341,7 @@ export default function ProjectPage() {
   const handleSubmit = async () => {
     const sourcePrompt = prompt.trim()
     if (!sourcePrompt) return
-    if (mode !== 'refine' || !designId) {
-      await requestBriefReview(sourcePrompt)
-      return
-    }
-
-    setGenerating(true)
-    setGenerationStage('generating')
-    setGenerateError(null)
-    setLayoutSaveError(null)
-    const currentLayout = serializeLayout()
-    const refinementRun = ++refinementRunRef.current
-    try {
-      const result = await refineLayout(designId, sourcePrompt, currentLayout)
-      if (refinementRun !== refinementRunRef.current) return
-      await playRefinement(currentLayout, result, refinementRun)
-      setDraftToRecover(null)
-      setRecoveredDraftAvailable(false)
-      setRefinementSummary(result.refinementSummary)
-      setAlternatives([])
-      setReviewChanges(true)
-      setPrompt('')
-      setGenerationNotice(null)
-      refreshThumbnailAfterGenerate()
-    } catch (err) {
-      setGenerateError(
-        getApiErrorMessage(err, 'Refinement failed. Try a more specific change.'),
-      )
-    } finally {
-      playbackSkipRef.current = false
-      if (refinementRun === refinementRunRef.current) {
-        setRefinementPlayback(null)
-      }
-      setGenerating(false)
-      setGenerationStage('idle')
-    }
+    await requestBriefReview(sourcePrompt)
   }
 
   const handleGenerateReviewed = async (useDefaults: boolean, extraNotes?: string) => {
@@ -498,43 +365,21 @@ export default function ProjectPage() {
     setGenerateError(null)
     setLayoutSaveError(null)
     try {
-      if (generationEngineFor(activeReview.requirements) === 'mvp') {
-        const result = await generateMvpLayout({
-          requirements: activeReview.requirements,
-          useDefaults,
-          projectId: id,
-          prompt: sourcePrompt,
-        }, controller.signal)
-        if (controller.signal.aborted) return
-        const initialLayout = generateResponseToCanvas(result, sourcePrompt)
-        loadLayout(initialLayout)
-        setAlternatives([initialLayout as LayoutOption, ...((result.alternatives ?? []) as LayoutOption[])])
-        setGenerationNotice(
-          result.defaults_applied.length > 0
-            ? `Assumed: ${result.defaults_applied.join(', ')}`
-            : null,
-        )
-      } else {
-        const designParams = {
-          plotWidthM: plotWidthM.trim() ? Number(plotWidthM) : undefined,
-          floors: floorsOverride.trim() ? Number(floorsOverride) : undefined,
-          orientation: orientation || undefined,
-        }
-        const hasParams =
-          designParams.plotWidthM !== undefined ||
-          designParams.floors !== undefined ||
-          designParams.orientation !== undefined
-        const result = await generateLayout(
-          sourcePrompt,
-          id,
-          hasParams ? designParams : undefined,
-          controller.signal,
-        )
-        if (controller.signal.aborted) return
-        loadLayout(result)
-        setAlternatives([result, ...(result.alternatives ?? [])])
-        setGenerationNotice(null)
-      }
+      const result = await generateMvpLayout({
+        requirements: activeReview.requirements,
+        useDefaults,
+        projectId: id,
+        prompt: sourcePrompt,
+      }, controller.signal)
+      if (controller.signal.aborted) return
+      const initialLayout = generateResponseToCanvas(result, sourcePrompt)
+      loadLayout(initialLayout)
+      setAlternatives([initialLayout as LayoutOption, ...((result.alternatives ?? []) as LayoutOption[])])
+      setGenerationNotice(
+        result.defaults_applied.length > 0
+          ? `Assumed: ${result.defaults_applied.join(', ')}`
+          : null,
+      )
       setActiveOption(0)
       setReviewChanges(false)
       useCanvasStore.getState().setViewMode('floor_plan')
@@ -542,10 +387,10 @@ export default function ProjectPage() {
       refreshThumbnailAfterGenerate()
       setDraftToRecover(null)
       setRecoveredDraftAvailable(false)
-      setRefinementSummary(null)
       setBriefReview(null)
       setReviewPrompt('')
       setPrompt('')
+      setEditingBrief(false)
     } catch (err) {
       if (axios.isCancel(err) || controller.signal.aborted) return
       const clarification = clarificationFromError(err)
@@ -584,26 +429,14 @@ export default function ProjectPage() {
     await requestBriefReview(clarifiedPrompt)
   }
 
-  const handleModeChange = (next: 'generate' | 'refine') => {
-    userPickedModeRef.current = true
-    setMode(next)
-    setBriefReview(null)
-    setGenerateError(null)
-  }
-
   const handlePromptChange = (value: string) => {
     setPrompt(value)
-    setRefinementSummary(null)
     setGenerationNotice(null)
     setBriefReview(null)
   }
 
   const cancelGeneration = () => {
     generateAbortRef.current?.abort()
-  }
-
-  const handleSkipPlayback = () => {
-    playbackSkipRef.current = true
   }
 
   const handlePickOption = (option: LayoutOption) => {
@@ -636,13 +469,6 @@ export default function ProjectPage() {
   const openReview = (value: boolean) => {
     setReviewChanges(value)
     setPanelOpen(true)
-  }
-
-  const focusRefinement = () => {
-    if (modelStage) leaveModelStage()
-    handleModeChange('refine')
-    setPanelOpen(false)
-    requestAnimationFrame(() => document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Layout prompt"]')?.focus())
   }
 
   const handleSaveLayout = async () => {
@@ -724,7 +550,7 @@ export default function ProjectPage() {
         const apiErr = err as { response?: { status?: number; data?: { error?: string } } }
         if (!active) return
         if (apiErr.response?.status === 404) {
-          navigate('/dashboard')
+          navigate('/projects')
         } else {
           setError(apiErr.response?.data?.error ?? 'Failed to load project')
           setLoading(false)
@@ -738,12 +564,6 @@ export default function ProjectPage() {
       active = false
     }
   }, [id, navigate, loadLayout])
-
-  useEffect(() => {
-    if (designId && mode === 'generate' && !userPickedModeRef.current) {
-      setMode('refine')
-    }
-  }, [designId, mode])
 
   // Adopt ?view= from the URL (initial load, back/forward navigation).
   useEffect(() => {
@@ -770,15 +590,16 @@ export default function ProjectPage() {
     )
   }, [viewMode, setSearchParams])
 
-  // Prefill the prompt when arriving from the Dashboard's hero composer,
-  // which creates the project first and forwards the brief via navigation
-  // state rather than auto-generating sight-unseen.
+  // Arriving from /projects/new: the brief was just written there, so read
+  // it back for review at once (review, not generate: nothing is drawn
+  // until the user confirms what was understood).
   useEffect(() => {
-    const initialPrompt = (location.state as { initialPrompt?: string } | null)?.initialPrompt
-    if (initialPrompt) {
-      setPrompt(initialPrompt)
-      navigate(location.pathname, { replace: true, state: null })
-    }
+    const state = location.state as { initialPrompt?: string; review?: boolean } | null
+    if (!state?.initialPrompt) return
+    setPrompt(state.initialPrompt)
+    navigate(location.pathname, { replace: true, state: null })
+    if (state.review) void requestBriefReview(state.initialPrompt)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per arrival
   }, [location.pathname, location.state, navigate])
 
   const enterEditMode = () => {
@@ -819,7 +640,7 @@ export default function ProjectPage() {
     setDeleting(true)
     try {
       await projectService.delete(id)
-      navigate('/dashboard')
+      navigate('/projects')
     } catch (err) {
       const apiErr = err as { response?: { data?: { error?: string } } }
       setDeleteError(apiErr.response?.data?.error ?? 'Failed to delete project')
@@ -949,7 +770,7 @@ export default function ProjectPage() {
 
             <EditorTopBar
               projectTitle={project.title}
-              onBackToDashboard={() => navigate('/dashboard')}
+              onBackToDashboard={() => navigate('/projects')}
               editing={editing}
               editTitle={editTitle}
               setEditTitle={setEditTitle}
@@ -971,18 +792,35 @@ export default function ProjectPage() {
               changeSummary={changeSummary}
               setChangeSummary={setChangeSummary}
               onSaveLayout={handleSaveLayout}
-              onHistory={() => setHistoryOpen(true)}
-              onActivity={() => setActivityOpen(true)}
-              onExportImage={handleExportImage}
-              onExportPdf={handleExportPdf}
-              onDuplicate={handleDuplicate}
-              onEditProject={enterEditMode}
-              onDelete={handleDelete}
-              exportingImage={exportingImage}
-              exportingPdf={exportingPdf}
-              duplicating={duplicating}
-              deleting={deleting}
-              roomCount={roomCount}
+              menubar={{
+                projectId: project.id,
+                roomCount,
+                onNewProject: () => navigate('/projects/new'),
+                onOpenProject: (projectId) => navigate(`/projects/${projectId}`),
+                onAllProjects: () => navigate('/projects'),
+                onDuplicate: handleDuplicate,
+                onExportImage: handleExportImage,
+                onExportPdf: handleExportPdf,
+                onShare: () => setShareOpen(true),
+                onProjectDetails: enterEditMode,
+                onDelete: handleDelete,
+                onHistory: () => setHistoryOpen(true),
+                onActivity: () => setActivityOpen(true),
+                onEditBrief: () => {
+                  // Start from the brief this plan was made from.
+                  const saved = useCanvasStore.getState().layoutMetadata.prompt
+                  if (!prompt.trim() && typeof saved === 'string') setPrompt(saved)
+                  setGenerateError(null)
+                  setEditingBrief(true)
+                },
+                optionCount: modelStage ? 0 : alternatives.length,
+                activeOption,
+                onPickOption: (index) => handlePickOption(alternatives[index]),
+                exportingImage,
+                exportingPdf,
+                duplicating,
+                deleting,
+              }}
               exportError={exportError}
               duplicateError={duplicateError}
               deleteError={deleteError}
@@ -998,7 +836,6 @@ export default function ProjectPage() {
               <BriefReviewPanel
                 key={`${reviewPrompt}:${briefReview.route}:${briefReview.questions.join('|')}`}
                 review={briefReview}
-                engine={generationEngineFor(briefReview.requirements)}
                 busy={generating}
                 error={generateError}
                 onGenerate={handleGenerateReviewed}
@@ -1011,11 +848,10 @@ export default function ProjectPage() {
               />
             )}
 
-            {roomCount > 0 && <>
+            {roomCount > 0 && !editingBrief && <>
               <div className="absolute inset-x-3 top-16 z-30 flex flex-wrap items-center justify-between gap-2">
                 {modelStage ? <div className="flex items-center gap-3"><button type="button" onClick={leaveModelStage} disabled={generating} className="rounded-lg border border-ink/15 bg-graphite-800/95 px-3 py-2 text-xs text-ink">← Back to layout</button><span className="text-xs font-semibold text-ink">3D model</span></div> : <ViewModeSwitcher disabled={generating} />}
                 <div className="flex items-center gap-2">
-                  {!modelStage && alternatives.length > 0 && <select aria-label="Layout option" disabled={generating} value={activeOption} onChange={(event) => handlePickOption(alternatives[Number(event.target.value)])} className="max-w-36 rounded-lg border border-ink/10 bg-graphite-800 px-2 py-2 text-xs text-ink">{alternatives.map((_, index) => <option key={index} value={index}>Option {index + 1}{index === 0 ? ' · recommended' : ''}</option>)}</select>}
                   <button type="button" aria-expanded={panelOpen} onClick={() => setPanelOpen(!panelOpen)} className="rounded-lg border border-ink/15 bg-graphite-800 px-3 py-2 text-xs text-ink lg:hidden">Rooms & details</button>
                 </div>
               </div>
@@ -1024,29 +860,7 @@ export default function ProjectPage() {
               {!generating && (viewMode === 'floor_plan' || viewMode === '3d') && <SelectionGizmo />}
             </>}
 
-            {refinementPlayback && (
-              <RefinementPlaybackPanel {...refinementPlayback} onSkip={handleSkipPlayback} />
-            )}
-
-            {refinementSummary && (
-              <div
-                role="status"
-                aria-live="polite"
-                className="absolute left-1/2 top-28 z-20 flex w-max max-w-[90%] -translate-x-1/2 items-center gap-3 rounded-xl border border-ok/30 bg-graphite-800/95 backdrop-blur px-4 py-2 shadow-sm"
-              >
-                <span className="text-xs font-medium text-ok">{refinementSummary}</span>
-                <button
-                  type="button"
-                  aria-label="Dismiss"
-                  className="text-xs font-medium text-ok hover:text-ink"
-                  onClick={() => setRefinementSummary(null)}
-                >
-                  ✕
-                </button>
-              </div>
-            )}
-
-            {activityCount > 0 && !selectedId && !refinementSummary && !generationNotice && !activityOpen && (
+            {activityCount > 0 && !selectedId && !generationNotice && !activityOpen && (
               <button
                 type="button"
                 onClick={() => openReview(true)}
@@ -1076,11 +890,12 @@ export default function ProjectPage() {
               </div>
             )}
 
-            {(!modelStage || roomCount === 0) && <CommandBar
-              roomCount={roomCount}
-              mode={mode}
-              onModeChange={handleModeChange}
-              designId={designId}
+            {editingBrief && roomCount > 0 && (
+              <div aria-hidden="true" className="absolute inset-0 z-10 bg-graphite-900/75 backdrop-blur-sm" />
+            )}
+
+            {(roomCount === 0 || editingBrief) && <CommandBar
+              onBackToPlan={roomCount > 0 ? () => setEditingBrief(false) : undefined}
               showParams={showParams}
               setShowParams={setShowParams}
               plotWidthM={plotWidthM}
@@ -1093,14 +908,12 @@ export default function ProjectPage() {
               setPrompt={handlePromptChange}
               generating={generating}
               generationStage={generationStage}
-              onCancel={mode === 'refine' ? undefined : cancelGeneration}
+              onCancel={cancelGeneration}
               busyLabel={
                 generationStage === 'extracting'
                   ? 'Understanding...'
                   : generationStage === 'generating'
-                    ? mode === 'refine'
-                      ? 'Refining...'
-                      : 'Generating...'
+                    ? 'Generating...'
                     : undefined
               }
               generateError={generateError}
@@ -1109,7 +922,7 @@ export default function ProjectPage() {
 
             {roomCount > 0 && <BottomStatusBar />}
           </div>
-          {roomCount > 0 && (viewMode === 'zoning' || viewMode === 'graph' ? <RightPanel onCreateModel={enterModelStage} open={panelOpen} onClose={() => setPanelOpen(false)} /> : <WorkspacePanel modelStage={modelStage} reviewChanges={reviewChanges} onReviewChanges={openReview} onCreateModel={enterModelStage} onRefine={focusRefinement} open={panelOpen} onClose={() => setPanelOpen(false)} busy={generating} />)}
+          {roomCount > 0 && (viewMode === 'zoning' || viewMode === 'graph' ? <RightPanel onCreateModel={enterModelStage} open={panelOpen} onClose={() => setPanelOpen(false)} /> : <WorkspacePanel modelStage={modelStage} reviewChanges={reviewChanges} onReviewChanges={openReview} onCreateModel={enterModelStage} open={panelOpen} onClose={() => setPanelOpen(false)} busy={generating} />)}
         </div>
       </main>
 

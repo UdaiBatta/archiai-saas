@@ -47,6 +47,7 @@ from app.config.mvp_defaults import (
 )
 from app.schemas.layout_plan import (
     ArchetypeReason,
+    Connection,
     Door,
     LayoutPlan,
     PlanPlot,
@@ -66,7 +67,7 @@ from app.services.layout_engine.archetypes import (
     vertical_core_bands,
     zoned_bands,
 )
-from app.services.layout_engine.geometry import EPS, Rect, Segment
+from app.services.layout_engine.geometry import EPS, Rect, Segment, uncovered_edges
 from app.services.layout_engine.polygon_subdivision import subdivide_polygon
 from app.services.layout_engine.subdivision import RoomNeed, SubdivisionError, subdivide
 from app.services.planning import (
@@ -85,6 +86,40 @@ _MIN_DOOR_EDGE = DOOR_WIDTH_M + 0.1     # a door needs this much shared wall
 _NARROW_DOOR_WIDTH = 0.7                # connectivity fallback on tight edges
 _NARROW_DOOR_EDGE = _NARROW_DOOR_WIDTH + 0.1
 _PRIVACY_THRESHOLD = 2  # matches quality.hard_constraints' own through_room_access threshold
+
+_SANITARY_TYPES = frozenset({"bathroom", "ensuite", "toilet", "washroom", "wc"})
+
+# Where a front door may go, most preferred first (catalog keys: "entry"
+# resolves to "foyer"). Non-residential programs enter through a lobby or
+# reception the same way.
+_FRONT_DOOR_ROOM_ORDER = (
+    "foyer", "lobby", "reception", "living_room", "open_plan_living",
+    "hallway", "corridor", "dining_room", "kitchen",
+)
+
+# Shared edges between two of these get no wall and no door (open plan).
+_OPEN_PLAN_TYPES = frozenset({
+    "living_room", "open_plan_living", "dining_room", "dining_area", "kitchen",
+    "foyer", "corridor", "hallway",
+})
+
+
+def _edge_kind(type_a: str, type_b: str) -> str:
+    def canon(t: str) -> str:
+        return catalog.resolve_alias(t) or t
+    return "open" if {canon(type_a), canon(type_b)} <= _OPEN_PLAN_TYPES else "wall"
+
+
+def _pair_kind(
+    need_a: RoomNeed, need_b: RoomNeed, overrides: dict[frozenset, Connection] | None
+) -> str:
+    """Edge kind for two adjacent rooms: the user's override if any (a
+    "door" connection still needs a physical wall to host it), else the
+    open-plan default."""
+    chosen = (overrides or {}).get(frozenset((need_a.key, need_b.key)))
+    if chosen is not None:
+        return "open" if chosen.kind == "open" else "wall"
+    return _edge_kind(need_a.type, need_b.type)
 
 
 class DoesNotFitError(ValueError):
@@ -182,6 +217,45 @@ def _build_program(spec: RequirementsSpec, *, inject_corridor: bool = True) -> E
     return _remap_program(to_engine_program(graph))
 
 
+def _require_home_garage_entry(
+    program: EngineProgram, spec: RequirementsSpec
+) -> EngineProgram:
+    """Add garage-to-entry edges for the residential recovery search.
+
+    An explicit garage-to-utility MUST edge takes precedence, while exterior
+    access remains valid for edited/imported plans.
+    """
+    if spec.building_type not in {
+        BuildingType.house, BuildingType.apartment, BuildingType.villa, BuildingType.duplex,
+    } or not program.entry_node:
+        return program
+    garages = [
+        need.key for need in program.needs
+        if (catalog.resolve_alias(need.type) or need.type) == "garage"
+    ]
+    type_by_key = {
+        need.key: (catalog.resolve_alias(need.type) or need.type)
+        for need in program.needs
+    }
+    existing = {frozenset(pair) for pair in program.must_adjacent}
+    added = [
+        (garage, program.entry_node) for garage in garages
+        if garage != program.entry_node
+        and frozenset((garage, program.entry_node)) not in existing
+        and not any(
+            garage in pair
+            and any(
+                key != garage and type_by_key.get(key) in {"utility", "laundry", "mudroom"}
+                for key in pair
+            )
+            for pair in program.must_adjacent
+        )
+    ]
+    if not added:
+        return program
+    return dataclasses.replace(program, must_adjacent=[*program.must_adjacent, *added])
+
+
 def _programs_by_floor(spec: RequirementsSpec) -> list[EngineProgram]:
     _guard_program_size(spec)
     try:
@@ -229,13 +303,34 @@ def _round(v: float) -> float:
     return round(v, 3)
 
 
+def _round_inside(px: float, py: float, plot: "polygon.Polygon") -> Vertex:
+    """Round a vertex to the millimetre grid without leaving the plot.
+
+    Plain rounding (what rectangular rooms use) can push a point on a slanted
+    boundary 1 mm outside it. Keep plain rounding whenever the plot covers
+    it, so polygon and rectangle neighbours agree; otherwise take the nearest
+    of the other surrounding grid points that stays inside. Deterministic in
+    (px, py), so rooms sharing a vertex agree."""
+    from shapely.geometry import Point
+
+    plain = (_round(px), _round(py))
+    if plot.covers(Point(*plain)):
+        return Vertex(x=plain[0], y=plain[1])
+    xs = {round(math.floor(px * 1000) / 1000, 3), round(math.ceil(px * 1000) / 1000, 3)}
+    ys = {round(math.floor(py * 1000) / 1000, 3), round(math.ceil(py * 1000) / 1000, 3)}
+    candidates = sorted((math.hypot(x - px, y - py), x, y) for x in xs for y in ys)
+    for _, x, y in candidates:
+        if plot.covers(Point(x, y)):
+            return Vertex(x=x, y=y)
+    return Vertex(x=plain[0], y=plain[1])
+
+
 def _build_walls(
     placed: list[tuple[RoomNeed, Rect]],
-    plot_w: float,
-    plot_d: float,
     *,
     floor: int = 0,
     id_prefix: str = "",
+    overrides: dict[frozenset, Connection] | None = None,
 ):
     """One wall per shared edge (never two overlapping ones) + boundary walls.
 
@@ -246,7 +341,7 @@ def _build_walls(
     walls: list[Wall] = []
     wall_rooms: dict[str, tuple[str, str | None]] = {}
 
-    def add(seg: Segment, a: str, b: str | None) -> str:
+    def add(seg: Segment, a: str, b: str | None, kind: str = "wall") -> str:
         wall_id = f"{id_prefix}w{len(walls) + 1}"
         walls.append(Wall(
             id=wall_id,
@@ -254,6 +349,8 @@ def _build_walls(
             x2=_round(seg.x2), y2=_round(seg.y2),
             thickness=WALL_THICKNESS_M,
             floor=floor,
+            kind=kind,
+            rooms=[a, b] if b is not None else None,
         ))
         wall_rooms[wall_id] = (a, b)
         return wall_id
@@ -262,17 +359,15 @@ def _build_walls(
         for need_b, rect_b in placed[i + 1:]:
             seg = rect_a.shared_edge(rect_b)
             if seg is not None:
-                add(seg, need_a.key, need_b.key)
+                add(seg, need_a.key, need_b.key, _pair_kind(need_a, need_b, overrides))
 
-    for need, rect in placed:  # boundary portions belong to exactly one room
-        if rect.x <= EPS:
-            add(Segment(0.0, rect.y, 0.0, rect.y2), need.key, None)
-        if rect.x2 >= plot_w - EPS:
-            add(Segment(plot_w, rect.y, plot_w, rect.y2), need.key, None)
-        if rect.y <= EPS:
-            add(Segment(rect.x, 0.0, rect.x2, 0.0), need.key, None)
-        if rect.y2 >= plot_d - EPS:
-            add(Segment(rect.x, plot_d, rect.x2, plot_d), need.key, None)
+    # Outside walls: every stretch of a room edge that no other room covers.
+    # Measured from the rooms themselves, not the plot edge, so a building
+    # set back inside its plot (or edited away from it) keeps its shell.
+    for need, rect in placed:
+        others = [r for n, r in placed if n.key != need.key]
+        for seg in uncovered_edges(rect, others):
+            add(seg, need.key, None)
     return walls, wall_rooms
 
 
@@ -291,6 +386,7 @@ def _build_walls_polygon(
     *,
     floor: int = 0,
     id_prefix: str = "",
+    overrides: dict[frozenset, Connection] | None = None,
 ):
     """Polygon counterpart of `_build_walls` — same one-wall-per-shared-edge
     contract, computed via `polygon.shared_edges`/`polygon.is_on_boundary`
@@ -298,7 +394,7 @@ def _build_walls_polygon(
     walls: list[Wall] = []
     wall_rooms: dict[str, tuple[str, str | None]] = {}
 
-    def add(seg: Segment, a: str, b: str | None) -> str:
+    def add(seg: Segment, a: str, b: str | None, kind: str = "wall") -> str:
         wall_id = f"{id_prefix}w{len(walls) + 1}"
         walls.append(Wall(
             id=wall_id,
@@ -306,6 +402,8 @@ def _build_walls_polygon(
             x2=_round(seg.x2), y2=_round(seg.y2),
             thickness=WALL_THICKNESS_M,
             floor=floor,
+            kind=kind,
+            rooms=[a, b] if b is not None else None,
         ))
         wall_rooms[wall_id] = (a, b)
         return wall_id
@@ -313,7 +411,7 @@ def _build_walls_polygon(
     for i, (need_a, poly_a) in enumerate(placed):
         for need_b, poly_b in placed[i + 1:]:
             for seg in polygon.shared_edges(poly_a, poly_b):
-                add(seg, need_a.key, need_b.key)
+                add(seg, need_a.key, need_b.key, _pair_kind(need_a, need_b, overrides))
 
     for need, poly in placed:  # boundary portions belong to exactly one room
         coords = list(poly.exterior.coords)
@@ -356,6 +454,26 @@ def _pair_priority(pair: frozenset, zone_of: dict[str, str]) -> int:
     return 2
 
 
+def _max_matching(partners: dict[str, list[str]]) -> dict[str, str]:
+    """Maximum one-to-one pairing (Kuhn's augmenting paths): left room ->
+    its own right room. Tiny inputs (rooms of two types on one floor)."""
+    match_right: dict[str, str] = {}
+
+    def augment(left: str, seen: set[str]) -> bool:
+        for right in partners[left]:
+            if right in seen:
+                continue
+            seen.add(right)
+            if right not in match_right or augment(match_right[right], seen):
+                match_right[right] = left
+                return True
+        return False
+
+    for left in partners:
+        augment(left, set())
+    return {left: right for right, left in match_right.items()}
+
+
 def _place_doors(
     placed: list[tuple[RoomNeed, Rect]],
     walls: list[Wall],
@@ -365,17 +483,21 @@ def _place_doors(
     zone_of: dict[str, str],
     *,
     allow_disconnected: bool = False,
-    add_convenience_doors: bool = True,
     id_prefix: str = "",
+    overrides: dict[frozenset, Connection] | None = None,
 ) -> list[Door]:
     doors: list[Door] = []
     doored_walls: set[str] = set()
+    overrides = overrides or {}
 
-    def add_door(wall: Wall, width: float) -> None:
+    def add_door(wall: Wall, width: float, at: float | None = None) -> None:
         if wall.id in doored_walls:
             return
         doored_walls.add(wall.id)
-        offset = max(0.0, (_wall_length(wall) - width) / 2)
+        length = _wall_length(wall)
+        # `at` = door centre as a fraction along the wall; None = centred.
+        centre = length / 2 if at is None else at * length
+        offset = min(max(0.0, centre - width / 2), max(0.0, length - width))
         doors.append(Door(
             id=f"{id_prefix}d{len(doors) + 1}",
             wall_ref=wall.id,
@@ -384,7 +506,10 @@ def _place_doors(
             floor=wall.floor,
         ))
 
-    interior = [w for w in walls if wall_rooms[w.id][1] is not None]
+    interior = [
+        w for w in walls if wall_rooms[w.id][1] is not None and w.kind != "open"
+    ]
+    open_links = [wall_rooms[w.id] for w in walls if w.kind == "open"]
     by_pair: dict[frozenset, list[Wall]] = {}
     for wall in interior:
         a, b = wall_rooms[wall.id]
@@ -405,27 +530,64 @@ def _place_doors(
         for p in spec.avoid_adjacency
     }
 
+    # A user's "wall" connection vetoes a door exactly like an AVOID pair.
+    forced_walls = {pair for pair, c in overrides.items() if c.kind == "wall"}
+
     def is_avoided(pair: frozenset) -> bool:
+        if pair in forced_walls:
+            return True
         pair_types = frozenset(canonical_type(types_by_key[k]) for k in pair)
         return pair_types in avoid_type_pairs
 
+    def door_width_for(wall: Wall) -> float | None:
+        if _wall_length(wall) >= _MIN_DOOR_EDGE:
+            return DOOR_WIDTH_M
+        if _wall_length(wall) >= _NARROW_DOOR_EDGE:
+            return _NARROW_DOOR_WIDTH
+        return None
+
+    # 0. Doors the user placed explicitly, where they put them.
+    for pair, chosen in overrides.items():
+        if chosen.kind != "door" or pair not in by_pair:
+            continue
+        best = max(by_pair[pair], key=_wall_length)
+        width = door_width_for(best)
+        if width is not None:
+            add_door(best, width, chosen.at)
+
+    # Bathrooms that open into their own room (en-suites): they are reached
+    # through that room, never given a corridor door that would stand in for
+    # the bedroom's own.
+    ensuite_keys: set[str] = set()
+
     # 1. `must`-adjacency doors (attached bathroom onto its bedroom, etc.).
+    #    One door per room pair, matched one-to-one: "each bedroom has its
+    #    own bathroom" gives every bedroom a door to a bathroom of its own,
+    #    not one door for the whole rule.
     for pref in spec.adjacency:
         if pref.strength != "must":
             continue
-        for pair, pair_walls in by_pair.items():
-            pair_types = {canonical_type(types_by_key[k]) for k in pair}
-            pref_a = canonical_type(pref.room_a)
-            pref_b = canonical_type(pref.room_b)
-            if pair_types == {pref_a, pref_b} or (
-                pref_a == pref_b
-                and len(pair_types) == 1
-                and pair_types == {pref_a}
-            ):
-                best = max(pair_walls, key=_wall_length)
-                if _wall_length(best) >= _MIN_DOOR_EDGE:
-                    add_door(best, DOOR_WIDTH_M)
-                break
+        pref_a = canonical_type(pref.room_a)
+        pref_b = canonical_type(pref.room_b)
+        doorable = {
+            pair: pair_walls for pair, pair_walls in by_pair.items()
+            if pair not in forced_walls
+            and max(_wall_length(w) for w in pair_walls) >= _MIN_DOOR_EDGE
+            and {canonical_type(types_by_key[k]) for k in pair} == {pref_a, pref_b}
+        }
+        if pref_a == pref_b:
+            # Same-type pair (rare): one door, as before.
+            chosen = list(doorable)[:1]
+        else:
+            side_a = sorted({k for pair in doorable for k in pair if canonical_type(types_by_key[k]) == pref_a})
+            partners = {
+                a: sorted(k for pair in doorable if a in pair for k in pair if k != a)
+                for a in side_a
+            }
+            chosen = [frozenset(pair) for pair in _max_matching(partners).items()]
+        for pair in chosen:
+            add_door(max(doorable[pair], key=_wall_length), DOOR_WIDTH_M)
+            ensuite_keys.update(k for k in pair if canonical_type(types_by_key[k]) in _SANITARY_TYPES)
 
     # 1.5. Guarantee any corridor/hallway spine has a door to a NON-PRIVATE
     #      neighbour, using its widest available shared wall even if narrow
@@ -443,10 +605,13 @@ def _place_doors(
     #      an invented opening.
     _MIN_PHYSICAL_DOOR_EDGE = 0.4
     for corridor_key in (k for k, t in types_by_key.items() if t in ("corridor", "hallway")):
+        # A bathroom is a dead end, never the corridor's link to the rest of
+        # the house; an en-suite especially (its door belongs to its bedroom).
         candidates = [
             (pair, walls) for pair, walls in by_pair.items()
             if corridor_key in pair
             and catalog.privacy_level_for(types_by_key[next(iter(pair - {corridor_key}))]) < _PRIVACY_THRESHOLD
+            and canonical_type(types_by_key[next(iter(pair - {corridor_key}))]) not in _SANITARY_TYPES
             and not is_avoided(pair)
         ]
         if not candidates:
@@ -491,28 +656,46 @@ def _place_doors(
         extended = True
         while extended:
             extended = False
-            for door in doors:
-                a, b = wall_rooms[door.wall_ref]
+            links = [wall_rooms[d.wall_ref] for d in doors] + open_links
+            for a, b in links:
                 if b is None or (a in connected) == (b in connected):
                     continue
                 connected.update((a, b))
                 extended = True
 
-    if not add_convenience_doors:
-        extend_through_existing_doors()
+    extend_through_existing_doors()
 
-    changed = True
-    while changed:
-        changed = False
-        ranked_pairs = sorted(
-            by_pair.items(),
-            key=lambda kv: (_pair_priority(kv[0], zone_of), sorted(kv[0])),
-        )
+    ranked_pairs = sorted(
+        by_pair.items(),
+        key=lambda kv: (_pair_priority(kv[0], zone_of), sorted(kv[0])),
+    )
+
+    def connect_one(tier: int) -> bool:
+        """Add one door from the reached set to an unreached room.
+
+        Tier 0 grows only out of public/circulation rooms; tier 1 may also
+        grow out of a kitchen, laundry, garage or store; tier 2 out of
+        anything (a bathroom or bedroom). The caller always retries the
+        lowest tier first, so a room is only reached through one of those
+        when nothing better reaches it, and the validator then flags it
+        (walk_through_room). An en-suite is never the way into its own
+        bedroom below tier 2."""
         for pair, pair_walls in ranked_pairs:
             a, b = sorted(pair)
             if (a in connected) == (b in connected):
                 continue
             if is_avoided(pair):
+                continue
+            source = a if a in connected else b
+            private = catalog.privacy_level_for(types_by_key[source]) >= _PRIVACY_THRESHOLD
+            sanitary = canonical_type(types_by_key[source]) in _SANITARY_TYPES
+            service = canonical_type(types_by_key[source]) in catalog.NO_THROUGH_TYPES
+            target = b if source == a else a
+            if (private or sanitary) and tier < 2:
+                continue
+            if service and tier < 1:
+                continue
+            if target in ensuite_keys and tier < 2:
                 continue
             best = max(pair_walls, key=_wall_length)
             if _wall_length(best) >= _MIN_DOOR_EDGE:
@@ -522,12 +705,53 @@ def _place_doors(
             else:
                 continue
             connected.update(pair)
-            if not add_convenience_doors:
-                # A newly reached room may already have a required/MUST door
-                # to its partner. Traverse that real opening before adding a
-                # redundant second door from the corridor.
-                extend_through_existing_doors()
-            changed = True
+            # A newly reached room may already be joined to others by a
+            # MUST door or an open-plan edge — follow those before adding a
+            # redundant door.
+            extend_through_existing_doors()
+            return True
+        return False
+
+    while connect_one(0) or connect_one(1) or connect_one(2):
+        pass
+
+    # 3. A home needs a bathroom nobody has to cross a bedroom to reach. If
+    #    every bathroom ended up an en-suite (a door only from its bedroom),
+    #    give one a second door onto a public room or the corridor as well.
+    sanitary_keys = [k for k, t in types_by_key.items() if canonical_type(t) in _SANITARY_TYPES]
+    if sanitary_keys:
+        links: dict[str, set[str]] = {}
+        for x, y in [wall_rooms[d.wall_ref] for d in doors] + open_links:
+            if y is not None:
+                links.setdefault(x, set()).add(y)
+                links.setdefault(y, set()).add(x)
+
+        def passable(key: str) -> bool:
+            return (
+                catalog.privacy_level_for(types_by_key[key]) < _PRIVACY_THRESHOLD
+                and canonical_type(types_by_key[key]) not in _SANITARY_TYPES
+            )
+
+        public = {circulation}
+        frontier = [circulation]
+        while frontier:
+            current = frontier.pop()
+            for nxt in links.get(current, ()):
+                if nxt not in public and passable(nxt):
+                    public.add(nxt)
+                    frontier.append(nxt)
+        if not any(links.get(k, set()) & public for k in sanitary_keys):
+            for key in sorted(sanitary_keys):
+                options = [
+                    max(pw, key=_wall_length) for pair, pw in by_pair.items()
+                    if key in pair and next(iter(pair - {key})) in public
+                    and not is_avoided(pair)
+                    and max(_wall_length(w) for w in pw) >= _NARROW_DOOR_EDGE
+                ]
+                if options:
+                    best = max(options, key=_wall_length)
+                    add_door(best, DOOR_WIDTH_M if _wall_length(best) >= _MIN_DOOR_EDGE else _NARROW_DOOR_WIDTH)
+                    break
 
     unreachable = [n.label for n, _ in placed if n.key not in connected]
     if unreachable and not allow_disconnected:
@@ -535,61 +759,38 @@ def _place_doors(
             f"no door-sized wall reaches: {', '.join(unreachable)} — increase plot size"
         )
 
-    # 3. Direct doors between every remaining adjacent pair. Step 2 only adds
-    #    the minimum doors needed for bare reachability (a spanning tree) —
-    #    a room can be fully "reachable" while a wall it visibly shares with
-    #    its next-door neighbour stays solid, which reads as broken
-    #    connectivity even though nothing is technically unreachable (e.g. a
-    #    dining room right next to the entry with no door between them,
-    #    routed instead through the living room). Skip a pair only when
-    #    there's a real reason not to connect them directly: both rooms are
-    #    genuinely private (bedroom-bedroom, bedroom-pooja_room — privacy,
-    #    not a defect) or the pair is explicitly avoided in the spec.
-    #
-    #    Uses catalog.privacy_level_for, NOT macro_zone — deliberately.
-    #    macro_zone folds "service" into the same "private" bucket as
-    #    genuinely private rooms (zoned_bands' banding wants that fold; see
-    #    its own docstring), so a bedroom-bathroom pair used to get skipped
-    #    here exactly like a bedroom-bedroom pair. That silently starved a
-    #    private room of its only non-private neighbour whenever its sole
-    #    other neighbour was a private-zoned room too — caught by workflow
-    #    4.5's own privacy-chain check going red on a live Hypothesis
-    #    counterexample (a pooja_room boxed in between a bedroom and a
-    #    bathroom, both skipped here, forcing the spanning tree to route it
-    #    through the bedroom). A bathroom at catalog privacy_level 1 is not
-    #    "private" by the same definition the new check uses, so it must be
-    #    allowed to bridge a private room to the rest of the house.
-    convenience_pairs = by_pair.items() if add_convenience_doors else ()
-    for pair, pair_walls in convenience_pairs:
-        if is_avoided(pair):
-            continue
-        if all(catalog.privacy_level_for(types_by_key[k]) >= _PRIVACY_THRESHOLD for k in pair):
-            continue
-        best = max(pair_walls, key=_wall_length)
-        if _wall_length(best) >= _MIN_DOOR_EDGE:
-            add_door(best, DOOR_WIDTH_M)
-        elif _wall_length(best) >= _NARROW_DOOR_EDGE:
-            add_door(best, _NARROW_DOOR_WIDTH)
+    # 4. Front door on the ground floor: the entry's street-facing outside
+    #    wall, else another outside wall of the entry, else the same search
+    #    over the next most public rooms, so a plan whose entry ended up
+    #    inland still gets a way in.
+    # The street side is the building's own outermost edge in the facing
+    # direction (the plot edge only when the building fills the plot).
+    shell = [w for w in walls if wall_rooms[w.id][1] is None]
+    vertical = [w.x1 for w in shell if abs(w.x1 - w.x2) <= EPS]
+    horizontal = [w.y1 for w in shell if abs(w.y1 - w.y2) <= EPS]
 
-    # 4. Front door on the entry's facing-side boundary wall (best effort).
-    entry_key = next((n.key for n, _ in placed if n.type == RoomType.entry.value), None)
-    if entry_key is not None:
-        def on_facing(wall: Wall) -> bool:
-            if facing == Facing.east:
-                return abs(wall.x1 - wall.x2) <= EPS and wall.x1 > 0
-            if facing == Facing.west:
-                return abs(wall.x1 - wall.x2) <= EPS and wall.x1 <= EPS
-            if facing == Facing.south:
-                return abs(wall.y1 - wall.y2) <= EPS and wall.y1 > 0
-            return abs(wall.y1 - wall.y2) <= EPS and wall.y1 <= EPS
+    def on_facing(wall: Wall) -> bool:
+        if facing in (Facing.east, Facing.west):
+            if abs(wall.x1 - wall.x2) > EPS or not vertical:
+                return False
+            edge = max(vertical) if facing == Facing.east else min(vertical)
+            return abs(wall.x1 - edge) <= EPS
+        if abs(wall.y1 - wall.y2) > EPS or not horizontal:
+            return False
+        edge = max(horizontal) if facing == Facing.south else min(horizontal)
+        return abs(wall.y1 - edge) <= EPS
 
-        boundary = [
-            w for w in walls
-            if wall_rooms[w.id] == (entry_key, None) and _wall_length(w) >= _MIN_DOOR_EDGE
-        ]
-        best = next((w for w in boundary if on_facing(w)), None) or (boundary[0] if boundary else None)
-        if best is not None:
-            add_door(best, DOOR_WIDTH_M)
+    if all(w.floor == 0 for w in walls):
+        for front_type in _FRONT_DOOR_ROOM_ORDER:
+            outside = [
+                w for w in walls
+                if wall_rooms[w.id][1] is None
+                and canonical_type(types_by_key[wall_rooms[w.id][0]]) == front_type
+                and _wall_length(w) >= _MIN_DOOR_EDGE
+            ]
+            if outside:
+                add_door(next((w for w in outside if on_facing(w)), outside[0]), DOOR_WIDTH_M)
+                break
 
     return doors
 
@@ -601,7 +802,8 @@ def rebuild_derived_geometry(
     plan: LayoutPlan,
     spec: RequirementsSpec,
 ) -> LayoutPlan:
-    """Recreate walls and doors from the plan's current room rectangles.
+    """Recreate walls and doors from the plan's current room rectangles,
+    honouring the user's ``plan.connections`` (wall / door / open per pair).
 
     Walls and doors are derived artifacts in the canonical ``LayoutPlan``
     contract. Editor geometry changes therefore invalidate any supplied copies.
@@ -611,7 +813,10 @@ def rebuild_derived_geometry(
     """
 
     if not plan.rooms:
-        return plan.model_copy(update={"walls": [], "doors": []})
+        return plan.model_copy(update={"walls": [], "doors": [], "connections": []})
+
+    overrides = {frozenset((c.room_a, c.room_b)): c for c in plan.connections}
+    adjacent_pairs: set[frozenset] = set()
 
     floors = sorted({room.floor for room in plan.rooms})
     multi_floor = len(floors) > 1 or floors != [0]
@@ -645,15 +850,14 @@ def rebuild_derived_geometry(
         prefix = f"f{floor}-" if multi_floor else ""
         if polygon_mode:
             walls, wall_rooms = _build_walls_polygon(
-                placed, plot_polygon, floor=floor, id_prefix=prefix
+                placed, plot_polygon, floor=floor, id_prefix=prefix, overrides=overrides
             )
         else:
             walls, wall_rooms = _build_walls(
                 placed,
-                plan.plot.width_m,
-                plan.plot.depth_m,
                 floor=floor,
                 id_prefix=prefix,
+                overrides=overrides,
             )
         zone_of = {need.key: catalog.zone_for(need.type) for need, _ in placed}
         doors = _place_doors(
@@ -665,10 +869,19 @@ def rebuild_derived_geometry(
             zone_of,
             allow_disconnected=True,
             id_prefix=prefix,
+            overrides=overrides,
         )
+        adjacent_pairs.update(frozenset(pair) for pair in wall_rooms.values() if pair[1] is not None)
         all_walls.extend(walls)
         all_doors.extend(doors)
-    return plan.model_copy(update={"walls": all_walls, "doors": all_doors})
+    # A connection whose rooms no longer touch (the user moved one away) is
+    # dropped rather than carried as a stale instruction.
+    connections = [
+        c for c in plan.connections if frozenset((c.room_a, c.room_b)) in adjacent_pairs
+    ]
+    return plan.model_copy(
+        update={"walls": all_walls, "doors": all_doors, "connections": connections}
+    )
 
 
 def plan_from_program(
@@ -786,8 +999,6 @@ def plan_from_program(
 
     walls, wall_rooms = _build_walls(
         placed,
-        plot_w,
-        plot_d,
         floor=floor,
         id_prefix=id_prefix,
     )
@@ -798,7 +1009,6 @@ def plan_from_program(
         spec,
         facing,
         program.zone_of,
-        add_convenience_doors=not used_band_plan.regions,
         id_prefix=id_prefix,
     )
 
@@ -870,11 +1080,14 @@ def plan_from_program(
 
         violations = validate(plan, spec)
         if violations:
+            messages = "; ".join(violation.message for violation in violations)
             if band_plan is None and archetype_key != "zoned_bands":
                 try:
                     safe_bands = zoned_bands(program, plot_w, plot_d, facing)
                 except SubdivisionError as exc:
-                    raise DoesNotFitError(f"{exc} — increase plot size") from exc
+                    # Report the rule this layout broke, not the fallback's
+                    # geometry complaint, which would hide the real reason.
+                    raise DoesNotFitError(messages) from exc
                 return plan_from_program(
                     spec,
                     program,
@@ -885,7 +1098,6 @@ def plan_from_program(
                     floor=floor,
                     id_prefix=id_prefix,
                 )
-            messages = "; ".join(violation.message for violation in violations)
             raise DoesNotFitError(messages)
     return plan
 
@@ -897,10 +1109,29 @@ def _generate_plan_multifloor(spec: RequirementsSpec) -> LayoutPlan:
     plot_w = spec.plot.width_m or DEFAULT_PLOT_WIDTH_M
     plot_d = spec.plot.depth_m or DEFAULT_PLOT_DEPTH_M
     facing = spec.facing or DEFAULT_FACING
+    programs = _programs_by_floor(spec)
+    # One footprint for every storey (they stack), sized to the largest.
+    area = max(sum(need.preferred_area for need in p.needs) for p in programs)
+    last_error: DoesNotFitError | None = None
+    for fw, fd in _footprint_candidates(area, plot_w, plot_d):
+        try:
+            plan = _stack_floors(spec, programs, fw, fd, facing)
+        except DoesNotFitError as exc:
+            last_error = exc
+            continue
+        dx, dy = _footprint_origin(fw, fd, plot_w, plot_d, facing)
+        return _placed_on_plot(plan, dx, dy, plot_w, plot_d)
+    assert last_error is not None
+    raise last_error
+
+
+def _stack_floors(
+    spec: RequirementsSpec, programs: list[EngineProgram], plot_w: float, plot_d: float, facing: Facing,
+) -> LayoutPlan:
     rooms: list[PlanRoom] = []
     walls: list[Wall] = []
     doors: list[Door] = []
-    for floor, program in enumerate(_programs_by_floor(spec)):
+    for floor, program in enumerate(programs):
         try:
             bands = vertical_core_bands(program, plot_w, plot_d, facing)
         except SubdivisionError as exc:
@@ -942,7 +1173,9 @@ def _generate_plan_multifloor(spec: RequirementsSpec) -> LayoutPlan:
     return plan
 
 
-def _generate_plan_polygon(spec: RequirementsSpec) -> LayoutPlan:
+def _generate_plan_polygon(
+    spec: RequirementsSpec, program: EngineProgram | None = None
+) -> LayoutPlan:
     """Polygon counterpart of `generate_plan`'s tail — same validation order,
     same error types, no zone/archetype banding (Phase 8 scope: `zoned_bands`
     already collapses to one band for a single zone group, so subdividing the
@@ -953,7 +1186,7 @@ def _generate_plan_polygon(spec: RequirementsSpec) -> LayoutPlan:
     if not plot_polygon.is_valid or not plot_polygon.is_simple or plot_polygon.area <= EPS:
         raise DoesNotFitError("plot boundary is not a valid simple polygon")
 
-    program = _build_program(spec)
+    program = program or _build_program(spec)
     needs = program.needs
     if not needs:
         raise DoesNotFitError("no rooms requested")
@@ -988,6 +1221,10 @@ def _generate_plan_polygon(spec: RequirementsSpec) -> LayoutPlan:
     walls, wall_rooms = _build_walls_polygon(placed, plot_polygon)
     doors = _place_doors(placed, walls, wall_rooms, spec, facing, program.zone_of)
 
+    boundary_ring = list(plot_polygon.exterior.coords)[:-1]
+    boundary = [Vertex(x=_round(px), y=_round(py)) for px, py in boundary_ring]
+    rounded_plot = polygon.polygon_from_vertices(boundary)
+
     rooms = []
     for need, poly in placed:
         minx, miny, maxx, maxy = poly.bounds
@@ -996,7 +1233,7 @@ def _generate_plan_polygon(spec: RequirementsSpec) -> LayoutPlan:
         vertices = None
         if not polygon.is_axis_aligned_rect(poly):
             ring = list(poly.exterior.coords)[:-1]  # drop the closing duplicate
-            vertices = [Vertex(x=_round(px), y=_round(py)) for px, py in ring]
+            vertices = [_round_inside(px, py, rounded_plot) for px, py in ring]
         rooms.append(PlanRoom(
             # `need.type` is already validated (see the rect path's own
             # comment above) — no RoomType(...) cast, same migration.
@@ -1005,28 +1242,182 @@ def _generate_plan_polygon(spec: RequirementsSpec) -> LayoutPlan:
         ))
 
     plot_minx, plot_miny, plot_maxx, plot_maxy = plot_polygon.bounds
-    boundary_ring = list(plot_polygon.exterior.coords)[:-1]
-    return LayoutPlan(
+    plan = LayoutPlan(
         plot=PlanPlot(
             width_m=plot_maxx - plot_minx,
             depth_m=plot_maxy - plot_miny,
             facing=facing,
-            boundary=[Vertex(x=_round(px), y=_round(py)) for px, py in boundary_ring],
+            boundary=boundary,
         ),
         rooms=rooms,
         walls=walls,
         doors=doors,
     )
+    from app.services.quality.hard_constraints import validate
+
+    violations = validate(plan, spec)
+    if violations:
+        raise DoesNotFitError("; ".join(violation.message for violation in violations))
+    return plan
+
+
+def _polygon_program_orders(program: EngineProgram, limit: int = 64):
+    """Try the original room order, then bounded single swaps.
+
+    Polygon cuts are sensitive to order, just like rectangular subdivision.
+    A full permutation search grows factorially, so keep this rescue pass
+    bounded while still covering small programs exhaustively by one swap.
+    """
+    yield program
+    tried = 1
+    for i in range(len(program.needs)):
+        for j in range(i + 1, len(program.needs)):
+            if tried >= limit:
+                return
+            needs = list(program.needs)
+            needs[i], needs[j] = needs[j], needs[i]
+            yield dataclasses.replace(program, needs=needs)
+            tried += 1
+
+
+# ── Building footprint ───────────────────────────────────────────────────────
+# A house does not fill its plot: it sits inside setbacks with open ground
+# around it. Filling the whole plot stretched every room to match it (a 60 m²
+# program on the 30 x 40 m default plot got 20x-sized rooms). The building is
+# sized to its program with comfort to spare and placed with a deeper yard on
+# the street side; if the program does not fit, the footprint grows back
+# toward the full plot, so nothing that fitted before stops fitting.
+_FOOTPRINT_COMFORT = 1.3   # program's preferred areas -> built area
+_FILL_WHOLE_PLOT_BELOW = 1.15  # plot within 15% of that: just use the plot
+_STREET_YARD_SHARE = 0.6   # of the spare depth, the part in front of the house
+_FOOTPRINT_STEP = 1.12     # growth per retry when the program doesn't fit
+
+
+def _footprint_candidates(program_area: float, plot_w: float, plot_d: float) -> list[tuple[float, float]]:
+    target = program_area * _FOOTPRINT_COMFORT
+    if plot_w * plot_d <= target * _FILL_WHOLE_PLOT_BELOW:
+        return [(plot_w, plot_d)]
+    # Smallest first, then ~12% steps up to the whole plot: the first size
+    # the program fits wins, so rooms stay as close to their own size as
+    # the layout allows.
+    scales, t = [], math.sqrt(target / (plot_w * plot_d))
+    while t < 1:
+        scales.append(t)
+        t *= _FOOTPRINT_STEP
+    return [(_round(plot_w * t), _round(plot_d * t)) for t in scales] + [(plot_w, plot_d)]
+
+
+def _footprint_origin(fw: float, fd: float, plot_w: float, plot_d: float, facing: Facing) -> tuple[float, float]:
+    spare_x, spare_y = plot_w - fw, plot_d - fd
+    street, back = _STREET_YARD_SHARE, 1 - _STREET_YARD_SHARE
+    if facing == Facing.east:
+        return _round(spare_x * back), _round(spare_y / 2)
+    if facing == Facing.west:
+        return _round(spare_x * street), _round(spare_y / 2)
+    if facing == Facing.south:
+        return _round(spare_x / 2), _round(spare_y * back)
+    return _round(spare_x / 2), _round(spare_y * street)
+
+
+def _placed_on_plot(plan: LayoutPlan, dx: float, dy: float, plot_w: float, plot_d: float) -> LayoutPlan:
+    """Move a plan generated on its footprint to its place on the plot."""
+    if dx == 0 and dy == 0 and (plan.plot.width_m, plan.plot.depth_m) == (plot_w, plot_d):
+        return plan
+    return plan.model_copy(update={
+        "plot": plan.plot.model_copy(update={"width_m": plot_w, "depth_m": plot_d}),
+        "footprint": PlanZoneSpan(
+            x=_round(dx), y=_round(dy), w=plan.plot.width_m, h=plan.plot.depth_m
+        ),
+        "rooms": [
+            r.model_copy(update={"x": _round(r.x + dx), "y": _round(r.y + dy)})
+            for r in plan.rooms
+        ],
+        "walls": [
+            w.model_copy(update={
+                "x1": _round(w.x1 + dx), "y1": _round(w.y1 + dy),
+                "x2": _round(w.x2 + dx), "y2": _round(w.y2 + dy),
+            })
+            for w in plan.walls
+        ],
+        "archetype_reasons": None if plan.archetype_reasons is None else [
+            reason.model_copy(update={"spans": [
+                s.model_copy(update={"x": _round(s.x + dx), "y": _round(s.y + dy)})
+                for s in reason.spans
+            ]})
+            for reason in plan.archetype_reasons
+        ],
+    })
+
+
+def plan_on_plot(
+    spec: RequirementsSpec, program: EngineProgram, plot_w: float, plot_d: float, facing: Facing,
+) -> LayoutPlan:
+    """``plan_from_program`` on a building footprint sized to the program,
+    placed on the plot (see the footprint notes above)."""
+    area = sum(need.preferred_area for need in program.needs)
+    last_error: DoesNotFitError | None = None
+    for fw, fd in _footprint_candidates(area, plot_w, plot_d):
+        try:
+            plan = plan_from_program(spec, program, fw, fd, facing)
+        except DoesNotFitError as exc:
+            last_error = exc
+            continue
+        dx, dy = _footprint_origin(fw, fd, plot_w, plot_d, facing)
+        return _placed_on_plot(plan, dx, dy, plot_w, plot_d)
+    assert last_error is not None
+    raise last_error
 
 
 def generate_plan(spec: RequirementsSpec) -> LayoutPlan:
     if spec.floors > 1:
         return _generate_plan_multifloor(spec)
     if spec.plot.boundary is not None:
-        return _generate_plan_polygon(spec)
+        program = _build_program(spec)
+        first_error: DoesNotFitError | None = None
+        for candidate_program in _polygon_program_orders(program):
+            try:
+                return _generate_plan_polygon(spec, candidate_program)
+            except DoesNotFitError as exc:
+                if first_error is None:
+                    first_error = exc
+        garage_program = _require_home_garage_entry(program, spec)
+        garage_labels = {
+            need.label.casefold() for need in program.needs
+            if (catalog.resolve_alias(need.type) or need.type) == "garage"
+        }
+        if garage_program is not program and any(
+            label in str(first_error).casefold() for label in garage_labels
+        ):
+            for candidate_program in _polygon_program_orders(garage_program):
+                try:
+                    return _generate_plan_polygon(spec, candidate_program)
+                except DoesNotFitError:
+                    continue
+        assert first_error is not None
+        raise first_error
 
     plot_w = spec.plot.width_m or DEFAULT_PLOT_WIDTH_M
     plot_d = spec.plot.depth_m or DEFAULT_PLOT_DEPTH_M
     facing = spec.facing or DEFAULT_FACING
     program = _build_program(spec)
-    return plan_from_program(spec, program, plot_w, plot_d, facing)
+    try:
+        return plan_on_plot(spec, program, plot_w, plot_d, facing)
+    except DoesNotFitError as first_error:
+        garage_labels = {
+            need.label.casefold() for need in program.needs
+            if (catalog.resolve_alias(need.type) or need.type) == "garage"
+        }
+        if not garage_labels or not any(label in str(first_error).casefold() for label in garage_labels):
+            raise
+        # The garage access rule can invalidate the default ordering even when
+        # another room ordering fits. Reuse the existing bounded candidate
+        # search as the fallback.
+        from app.services.layout_engine.search import generate_candidates
+
+        try:
+            candidates = generate_candidates(spec)
+        except DoesNotFitError:
+            raise first_error
+        if candidates:
+            return candidates[0].plan
+        raise first_error

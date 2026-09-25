@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
-import { WebsiteNavbar } from '../../components/website/WebsiteNavbar'
+import { WebsiteNavbar, useStartDesigningTarget } from '../../components/website/WebsiteNavbar'
 import { WebsiteFooter } from '../../components/website/WebsiteFooter'
 import { PricingCard } from '../../components/website/PricingCard'
-import { DemoModal } from '../../components/website/DemoModal'
 import {
   PLANS,
   type BillingCycle,
@@ -21,34 +20,30 @@ const COMPARISON_ROWS: ComparisonRow[] = [
   { label: 'Projects', values: ['3', 'Unlimited', 'Unlimited', 'Unlimited'] },
   { label: '2D plan editor', values: ['✓', '✓', '✓', '✓'] },
   { label: '3D editing', values: ['Basic view', 'Advanced', 'Advanced', 'Advanced'] },
-  { label: 'Zoning & room graph views', values: ['—', '✓', '✓', '✓'] },
+  { label: 'Zoning & access graph views', values: ['—', '✓', '✓', '✓'] },
   { label: 'Version history', values: ['—', '✓', '✓', '✓'] },
   { label: 'Team workspaces & roles', values: ['—', '—', '✓', '✓'] },
   { label: 'Activity & audit logs', values: ['—', '—', '✓', '✓'] },
   { label: 'Exports', values: ['PNG', 'PNG + PDF', 'PNG + PDF', 'PNG + PDF'] },
-  { label: 'SSO & security review', values: ['—', '—', '—', '✓'] },
   { label: 'Support', values: ['Community', 'Priority', 'Priority', 'Dedicated'] },
 ]
 
 export default function PricingPage() {
   const navigate = useNavigate()
+  const startTarget = useStartDesigningTarget()
   useHashScroll()
   const [searchParams] = useSearchParams()
   const [cycle, setCycle] = useState<BillingCycle>('monthly')
-  const [demoOpen, setDemoOpen] = useState(false)
   const preselected = searchParams.get('plan')
 
+  // Only plans you can actually start on are clickable (see PricingCard).
   const handleSelect = (plan: PlanDefinition) => {
-    if (plan.priceMonthly === null) {
-      setDemoOpen(true)
-      return
-    }
-    navigate(`/checkout?plan=${plan.id}&cycle=${cycle}`)
+    if (plan.available) navigate(startTarget)
   }
 
   return (
-    <div className="min-h-screen bg-surface text-ink">
-      <WebsiteNavbar onBookDemo={() => setDemoOpen(true)} />
+    <div className="min-h-screen bg-night text-ink">
+      <WebsiteNavbar />
 
       <main className="mx-auto w-full max-w-6xl px-4 pb-20 pt-12 sm:px-6">
         <div className="text-center">
@@ -56,7 +51,7 @@ export default function PricingPage() {
             Plans &amp; Pricing
           </h1>
           <p className="mt-3 text-sm text-muted sm:text-base">
-            Choose the perfect plan for your design workflow.
+            Start free on Starter. Paid plans are listed so you can see what’s coming; they aren’t on sale yet.
           </p>
 
           {/* Billing cycle toggle */}
@@ -104,10 +99,6 @@ export default function PricingPage() {
           ))}
         </div>
 
-        <p className="mt-6 rounded-lg border border-warn/30 bg-warn/10 px-4 py-2.5 text-center text-xs text-warn">
-          This is a demo checkout flow. Payment gateway integration is pending —
-          selecting a plan will not charge anything.
-        </p>
 
         {/* Comparison table */}
         <section className="mt-14">
@@ -157,7 +148,6 @@ export default function PricingPage() {
       </main>
 
       <WebsiteFooter />
-      <DemoModal open={demoOpen} variant="book" onClose={() => setDemoOpen(false)} />
     </div>
   )
 }

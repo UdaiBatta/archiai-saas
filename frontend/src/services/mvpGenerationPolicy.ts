@@ -4,22 +4,12 @@ import type {
   RequirementsSpec,
 } from '../types/contracts'
 
-export type GenerationEngine = 'mvp' | 'established'
-
 export interface GenerationOverrides {
   plotWidthM?: string
   floors?: string
   orientation?: '' | 'N' | 'S' | 'E' | 'W'
 }
 
-const MVP_BUILDING_TYPES = new Set([
-  'house',
-  'apartment',
-  'villa',
-  'duplex',
-  'clinic',
-  'office',
-])
 const FACING_BY_ORIENTATION: Record<'N' | 'S' | 'E' | 'W', Facing> = {
   N: 'north',
   S: 'south',
@@ -63,14 +53,6 @@ export function applyGenerationOverrides(
     avoid_adjacency: requirements.avoid_adjacency.map((edge) => ({ ...edge })),
     missing_info: [...requirements.missing_info],
   }
-}
-
-export function generationEngineFor(
-  requirements: RequirementsSpec,
-): GenerationEngine {
-  return requirements.spaces?.length || MVP_BUILDING_TYPES.has(requirements.building_type)
-    ? 'mvp'
-    : 'established'
 }
 
 export function reviewWithOverrides(

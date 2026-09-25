@@ -5,6 +5,7 @@ from app.models.design import Design
 from app.models.design_version import DesignVersion
 from app.models.project import Project
 from app.tests.conftest import TestSessionLocal
+from app.tests.conftest import generate_design
 
 
 async def _register_and_token(client: AsyncClient, email: str) -> str:
@@ -248,11 +249,7 @@ async def test_project_versions_api_returns_versions_newest_first(client: AsyncC
         headers={"Authorization": f"Bearer {token}"},
     )
     project_id = project.json()["id"]
-    generated = await client.post(
-        "/api/design/generate",
-        json={"projectId": project_id, "prompt": "2 bedroom apartment with kitchen"},
-        headers={"Authorization": f"Bearer {token}"},
-    )
+    generated = await generate_design(client, {"Authorization": f"Bearer {token}"}, project_id)
     layout = generated.json()
     layout["rooms"][0]["label"] = "Saved Label"
     await client.put(
@@ -304,11 +301,7 @@ async def test_duplicate_project_copies_latest_design_layout_and_thumbnail(clien
         headers={"Authorization": f"Bearer {token}"},
     )
     project_id = project.json()["id"]
-    generated = await client.post(
-        "/api/design/generate",
-        json={"projectId": project_id, "prompt": "2 bedroom apartment with kitchen"},
-        headers={"Authorization": f"Bearer {token}"},
-    )
+    generated = await generate_design(client, {"Authorization": f"Bearer {token}"}, project_id)
     layout = generated.json()
     layout["rooms"][0]["label"] = "Copied Room"
     await client.put(
@@ -365,11 +358,7 @@ async def test_delete_project_with_designs_succeeds(client: AsyncClient):
         headers={"Authorization": f"Bearer {token}"},
     )
     project_id = project.json()["id"]
-    await client.post(
-        "/api/design/generate",
-        json={"projectId": project_id, "prompt": "2 bedroom apartment with kitchen"},
-        headers={"Authorization": f"Bearer {token}"},
-    )
+    await generate_design(client, {"Authorization": f"Bearer {token}"}, project_id)
 
     response = await client.delete(
         f"/api/projects/{project_id}",
@@ -396,11 +385,7 @@ async def test_project_activity_returns_scoped_entries_newest_first(client: Asyn
     )
     project_id = project.json()["id"]
 
-    generated = await client.post(
-        "/api/design/generate",
-        json={"projectId": project_id, "prompt": "2 bedroom apartment with kitchen"},
-        headers={"Authorization": f"Bearer {token}"},
-    )
+    generated = await generate_design(client, {"Authorization": f"Bearer {token}"}, project_id)
     design = generated.json()
     await client.put(
         f"/api/design/{design['designId']}",
@@ -449,11 +434,7 @@ async def test_project_activity_isolates_between_projects(client: AsyncClient):
         json={"title": "B", "description": None},
         headers={"Authorization": f"Bearer {token}"},
     )
-    await client.post(
-        "/api/design/generate",
-        json={"projectId": project_a.json()["id"], "prompt": "2 bedroom apartment with kitchen"},
-        headers={"Authorization": f"Bearer {token}"},
-    )
+    await generate_design(client, {"Authorization": f"Bearer {token}"}, project_a.json()["id"])
 
     activity_a = await client.get(
         f"/api/projects/{project_a.json()['id']}/activity",

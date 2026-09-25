@@ -15,7 +15,6 @@ import { DimensionAnnotations } from './DimensionAnnotations'
 import { ResizeHandles } from './ResizeHandles'
 import { roomVisualTreatment } from './roomVisualTreatment'
 import { displayRoomColor } from './editorPalette'
-import { formatArea } from '../../utils/format'
 import { wallModelPieces } from './modelGeometry'
 
 interface OrbitHandle {
@@ -67,9 +66,13 @@ export function RoomMesh({
   const setInteractionMode = useCanvasStore((s) => s.setInteractionMode)
   const setPointerIntent = useCanvasStore((s) => s.setPointerIntent)
   const objects = useCanvasStore((s) => s.rooms)
-  const wallPieces = useMemo(() => modelStage && room.objectType === 'wall'
+  // Both 3D views draw the real building: engine walls with door openings
+  // cut out and rooms as floor slabs, so an open-plan edge (no wall) reads
+  // as one continuous space instead of two outlined boxes.
+  const solid3d = modelStage || viewMode === '3d'
+  const wallPieces = useMemo(() => solid3d && room.objectType === 'wall'
     ? wallModelPieces(room, objects.filter((object) => object.objectType === 'door' || object.objectType === 'window'))
-    : null, [modelStage, room, objects])
+    : null, [solid3d, room, objects])
 
   const isSelected = selectedId === room.id
   const definition = COMPONENT_REGISTRY[room.objectType]
@@ -80,7 +83,7 @@ export function RoomMesh({
   const isDimensionable = definition.canResize
   const isPlanView = viewMode !== '3d'
   const isSpace = definition.category === 'space'
-  const modelSurface = modelStage && (isSpace || (room.objectType === 'door' && typeof room.hostWallId === 'string'))
+  const modelSurface = solid3d && (isSpace || (room.objectType === 'door' && typeof room.hostWallId === 'string'))
   const renderHeight = modelSurface ? 0.045 : room.size.h
   const renderY = modelSurface ? room.position.y - room.size.h / 2 + renderHeight / 2 : room.position.y
   const modelFurniture = modelStage && room.objectType === 'furniture'
@@ -253,26 +256,26 @@ export function RoomMesh({
       <boxGeometry args={[room.size.w, renderHeight, room.size.d]} />
       <meshStandardMaterial
         visible={!wallPieces && !modelFurniture}
-        color={modelStage && isSpace ? (isSelected ? '#d8d1ed' : '#eeeae1') : displayRoomColor(room)}
+        color={modelStage && isSpace ? (isSelected ? '#F3D5CB' : '#eeeae1') : displayRoomColor(room)}
         emissive={visual.emissive}
         emissiveIntensity={visual.emissiveIntensity}
-        transparent={!modelStage && visual.opacity < 1}
-        opacity={modelStage ? 1 : visual.opacity}
-        depthWrite={modelStage || visual.depthWrite}
+        transparent={!solid3d && visual.opacity < 1}
+        opacity={solid3d ? 1 : visual.opacity}
+        depthWrite={solid3d || visual.depthWrite}
         roughness={visual.roughness}
         metalness={visual.metalness}
       />
       {wallPieces?.map((piece, index) => (
         <mesh key={index} position={piece.position} castShadow receiveShadow>
           <boxGeometry args={piece.size} />
-          <meshStandardMaterial color={isSelected ? '#cbbce8' : '#e2e1d7'} roughness={0.9} />
+          <meshStandardMaterial color={isSelected ? '#F0C4B6' : '#e2e1d7'} roughness={0.9} />
         </mesh>
       ))}
       {modelFurniture && (
         <>
           <mesh position={[0, room.size.h / 2 - 0.06, 0]} castShadow receiveShadow>
             <boxGeometry args={[room.size.w, Math.min(0.12, room.size.h), room.size.d]} />
-            <meshStandardMaterial color={isSelected ? '#ab94e0' : '#a894be'} roughness={0.8} />
+            <meshStandardMaterial color={isSelected ? '#C08A6C' : '#8C6A55'} roughness={0.8} />
           </mesh>
           {[-1, 1].flatMap((x) => [-1, 1].map((z) => (
             <mesh key={`${x}:${z}`} position={[x * room.size.w * 0.38, -0.06, z * room.size.d * 0.38]} castShadow>
@@ -282,42 +285,7 @@ export function RoomMesh({
           )))}
         </>
       )}
-      {isSpace && !isPlanView && !modelStage && (
-        <>
-          <mesh
-            position={[0, -room.size.h / 2 + 0.035, 0]}
-            raycast={() => null}
-            receiveShadow
-          >
-            <boxGeometry args={[room.size.w + 0.06, 0.07, room.size.d + 0.06]} />
-            <meshStandardMaterial
-              color={displayRoomColor(room)}
-              roughness={0.62}
-              metalness={0.03}
-            />
-          </mesh>
-          <mesh
-            position={[0, room.size.h / 2 + 0.018, 0]}
-            raycast={() => null}
-          >
-            <boxGeometry
-              args={[
-                Math.max(0.05, room.size.w - 0.1),
-                0.035,
-                Math.max(0.05, room.size.d - 0.1),
-              ]}
-            />
-            <meshStandardMaterial
-              color="#ffffff"
-              transparent
-              opacity={isSelected ? 0.25 : 0.14}
-              depthWrite={false}
-              roughness={0.45}
-            />
-          </mesh>
-        </>
-      )}
-      {!modelStage && (isSelected || definition.category === 'space' || room.objectType === 'stair') && (
+      {!solid3d && (isSelected || definition.category === 'space' || room.objectType === 'stair') && (
         <lineSegments>
           <edgesGeometry args={[new THREE.BoxGeometry(room.size.w, room.size.h, room.size.d)]} />
           <lineBasicMaterial
@@ -359,8 +327,10 @@ export function RoomMesh({
       zIndexRange={[1, 0]}
       style={{ pointerEvents: 'none' }}
     >
+      {/* One line per room keeps neighbouring small rooms' labels from
+          stacking on each other; the area lives in the selection toolbar. */}
       <div
-        className={`min-w-max rounded-lg border bg-graphite-800/90 px-2.5 py-1.5 shadow-md backdrop-blur ${
+        className={`min-w-max whitespace-nowrap rounded-md border bg-graphite-800/90 px-2 py-0.5 shadow-md backdrop-blur ${
           invalid
             ? 'border-danger/70 text-danger ring-2 ring-danger/20'
             : isSelected
@@ -376,11 +346,6 @@ export function RoomMesh({
           />
           {room.label}
         </div>
-        {isSpace && !isSelected && (
-          <div className="mt-0.5 pl-3 text-[9px] font-medium text-muted-light">
-            {formatArea(room.size.w * room.size.d)}
-          </div>
-        )}
       </div>
     </Html>
   ) : null

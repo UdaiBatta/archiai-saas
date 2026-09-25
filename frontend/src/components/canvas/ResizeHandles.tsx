@@ -16,6 +16,7 @@ import {
   resizeRoomFromWorldCorner,
   type CornerResizeHandle,
 } from './resizeHandleGeometry'
+import { EDITOR_PALETTE } from './editorPalette'
 
 interface OrbitHandle {
   enabled: boolean
@@ -202,8 +203,8 @@ export function ResizeHandles({
           >
             <boxGeometry args={[handleSize, handleHeight, handleSize]} />
             <meshStandardMaterial
-              color="#8069df"
-              emissive="#8069df"
+              color={EDITOR_PALETTE.selection}
+              emissive={EDITOR_PALETTE.selection}
               emissiveIntensity={is3d ? 0.55 : 0.25}
               depthTest={false}
             />

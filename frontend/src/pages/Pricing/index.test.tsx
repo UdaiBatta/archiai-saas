@@ -15,22 +15,23 @@ function renderPricing() {
     <MemoryRouter initialEntries={['/pricing']}>
       <Routes>
         <Route path="/pricing" element={<PricingPage />} />
-        <Route path="/checkout" element={<LocationProbe />} />
+        <Route path="/register" element={<LocationProbe />} />
       </Routes>
     </MemoryRouter>,
   )
 }
 
 describe('Pricing page', () => {
-  it('renders all four plans with the demo-payment note and no editor chrome', () => {
+  it('renders all four plans, saying plainly which can be started today', () => {
     renderPricing()
 
     expect(screen.getByRole('heading', { name: 'Plans & Pricing' })).toBeInTheDocument()
     for (const plan of ['Starter', 'Pro', 'Team', 'Enterprise']) {
       expect(screen.getByRole('heading', { name: plan })).toBeInTheDocument()
     }
-    expect(screen.getByText(/demo checkout flow/i)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Select' })).not.toBeInTheDocument()
+    expect(screen.getByText(/aren’t on sale yet/)).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Coming soon' })).toHaveLength(3)
+    expect(screen.queryByText(/demo checkout/i)).not.toBeInTheDocument()
     expect(screen.queryByRole('tab', { name: '2D Plan' })).not.toBeInTheDocument()
   })
 
@@ -38,20 +39,22 @@ describe('Pricing page', () => {
     renderPricing()
     const user = userEvent.setup()
 
-    expect(screen.getByText('$29/mo')).toBeInTheDocument()
+    // The amount and its period are styled apart: "$29" + "/mo".
+    expect(screen.getByText('$29')).toBeInTheDocument()
+    expect(screen.getAllByText('/mo').length).toBeGreaterThan(0)
     await user.click(screen.getByRole('tab', { name: /annual/i }))
-    expect(screen.getByText('$290/yr')).toBeInTheDocument()
-    expect(screen.queryByText('$29/mo')).not.toBeInTheDocument()
+    expect(screen.getByText('$290')).toBeInTheDocument()
+    expect(screen.queryByText('$29')).not.toBeInTheDocument()
+    expect(screen.queryByText('/mo')).not.toBeInTheDocument()
   })
 
-  it('sends a purchasable plan to checkout with plan and cycle params', async () => {
+  it('starts the free plan by sending you to sign-up', async () => {
     renderPricing()
     const user = userEvent.setup()
 
-    await user.click(screen.getByRole('tab', { name: /annual/i }))
-    await user.click(screen.getByRole('button', { name: 'Start Pro trial' }))
+    await user.click(screen.getByRole('button', { name: 'Start free' }))
 
-    expect(screen.getByText('at:/checkout?plan=pro&cycle=annual')).toBeInTheDocument()
+    expect(screen.getByText('at:/register')).toBeInTheDocument()
   })
 
   it('renders the comparison table', () => {

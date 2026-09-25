@@ -1,4 +1,5 @@
 from httpx import AsyncClient
+from app.tests.conftest import generate_design
 
 
 async def _register_and_token(client: AsyncClient, email: str) -> str:
@@ -26,11 +27,7 @@ async def _create_project(
 
 
 async def _create_saved_design(client: AsyncClient, token: str, project_id: str) -> dict:
-    generated = await client.post(
-        "/api/design/generate",
-        json={"projectId": project_id, "prompt": "2 bedroom apartment with kitchen"},
-        headers={"Authorization": f"Bearer {token}"},
-    )
+    generated = await generate_design(client, {"Authorization": f"Bearer {token}"}, project_id)
     assert generated.status_code == 200
     layout = generated.json()
     layout["rooms"][0]["label"] = "Latest Saved Room"

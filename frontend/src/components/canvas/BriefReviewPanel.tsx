@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import type { ExtractResponse } from '../../types/contracts'
-import type { GenerationEngine } from '../../services/mvpGenerationPolicy'
 
 interface BriefReviewPanelProps {
   review: ExtractResponse
-  engine: GenerationEngine
   busy: boolean
   error?: string | null
   onGenerate: (useDefaults: boolean, extraNotes?: string) => void

@@ -1,63 +1,85 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
+import { beforeEach, describe, expect, it } from 'vitest'
 
+import { useAuthStore } from '../../store/authStore'
+import { EXAMPLE } from '../../constants/examplePlan'
 import Landing from './index'
+
+function Probe() {
+  const location = useLocation()
+  return <div>at:{location.pathname + location.hash}</div>
+}
 
 function renderLanding() {
   return render(
     <MemoryRouter initialEntries={['/']}>
       <Routes>
         <Route path="/" element={<Landing />} />
-        <Route path="/pricing" element={<div>Pricing page stub</div>} />
+        <Route path="*" element={<Probe />} />
       </Routes>
     </MemoryRouter>,
   )
 }
 
+// Every route the app defines (App.tsx); a link anywhere else leads nowhere.
+const REAL_ROUTES = ['/', '/pricing', '/login', '/register', '/projects']
+const REAL_SECTIONS = ['how-it-works', 'example', 'features']
+
+beforeEach(() => {
+  useAuthStore.setState({ isAuthenticated: false })
+})
+
 describe('Landing page', () => {
-  it('renders the approved hero without any editor chrome', () => {
+  it('leads with what the product does and one main action', () => {
     renderLanding()
-
     expect(
-      screen.getByRole('heading', { name: 'Design better spaces, faster.' }),
+      screen.getByRole('heading', { level: 1, name: 'Write the brief. Get the plan.' }),
     ).toBeInTheDocument()
-    expect(screen.getByText('AI-powered architectural design')).toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: 'Start Free Trial' }).length).toBeGreaterThan(0)
-
-    // Website navbar only — no editor tool rail / editor tabs on marketing pages.
-    expect(screen.queryByRole('button', { name: 'Select' })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('link', { name: 'Start designing — free' })[0]).toHaveAttribute('href', '/register')
+    // No editor chrome on marketing pages.
     expect(screen.queryByRole('tab', { name: '2D Plan' })).not.toBeInTheDocument()
   })
 
-  it('shows the feature cards and pricing preview', () => {
-    renderLanding()
-
-    for (const title of ['AI-Powered Design', 'Built-in Compliance', 'Team Collaboration', 'Cloud-Native']) {
-      expect(screen.getByRole('heading', { name: title })).toBeInTheDocument()
+  it('has no link or button that leads nowhere', () => {
+    const { container } = renderLanding()
+    for (const link of screen.getAllByRole('link')) {
+      const [path, hash] = (link.getAttribute('href') ?? '').split('#')
+      expect(REAL_ROUTES, `${link.textContent} -> ${link.getAttribute('href')}`).toContain(path || '/')
+      if (hash) {
+        expect(REAL_SECTIONS).toContain(hash)
+        expect(container.querySelector(`#${hash}`), `section #${hash}`).not.toBeNull()
+      }
     }
-    for (const plan of ['Starter', 'Pro', 'Team', 'Enterprise']) {
-      expect(screen.getByRole('heading', { name: plan })).toBeInTheDocument()
-    }
+    // The old placeholder demo flow is gone.
+    expect(screen.queryByText(/pending integration|Watch Demo|Book a Demo/i)).not.toBeInTheDocument()
   })
 
-  it('routes Start Free Trial to the pricing page', async () => {
+  it('shows the real example: brief, what was understood, and the generated plan', () => {
     renderLanding()
-    const user = userEvent.setup()
-
-    await user.click(screen.getAllByRole('button', { name: 'Start Free Trial' })[0])
-
-    expect(screen.getByText('Pricing page stub')).toBeInTheDocument()
+    const example = document.getElementById('example')!
+    expect(within(example).getByText(`“${EXAMPLE.brief}”`)).toBeInTheDocument()
+    expect(within(example).getByText('2 bathrooms')).toBeInTheDocument()
+    expect(within(example).getByText('Keep apart')).toBeInTheDocument()
+    expect(within(example).getByText('kitchen ↔ bathroom')).toBeInTheDocument()
+    expect(within(example).getByRole('img', { name: /Generated floor plan: .*Master Bedroom/ })).toBeInTheDocument()
   })
 
-  it('opens the Watch Demo placeholder modal', async () => {
+  it('sends a signed-in visitor to their dashboard instead of sign-up', () => {
+    useAuthStore.setState({ isAuthenticated: true })
+    renderLanding()
+    expect(screen.getAllByRole('link', { name: 'Start designing — free' })[0]).toHaveAttribute('href', '/projects')
+    expect(screen.getByRole('link', { name: 'Your projects' })).toHaveAttribute('href', '/projects')
+  })
+
+  it('starts Starter from the pricing preview and keeps unreleased plans disabled', async () => {
     renderLanding()
     const user = userEvent.setup()
-
-    await user.click(screen.getByRole('button', { name: /Watch Demo/ }))
-
-    expect(screen.getByRole('dialog', { name: 'Watch demo' })).toBeInTheDocument()
-    expect(screen.getByText(/Placeholder — this flow is pending integration/)).toBeInTheDocument()
+    for (const button of screen.getAllByRole('button', { name: 'Coming soon' })) {
+      expect(button).toBeDisabled()
+    }
+    await user.click(screen.getByRole('button', { name: 'Start free' }))
+    expect(screen.getByText('at:/register')).toBeInTheDocument()
   })
 })

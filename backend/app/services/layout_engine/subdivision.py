@@ -12,9 +12,9 @@ Adjacency is a SOFT preference expressed in list order (the caller chains
 same half and end up as edge-sharing siblings. No constraint solving in v0,
 exactly as the workplan prescribes.
 
-Facing bias: the first group of the ordered list is assigned the facing-side
-child rect, so entry-first ordering pulls the entry toward the plot's facing
-edge.
+Facing bias: the first group of the ordered list, or whichever group holds the
+entry, is assigned the facing-side child rect, so the entry reaches the plot's
+facing edge (and so an outside wall for the front door).
 """
 from dataclasses import dataclass
 
@@ -99,11 +99,22 @@ def subdivide(needs: list[RoomNeed], rect: Rect, facing: Facing) -> list[tuple[R
 
     i = split_index(needs)
     group_a, group_b = needs[:i], needs[i:]
+    entry_in_b = any(n.type == "entry" for n in group_b)
+    facing_axis = "x" if facing in (Facing.east, Facing.west) else "y"
 
     # Prefer cutting the longer side (keeps cells square-ish); fall back to the
     # other axis when the preferred one cannot honour minimum areas.
     axes = ("x", "y") if rect.w >= rect.d else ("y", "x")
+    if entry_in_b:
+        # A cut across the facing axis gives the street side to group A only,
+        # which would box the entry in. Cut parallel to the street first so
+        # both halves keep it (the entry becomes a passage from the street
+        # in, and its neighbour keeps its window).
+        axes = tuple(sorted(axes, key=lambda axis: axis == facing_axis))
     for axis in axes:
+        # Still across the facing axis: swap so the entry takes the street side.
+        swapped = axis == facing_axis and entry_in_b
+        group_a, group_b = (needs[i:], needs[:i]) if swapped else (needs[:i], needs[i:])
         span, other = (rect.w, rect.d) if axis == "x" else (rect.d, rect.w)
         t = clamped_cut(span, other, group_a, group_b)
         if t is None:
@@ -128,7 +139,10 @@ def subdivide(needs: list[RoomNeed], rect: Rect, facing: Facing) -> list[tuple[R
             rect_a, rect_b = high, low
         else:
             rect_a, rect_b = low, high
-        return subdivide(group_a, rect_a, facing) + subdivide(group_b, rect_b, facing)
+        parts_a = subdivide(group_a, rect_a, facing)
+        parts_b = subdivide(group_b, rect_b, facing)
+        # Keep the caller's room order in the output either way.
+        return parts_b + parts_a if swapped else parts_a + parts_b
 
     raise SubdivisionError(
         f"cannot cut {rect.w:.1f}x{rect.d:.1f}m for {len(group_a)}+{len(group_b)} rooms"

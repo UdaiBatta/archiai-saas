@@ -825,6 +825,136 @@ def _apply_prompt_semantics(payload: dict[str, Any], prompt: str, missing: list[
             avoid.append({"room_a": "bedroom", "room_b": "entry"})
 
 
+# ── Program reconciliation ──────────────────────────────────────────────────
+# The model reads the same brief differently from run to run (an attached
+# bathroom listed as bathroom AND ensuite, "dining area" as a second dining
+# room, rules pointing at rooms it never listed). This last pass settles the
+# program from what the brief states outright, so the result no longer
+# depends on how the model happened to phrase it.
+
+# Catalog keys that name the same physical room as another key.
+_SAME_ROOM = {"ensuite": "bathroom", "dining_area": "dining_room"}
+# Rooms the engine adds itself; rules may name them without them being listed.
+_ENGINE_ADDED = frozenset({"foyer", "corridor", "hallway"})
+_BATH_WORD = r"(?:bath(?:room)?s?|toilets?|washrooms?)"
+_EXPLICIT_BATHS_RE = re.compile(rf"\b(?P<count>{_COUNT_TOKEN})\s+(?:\w+\s+)?{_BATH_WORD}\b", re.IGNORECASE)
+_ATTACHED_RE = re.compile(rf"\b(?:attached|en[- ]?suite)(?:\s+{_BATH_WORD})?", re.IGNORECASE)
+_SHARED_RE = re.compile(
+    rf"\b(?:(?P<count>{_COUNT_TOKEN})\s+)?(?:common|shared)\s+{_BATH_WORD}"
+    rf"|\bsharing\s+(?:a\s+|one\s+|the\s+)?(?:common\s+)?{_BATH_WORD}",
+    re.IGNORECASE,
+)
+_EACH_ATTACHED_RE = re.compile(
+    r"\b(?:each|every|all)\s+(?:\w+\s+){0,2}bedrooms?\b[^.]*?\b(?:attached|en[- ]?suite)",
+    re.IGNORECASE,
+)
+
+
+def _merged_key(value: object) -> str:
+    key = resolve_alias(str(value)) or str(value)
+    return _SAME_ROOM.get(key, key)
+
+
+def _count_token(value: str | None) -> int:
+    return 1 if value is None else _parse_count_token(value)
+
+
+def _stated_bathroom_count(prompt: str, bedrooms: int) -> int | None:
+    """Total bathrooms the brief states outright, or None if it doesn't."""
+    explicit = [
+        _parse_count_token(m.group("count"))
+        for m in _EXPLICIT_BATHS_RE.finditer(prompt)
+        if not re.match(r"(?:attached|en[- ]?suite)", m.group(0).split(None, 1)[1], re.IGNORECASE)
+    ]
+    shared = sum(_count_token(m.group("count")) for m in _SHARED_RE.finditer(prompt))
+    if _EACH_ATTACHED_RE.search(prompt):
+        attached = bedrooms
+    else:
+        attached = len(_ATTACHED_RE.findall(prompt))
+    if explicit and not (shared or attached):
+        return sum(explicit)
+    if shared or attached:
+        return max(sum(explicit), shared + attached) if explicit else shared + attached
+    return None
+
+
+def _reconcile_program(payload: dict[str, Any], prompt: str) -> None:
+    spaces = payload.get("spaces")
+    rooms = payload.get("rooms")
+    if isinstance(spaces, list) and spaces:
+        entries, type_key = spaces, "space_type"
+    elif isinstance(rooms, list) and rooms:
+        entries, type_key = rooms, "type"
+    else:
+        return
+
+    # 1. One entry per physical room type; the same room named twice keeps
+    #    the larger count, never the sum.
+    merged: dict[str, dict[str, Any]] = {}
+    kept: list[object] = []
+    for entry in entries:
+        if not isinstance(entry, dict) or not isinstance(entry.get("count"), int):
+            kept.append(entry)
+            continue
+        key = _merged_key(entry.get(type_key))
+        if key in merged:
+            merged[key]["count"] = max(merged[key]["count"], entry["count"])
+            continue
+        if key != (resolve_alias(str(entry.get(type_key))) or entry.get(type_key)):
+            # e.g. "ensuite" becomes "bathroom" in the survivor's own vocabulary.
+            entry = {**entry, type_key: "bathroom" if key == "bathroom" else (
+                "dining" if type_key == "type" else key)}
+        merged[key] = entry
+        kept.append(entry)
+    entries[:] = kept
+
+    # 2. Bathrooms: the brief's own words win over the model's count.
+    bedrooms = sum(
+        e["count"] for e in entries
+        if isinstance(e, dict) and _merged_key(e.get(type_key)) in ("bedroom", "master_bedroom")
+        and isinstance(e.get("count"), int)
+    )
+    stated = _stated_bathroom_count(prompt, bedrooms)
+    if stated is not None and stated > 0:
+        bath = merged.get("bathroom")
+        if bath is None:
+            bath = {type_key: "bathroom", "count": stated}
+            entries.append(bath)
+            merged["bathroom"] = bath
+        bath["count"] = stated
+
+    program = {_merged_key(e.get(type_key)) for e in entries if isinstance(e, dict)}
+    adjacency = payload.get("adjacency") if isinstance(payload.get("adjacency"), list) else []
+    avoid = payload.get("avoid_adjacency") if isinstance(payload.get("avoid_adjacency"), list) else []
+
+    # 3. A bathroom shared by the bedrooms belongs near them.
+    if _SHARED_RE.search(prompt) and "bedroom" in program and "bathroom" in program:
+        adjacency.append({"room_a": "bedroom", "room_b": "bathroom", "strength": "should"})
+
+    # 4. Rules about rooms that aren't in the program are dropped, and each
+    #    pair is stated once (the stronger "must" wins over "should").
+    def clean(edges: list[object], strength: bool) -> list[object]:
+        best: dict[frozenset, dict[str, Any]] = {}
+        order: list[frozenset] = []
+        for edge in edges:
+            if not isinstance(edge, dict):
+                continue
+            a, b = _merged_key(edge.get("room_a")), _merged_key(edge.get("room_b"))
+            if a == b or not all(k in program or k in _ENGINE_ADDED for k in (a, b)):
+                continue
+            pair = frozenset((a, b))
+            fixed = {**edge, "room_a": a, "room_b": b}
+            if pair not in best:
+                order.append(pair)
+                best[pair] = fixed
+            elif strength and fixed.get("strength") == "must":
+                best[pair] = fixed
+        return [best[p] for p in order]
+
+    payload["adjacency"] = clean(adjacency, strength=True)
+    payload["avoid_adjacency"] = clean(avoid, strength=False)
+
+
 def normalize_extraction(
     raw: Mapping[str, Any], *, prompt: str = ""
 ) -> dict[str, Any]:
@@ -898,6 +1028,8 @@ def normalize_extraction(
 
     _promote_remaining_rooms(payload)
     payload["spaces"] = _normalize_spaces(payload.get("spaces", []), missing)
+    if prompt:
+        _reconcile_program(payload, prompt)
 
     rooms = payload.get("rooms")
     spaces = payload.get("spaces")

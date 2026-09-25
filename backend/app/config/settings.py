@@ -53,6 +53,12 @@ class Settings(BaseSettings):
     # mode: no auth header, strict /models discovery, GPU-serialized calls.
     # Never commit a real key.
     LLM_API_KEY: str = ""
+    # reasoning_effort sent with extraction calls. Empty = "none" for a local
+    # model and omitted for a hosted one (some hosted APIs reject the field).
+    # Set it for a hosted thinking model that accepts it: Gemini 3.x needs
+    # "none", or its hidden reasoning eats the output budget and the JSON is
+    # cut off mid-object.
+    LLM_REASONING_EFFORT: str = ""
 
     # Razorpay (Phase 3). All optional so dev/tests run without them; order
     # creation is disabled and the webhook rejects everything until set.

@@ -1,75 +1,97 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Room } from '../../store/canvasStore'
-import { buildRoomGraph, connectionsFor } from './roomGraphModel'
+import type { RoomEdge } from '../../types/contracts'
+import { buildRoomGraph, connectionsFor, effectiveEdges, zoneEntrances } from './roomGraphModel'
 
-function room(partial: Partial<Room>): Room {
+function room(id: string, roomType: string, x = 0, extra: Partial<Room> = {}): Room {
   return {
-    id: partial.id ?? 'r1',
-    label: partial.label ?? 'Room',
-    objectType: partial.objectType ?? 'room',
-    roomType: partial.roomType,
-    floorLevel: partial.floorLevel ?? 0,
-    position: partial.position ?? { x: 0, y: 1.5, z: 0 },
-    size: partial.size ?? { w: 4, h: 3, d: 4 },
-    rotation: { x: 0, y: 0, z: 0 },
-    color: '#5F6E88',
+    id, label: id, objectType: 'room', roomType, floorLevel: 0,
+    position: { x, y: 1.5, z: 0 }, size: { w: 4, h: 3, d: 4 },
+    rotation: { x: 0, y: 0, z: 0 }, color: '#000', ...extra,
   } as Room
 }
 
-describe('buildRoomGraph', () => {
-  it('links rooms sharing a wall with a direct connection', () => {
-    // Two 4x4 rooms side by side, touching at x = 2.
-    const rooms = [
-      room({ id: 'a', label: 'Living Room', roomType: 'living_room', position: { x: 0, y: 1.5, z: 0 } }),
-      room({ id: 'b', label: 'Kitchen', roomType: 'kitchen', position: { x: 4, y: 1.5, z: 0 } }),
-    ]
-    const { nodes, edges } = buildRoomGraph(rooms, 0)
+// entry | living | corridor | bed, with a bathroom behind the bedroom.
+const ROOMS = [
+  room('Entry', 'entry', 0),
+  room('Living', 'living_room', 4),
+  room('Corridor', 'corridor', 8),
+  room('Bed', 'bedroom', 12),
+  room('Bath', 'bathroom', 16),
+]
+const EDGES: RoomEdge[] = [
+  { rooms: ['Entry', 'Living'], kind: 'open' },
+  { rooms: ['Corridor', 'Living'], kind: 'open' },
+  { rooms: ['Bed', 'Corridor'], kind: 'door' },
+  { rooms: ['Bath', 'Bed'], kind: 'door' },
+]
 
-    expect(nodes).toHaveLength(2)
-    expect(edges).toEqual([{ source: 'a', target: 'b', kind: 'direct' }])
+describe('access graph', () => {
+  it('measures depth and the route from the entrance', () => {
+    const graph = buildRoomGraph(ROOMS, 0, EDGES)
+    expect(graph.entranceId).toBe('Entry')
+    expect(Object.fromEntries(graph.nodes.map((n) => [n.id, n.depth]))).toEqual({
+      Entry: 0, Living: 1, Corridor: 2, Bed: 3, Bath: 4,
+    })
+    expect(graph.routes.get('Bath')).toEqual(['Entry', 'Living', 'Corridor', 'Bed', 'Bath'])
   })
 
-  it('marks nearby but detached rooms as proximity connections', () => {
-    const rooms = [
-      room({ id: 'a', position: { x: 0, y: 1.5, z: 0 } }),
-      room({ id: 'b', position: { x: 5.5, y: 1.5, z: 0 } }), // 1.5 m gap
-    ]
-    const { edges } = buildRoomGraph(rooms, 0)
-    expect(edges).toEqual([{ source: 'a', target: 'b', kind: 'proximity' }])
+  it('calls a bathroom behind one bedroom an en-suite, not a problem', () => {
+    const graph = buildRoomGraph(ROOMS, 0, EDGES)
+    expect(graph.findings).toEqual([
+      { roomId: 'Bath', severity: 'info', message: 'Bath is reached through Bed (en-suite).' },
+    ])
   })
 
-  it('does not connect corner-touching rooms as direct', () => {
-    const rooms = [
-      room({ id: 'a', position: { x: 0, y: 1.5, z: 0 } }),
-      room({ id: 'b', position: { x: 4, y: 1.5, z: 4 } }), // corners meet at (2,2)
-    ]
-    const { edges } = buildRoomGraph(rooms, 0)
-    expect(edges.filter((edge) => edge.kind === 'direct')).toHaveLength(0)
+  it('flags a room with no way in, and a bedroom opened onto public space', () => {
+    const edges = effectiveEdges(EDGES, [
+      { room_a: 'Corridor', room_b: 'Bed', kind: 'wall' },
+    ])
+    const walled = buildRoomGraph(ROOMS, 0, edges)
+    expect(walled.nodes.find((n) => n.id === 'Bed')!.depth).toBeNull()
+    expect(walled.findings.map((f) => f.message)).toContain(
+      "Bed can't be reached from the entrance: it has no door or opening.",
+    )
+
+    const opened = buildRoomGraph(ROOMS, 0, effectiveEdges(EDGES, [
+      { room_a: 'Bed', room_b: 'Corridor', kind: 'open' },
+    ]))
+    expect(opened.findings.map((f) => f.message)).toContain('Bed is open to Corridor: no door for privacy.')
   })
 
-  it('only includes spaces on the requested floor', () => {
-    const rooms = [
-      room({ id: 'a', floorLevel: 0 }),
-      room({ id: 'b', floorLevel: 1, position: { x: 4, y: 1.5, z: 0 } }),
-      room({ id: 'w', objectType: 'wall', floorLevel: 0 }),
-    ]
-    const { nodes, edges } = buildRoomGraph(rooms, 0)
-    expect(nodes.map((node) => node.id)).toEqual(['a'])
-    expect(edges).toEqual([])
+  it('flags a bedroom reachable only through another bedroom', () => {
+    const rooms = [...ROOMS, room('Bed 2', 'bedroom', 12, { position: { x: 12, y: 1.5, z: 4 } })]
+    const graph = buildRoomGraph(rooms, 0, [...EDGES, { rooms: ['Bed', 'Bed 2'], kind: 'door' }])
+    expect(graph.findings).toContainEqual({
+      roomId: 'Bed 2', severity: 'warn', message: 'Bed 2 can only be reached by walking through Bed.',
+    })
   })
-})
 
-describe('connectionsFor', () => {
+  it('takes the entrance from the front door when there is one', () => {
+    const objects = [
+      ...ROOMS,
+      { ...room('w', 'wall', 18), objectType: 'wall' } as Room,
+      { ...room('d', 'door', 18), objectType: 'door', hostWallId: 'w' } as Room,
+    ]
+    expect(buildRoomGraph(objects, 0, EDGES).entranceId).toBe('Bath')
+  })
+
+  it('ignores user choices for rooms that do not share a wall', () => {
+    expect(effectiveEdges(EDGES, [{ room_a: 'Entry', room_b: 'Bath', kind: 'door' }])).toEqual(EDGES)
+  })
+
+  it('reports how each zone is entered', () => {
+    const entries = zoneEntrances(buildRoomGraph(ROOMS, 0, EDGES))
+    expect([...entries.get('private')!.from]).toEqual(['Corridor'])
+    expect(entries.get('private')!.doors).toBe(1)
+  })
+
   it('lists a node connections with the other endpoint', () => {
-    const edges = [
-      { source: 'a', target: 'b', kind: 'direct' as const },
-      { source: 'c', target: 'a', kind: 'proximity' as const },
-      { source: 'b', target: 'c', kind: 'direct' as const },
-    ]
-    expect(connectionsFor(edges, 'a')).toEqual([
-      { otherId: 'b', kind: 'direct' },
-      { otherId: 'c', kind: 'proximity' },
+    const graph = buildRoomGraph(ROOMS, 0, EDGES)
+    expect(connectionsFor(graph.edges, 'Bed')).toEqual([
+      { otherId: 'Corridor', kind: 'door' },
+      { otherId: 'Bath', kind: 'door' },
     ])
   })
 })

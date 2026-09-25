@@ -48,10 +48,10 @@ def _room(
     [
         ("1bhk", 100),
         ("2bhk", 100),
-        ("3bhk_adjacencies", 72),
+        ("3bhk_adjacencies", 90),  # was 72: stacked wet core + footprint
         # Stronger sanitary circulation changed this layout: all three baths
         # now open to the corridor instead of one relying on a bedroom route.
-        ("4bhk", 87),
+        ("4bhk", 92),  # was 87: stacked wet core
     ],
 )
 def test_residential_scores_are_unchanged_from_the_pre_pack_baseline(

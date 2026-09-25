@@ -3,7 +3,8 @@ import { useCanvasStore } from '../../store/canvasStore'
 import { COMPONENT_REGISTRY } from '../../store/componentRegistry'
 import { InspectorProperties } from './Inspector'
 import { ZONE_META, displayRoomColor } from './editorPalette'
-import { buildRoomGraph, connectionsFor } from './roomGraphModel'
+import { connectionsFor } from './roomGraphModel'
+import { useAccessGraph } from './useAccessGraph'
 import { isZonableObject, summarizeZones, zoneForRoom } from './zoneModel'
 import { formatArea, formatDims, roomArea } from '../../utils/format'
 import { cardinalName, parseOrientation } from './orientationModel'
@@ -134,10 +135,7 @@ export function RightPanel({ onCreateModel, open = true, onClose }: { onCreateMo
   const floorRooms = rooms.filter((r) => (r.floorLevel ?? 0) === activeLevel)
   const activeFloor = floors.find((f) => f.level === activeLevel)
 
-  const graph = useMemo(
-    () => buildRoomGraph(rooms, room?.floorLevel ?? activeLevel),
-    [rooms, room?.floorLevel, activeLevel],
-  )
+  const graph = useAccessGraph(room?.floorLevel ?? activeLevel)
   const connections = room ? connectionsFor(graph.edges, room.id) : []
   const labelOf = (id: string) => rooms.find((r) => r.id === id)?.label ?? id
 
@@ -199,7 +197,7 @@ export function RightPanel({ onCreateModel, open = true, onClose }: { onCreateMo
           >
             <span className="truncate text-ink">{labelOf(connection.otherId)}</span>
             <span className="shrink-0 text-[10px] text-muted-light">
-              {connection.kind === 'direct' ? 'Direct' : 'Proximity'}
+              {connection.kind === 'door' ? 'Door' : connection.kind === 'open' ? 'Open' : 'Wall'}
             </span>
           </button>
         </li>
@@ -268,13 +266,16 @@ export function RightPanel({ onCreateModel, open = true, onClose }: { onCreateMo
     }
     const directNeighbourTypes = new Set(
       connections
-        .filter((connection) => connection.kind === 'direct')
         .map((connection) => {
           const other = rooms.find((candidate) => candidate.id === connection.otherId)
           return typeof other?.roomType === 'string' ? other.roomType : ''
         }),
     )
-    for (const pair of programConstraints.avoidPairs ?? []) {
+    // Adjacency comes from the synced plan edges; without them "not
+    // adjacent" would be a guess, so these checks are left out.
+    const avoidPairs = graph.hasConnectionData ? programConstraints.avoidPairs ?? [] : []
+    const separations = graph.hasConnectionData ? programConstraints.separations ?? [] : []
+    for (const pair of avoidPairs) {
       if (!pair.includes(roomType)) continue
       const other = pair[0] === roomType ? pair[1] : pair[0]
       roomChecks.push({
@@ -282,7 +283,7 @@ export function RightPanel({ onCreateModel, open = true, onClose }: { onCreateMo
         ok: !directNeighbourTypes.has(other),
       })
     }
-    for (const pair of programConstraints.separations ?? []) {
+    for (const pair of separations) {
       if (!pair.includes(roomType)) continue
       const other = pair[0] === roomType ? pair[1] : pair[0]
       roomChecks.push({
@@ -391,14 +392,15 @@ export function RightPanel({ onCreateModel, open = true, onClose }: { onCreateMo
             <div className="mt-2 flex flex-col gap-1 text-[11px] text-muted">
               <span>{graph.nodes.length} rooms on this floor</span>
               <span>
-                {graph.edges.filter((edge) => edge.kind === 'direct').length} direct connections
+                {graph.edges.filter((edge) => edge.kind === 'door').length} doors ·{' '}
+                {graph.edges.filter((edge) => edge.kind === 'open').length} open connections
               </span>
               <span>
-                {graph.edges.filter((edge) => edge.kind === 'proximity').length} proximity links
+                {graph.findings.filter((finding) => finding.severity === 'warn').length} access warnings
               </span>
               <span className="mt-1 text-[10px] leading-snug text-muted-light">
-                Connections are derived from the current plan geometry. Select a
-                room node to inspect its relationships.
+                Lines follow the plan's doors and openings. Click one in the
+                graph to switch it between wall, door and open.
               </span>
             </div>
           </div>
@@ -565,7 +567,7 @@ export function RightPanel({ onCreateModel, open = true, onClose }: { onCreateMo
             <div>
               <SectionTitle>Adjacent spaces</SectionTitle>
               <p className="mt-1 text-[11px] text-muted-light">
-                Derived from shared walls and proximity on {activeFloor?.name ?? 'this floor'}.
+                Rooms sharing a wall on {activeFloor?.name ?? 'this floor'}, and how you get between them.
               </p>
             </div>
             {connections.length === 0 ? (
@@ -677,7 +679,7 @@ export function RightPanel({ onCreateModel, open = true, onClose }: { onCreateMo
             type="button"
             data-testid="create-3d-model"
             onClick={onCreateModel}
-            className="w-full rounded-lg bg-accent px-3 py-2 text-sm font-bold text-white shadow-[0_4px_16px_-4px_rgba(118,99,215,0.45)] hover:bg-accent-bright"
+            className="w-full rounded-lg bg-accent px-3 py-2 text-sm font-bold text-graphite-950 shadow-[0_4px_16px_-4px_rgba(255,59,31,0.45)] hover:bg-accent-bright"
           >
             Create a 3D model →
           </button>

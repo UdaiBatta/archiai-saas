@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import type { Room } from '../../store/canvasStore'
-import { LayoutThumbnail } from './LayoutThumbnail'
+import { LayoutThumbnail, layoutThumbnailDataUrl } from './LayoutThumbnail'
 
 function room(partial: Partial<Room>): Room {
   return {
@@ -38,5 +38,22 @@ describe('LayoutThumbnail', () => {
   it('renders just the sheet for an empty layout', () => {
     const { container } = render(<LayoutThumbnail rooms={[]} />)
     expect(container.querySelectorAll('rect')).toHaveLength(1)
+  })
+
+  it('makes a standalone SVG preview from the plan data, whatever view is on screen', () => {
+    const url = layoutThumbnailDataUrl([
+      room({ id: 'a' }),
+      room({ id: 'b', position: { x: 5, y: 1.5, z: 0 } }),
+      room({ id: 'wall', objectType: 'wall' }),
+    ])
+    expect(url).toMatch(/^data:image\/svg\+xml;charset=utf-8,/)
+    const svg = decodeURIComponent(url!.split(',')[1])
+    expect(svg).toContain('xmlns="http://www.w3.org/2000/svg"')
+    // background sheet + 2 spaces (the wall is not drawn)
+    expect(svg.match(/<rect /g)).toHaveLength(3)
+  })
+
+  it('has no preview for a plan with no rooms', () => {
+    expect(layoutThumbnailDataUrl([])).toBeNull()
   })
 })

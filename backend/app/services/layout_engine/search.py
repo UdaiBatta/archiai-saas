@@ -2,7 +2,7 @@
 candidate search.
 
 The production MVP API uses :func:`best_candidate` for rectangular plots.
-Every candidate flows through the exact same proven ``engine.plan_from_program``
+Every candidate flows through the exact same proven ``engine.plan_on_plot``
 pipeline ``generate_plan()`` itself uses, parameterized by a room-order-
 shuffled copy of the same ``EngineProgram`` — so a candidate carries the
 identical zero-overlap/zero-gap/reachability guarantees a single-shot plan
@@ -44,8 +44,9 @@ from app.services.layout_engine.engine import (
     DoesNotFitError,
     _build_program,
     _guard_program_size,
+    _require_home_garage_entry,
     generate_plan,
-    plan_from_program,
+    plan_on_plot,
 )
 from app.services.planning import EngineProgram, ProgramGraph, from_requirements
 from app.services.planning.graph_scoring import score_graph_satisfaction
@@ -121,7 +122,7 @@ def _anneal(
     for _ in range(max(0, iterations)):
         neighbor_program = _swap_neighbor(current_program, rng)
         try:
-            plan = plan_from_program(spec, neighbor_program, plot_w, plot_d, facing)
+            plan = plan_on_plot(spec, neighbor_program, plot_w, plot_d, facing)
         except DoesNotFitError:
             temp *= _ANNEAL_COOLING
             continue
@@ -192,7 +193,7 @@ def generate_candidates(
             continue
         seen_orders.add(order)
         try:
-            plan = plan_from_program(spec, program, plot_w, plot_d, facing)
+            plan = plan_on_plot(spec, program, plot_w, plot_d, facing)
         except DoesNotFitError as exc:
             last_error = exc
             continue
@@ -200,7 +201,30 @@ def generate_candidates(
         scored.append((candidate, program))
 
     if not scored and last_error is not None:
-        raise last_error
+        # Some room orders can route a residential garage through a kitchen or
+        # public room. Only after the ordinary search finds no valid plan do
+        # we retry with the engine's direct garage-to-entry default; a brief's
+        # explicit garage-to-utility MUST edge is preserved by the helper.
+        garage_program = _require_home_garage_entry(base_program, spec)
+        if garage_program is base_program:
+            raise last_error
+        fallback_rng = random.Random(seed)
+        seen_orders.clear()
+        for i in range(max(0, n)):
+            program = garage_program if i == 0 else _shuffled(garage_program, fallback_rng)
+            order = tuple(need.key for need in program.needs)
+            if order in seen_orders:
+                continue
+            seen_orders.add(order)
+            try:
+                plan = plan_on_plot(spec, program, plot_w, plot_d, facing)
+            except DoesNotFitError as exc:
+                last_error = exc
+                continue
+            candidate = Candidate(plan=plan, energy=energy(plan, spec, graph), seed=seed + i)
+            scored.append((candidate, program))
+        if not scored:
+            raise last_error
     scored.sort(key=lambda pair: pair[0].energy)
 
     if anneal_iterations > 0 and scored:

@@ -1,11 +1,14 @@
 import type { CanvasLayout, Room } from '../store/canvasStore'
 import type {
+  Connection,
   Facing,
   GenerateMvpResponse,
   HardQualitySnapshot,
   LayoutPlan,
   MvpQualitySnapshot,
+  PlanZoneSpan,
   RequirementsSpec,
+  RoomEdge,
 } from '../types/contracts'
 import { canonicalQuarterTurn, quarterTurnSwapsAxes } from '../utils/quarterTurn'
 
@@ -75,7 +78,27 @@ function wallObject(layout: LayoutPlan, index: number): Room {
     },
     rotation: { x: 0, y: 0, z: 0 },
     color: '#475569',
+    ...(wall.rooms?.length === 2 ? { betweenRooms: [...wall.rooms] } : {}),
   }
+}
+
+/** Every adjacent room pair and how it currently meets: open (no wall),
+ * door (a wall with a door in it) or wall (solid). */
+export function edgesFromLayout(layout: LayoutPlan): RoomEdge[] {
+  const doored = new Set(layout.doors.map((door) => door.wall_ref))
+  const byPair = new Map<string, RoomEdge>()
+  for (const wall of layout.walls) {
+    if (wall.rooms?.length !== 2) continue
+    const rooms = [...wall.rooms].sort() as [string, string]
+    const key = rooms.join('|')
+    const kind = wall.kind === 'open' ? 'open' : doored.has(wall.id) ? 'door' : 'wall'
+    const previous = byPair.get(key)
+    // A pair can share several wall segments; any door wins over solid wall.
+    if (!previous || (previous.kind === 'wall' && kind === 'door')) {
+      byPair.set(key, { rooms, kind })
+    }
+  }
+  return [...byPair.values()]
 }
 
 function doorObject(layout: LayoutPlan, index: number): Room | null {
@@ -114,7 +137,9 @@ function doorObject(layout: LayoutPlan, index: number): Room | null {
 }
 
 export function layoutPlanDerivedObjects(layout: LayoutPlan): Room[] {
-  const wallObjects = layout.walls.map((_, index) => wallObject(layout, index))
+  const wallObjects = layout.walls.flatMap((wall, index) =>
+    wall.kind === 'open' ? [] : [wallObject(layout, index)],
+  )
   const doorObjects = layout.doors
     .map((_, index) => doorObject(layout, index))
     .filter((door): door is Room => door !== null)
@@ -214,6 +239,9 @@ export function layoutPlanToCanvas(
       mvpRequirements: options.requirements,
       mvpQuality: options.quality,
       mvpVastuEnabled: /va?astu/i.test(options.prompt ?? ''),
+      mvpEdges: edgesFromLayout(layout),
+      mvpConnections: layout.connections ?? [],
+      ...(layout.footprint ? { mvpFootprint: layout.footprint } : {}),
       ...(layout.archetype_reasons?.length
         ? { archetypeReasons: layout.archetype_reasons }
         : {}),
@@ -250,6 +278,8 @@ export function canvasObjectsToLayoutPlan(
   objects: Room[],
   footprint: { x: number; z: number; w: number; d: number },
   facing: Facing,
+  connections: Connection[] = [],
+  building?: PlanZoneSpan,
 ): LayoutPlan {
   const rooms = objects
     .filter(
@@ -331,6 +361,7 @@ export function canvasObjectsToLayoutPlan(
       ),
       thickness: round3(horizontal ? wall.size.d : wall.size.w),
       floor: wall.floorLevel ?? 0,
+      ...(Array.isArray(wall.betweenRooms) ? { rooms: wall.betweenRooms as string[] } : {}),
     }
   })
   const wallById = new Map(walls.map((wall) => [wall.id, wall]))
@@ -358,6 +389,8 @@ export function canvasObjectsToLayoutPlan(
     rooms,
     walls,
     doors,
+    ...(connections.length ? { connections } : {}),
+    ...(building ? { footprint: building } : {}),
   }
 }
 

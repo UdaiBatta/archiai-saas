@@ -6,8 +6,9 @@ Rect math. Used three ways: engine self-check (Phase 1 tests), the
 must stay fast), and the reject tier of the scorer (Phase 6).
 
 Violation codes (stable API): overlap, out_of_bounds, below_min_size,
-unreachable, missing_requested_room, through_room_access,
-staircase_alignment.
+unreachable, missing_requested_room, through_room_access, unmet_must_connection,
+staircase_alignment, outdoor_room_inland, entry_inland, walk_through_room,
+garage_access.
 
 Reachability walks the access graph derived from doors: each door's midpoint
 connects every room whose boundary touches that point (interior doors connect
@@ -93,17 +94,21 @@ def _inside_plot(room: PlanRoom, plan: LayoutPlan) -> bool:
 
 
 def _door_adjacency(plan: LayoutPlan) -> dict[str, set[str]]:
-    """room id -> set of room ids it directly shares a door with."""
+    """room id -> set of room ids it directly shares a door or open edge with."""
     walls_by_id = {w.id: w for w in plan.walls}
     adjacency: dict[str, set[str]] = {room.id: set() for room in plan.rooms}
-    for door in plan.doors:
-        wall = walls_by_id.get(door.wall_ref)
-        if wall is None:
-            continue
-        x, y = _door_point(door, wall)
+    passages = [
+        (_door_point(door, wall), door.floor)
+        for door in plan.doors
+        if (wall := walls_by_id.get(door.wall_ref)) is not None and wall.floor == door.floor
+    ] + [
+        (((w.x1 + w.x2) / 2, (w.y1 + w.y2) / 2), w.floor)
+        for w in plan.walls if w.kind == "open"
+    ]
+    for (x, y), floor in passages:
         touching = [
             room.id for room in plan.rooms
-            if room.floor == door.floor == wall.floor and _touches(room, x, y)
+            if room.floor == floor and _touches(room, x, y)
         ]
         for a in touching:
             for b in touching:
@@ -141,6 +146,13 @@ def _walk(start: str, adjacency: dict[str, set[str]], blocked: frozenset[str] = 
 
 _PRIVACY_THRESHOLD = 2
 _SANITARY_TYPES = frozenset({"bathroom", "ensuite", "toilet", "washroom", "wc"})
+RESIDENTIAL_BUILDINGS = frozenset({"house", "apartment", "villa", "duplex"})
+# Closets: rooms that serve another room and may sit behind it (a store in a
+# bedroom or consultation room, a pantry or laundry off the kitchen).
+_CLOSET_TYPES = frozenset({
+    "storage", "store_room", "stock_room", "pantry", "laundry", "utility",
+    "mechanical", "plant", "shaft",
+})
 
 
 def _must_exempt_pairs(rooms: list[PlanRoom], requirements: RequirementsSpec | None) -> set[frozenset]:
@@ -190,19 +202,202 @@ def _through_room_access_violations(
 
     exempt_pairs = _must_exempt_pairs(rooms, requirements)
     labels = {r.id: r.label for r in rooms}
+    via_public = _walk(start, adjacency, frozenset(private_ids))
+    shared_bathroom_reachable = bool(sanitary_ids & via_public)
     violations: list[Violation] = []
     for pid in sorted(target_ids):
         if pid == start or pid not in reachable:
             continue  # a disconnected room is already reported as `unreachable`
+        # An en-suite: a bathroom may be reached through the one private room
+        # it opens straight into — as long as the home also has a bathroom
+        # nobody has to cross a bedroom to reach. A home whose ONLY bathroom
+        # sits behind a bedroom still fails.
+        own_bedroom = (
+            adjacency.get(pid, set())
+            if pid in sanitary_ids and shared_bathroom_reachable
+            else set()
+        )
         blocked = frozenset(
             other for other in private_ids
-            if other != pid and frozenset((pid, other)) not in exempt_pairs
+            if other != pid
+            and frozenset((pid, other)) not in exempt_pairs
+            and other not in own_bedroom
         )
         if pid not in _walk(start, adjacency, blocked):
             violations.append(Violation(
                 code="through_room_access",
                 room_ids=[pid],
                 message=f"{labels[pid]} is only reachable by walking through a private room",
+            ))
+    return violations
+
+
+def _walk_through_violations(
+    plan: LayoutPlan,
+    adjacency: dict[str, set[str]],
+    start: str,
+    reachable: set[str],
+    requirements: RequirementsSpec | None,
+    already_flagged: set[str],
+) -> list[Violation]:
+    """In a home, no room may be reachable from the entrance only by walking
+    through a bedroom, a bathroom, a kitchen, laundry, utility room, garage or
+    store. That covers every destination (a garage behind a
+    bedroom, a bedroom behind its own bathroom), where ``through_room_access``
+    only guards private and sanitary ones. An open kitchen counts too: in a
+    real open plan the way through runs across the living and dining area,
+    not the cooking zone.
+
+    Exempt: closets (a store, pantry or laundry may sit behind the room it
+    serves), and a room the brief attaches on purpose (an en-suite through
+    its bedroom), through that partner only. Bathrooms themselves are left
+    to ``through_room_access``, which knows an en-suite behind its bedroom is
+    fine as long as the home has a bathroom nobody has to cross a bedroom for.
+
+    Homes only: other buildings keep the privacy rule alone (a warehouse
+    office is reached across its storage floor; hotels, clinics and offices
+    have their own access patterns)."""
+    if requirements is None or requirements.building_type.value not in RESIDENTIAL_BUILDINGS:
+        return []
+    blockers = set()
+    for r in plan.rooms:
+        kind = resolve_alias(r.type) or r.type
+        if (
+            kind in catalog.NO_THROUGH_TYPES
+            or kind in _SANITARY_TYPES
+            or catalog.privacy_level_for(r.type) >= _PRIVACY_THRESHOLD
+        ):
+            blockers.add(r.id)
+    if not blockers:
+        return []
+    exempt = _must_exempt_pairs(plan.rooms, requirements)
+    labels = {r.id: r.label for r in plan.rooms}
+    kinds = {r.id: resolve_alias(r.type) or r.type for r in plan.rooms}
+    # Only a dependent room may sit behind the room it serves: a bathroom
+    # behind its bedroom, a utility room behind its kitchen. Never the
+    # reverse (a bedroom reached through its own bathroom).
+    dependent = {
+        rid for rid, kind in kinds.items()
+        if kind in _SANITARY_TYPES or kind in catalog.NO_THROUGH_TYPES
+    }
+    violations: list[Violation] = []
+    for room in plan.rooms:
+        rid = room.id
+        if rid == start or rid not in reachable or rid in already_flagged:
+            continue
+        if kinds[rid] in _CLOSET_TYPES or kinds[rid] in _SANITARY_TYPES:
+            continue
+        blocked = frozenset(
+            b for b in blockers
+            if b != rid
+            and not (rid in dependent and frozenset((rid, b)) in exempt)
+            and not (
+                kinds[rid] == "garage"
+                and b in adjacency.get(rid, set())
+                and kinds[b] in {"utility", "laundry", "mudroom"}
+            )
+        )
+        if rid in _walk(start, adjacency, blocked):
+            continue
+        # Name the rooms walked through on the shortest route in.
+        parent: dict[str, str | None] = {start: None}
+        queue = [start]
+        while queue and rid not in parent:
+            current = queue.pop(0)
+            for nxt in sorted(adjacency.get(current, ())):
+                if nxt not in parent:
+                    parent[nxt] = current
+                    queue.append(nxt)
+        through: list[str] = []
+        at = parent.get(rid)
+        while at is not None:
+            if at in blocked:
+                through.append(labels[at])
+            at = parent.get(at)
+        names = " and ".join(reversed(through)) or "another room"
+        violations.append(Violation(
+            code="walk_through_room",
+            room_ids=[rid],
+            message=f"{labels[rid]} can only be reached by walking through the {names}",
+        ))
+    return violations
+
+
+def _exterior_door_rooms(plan: LayoutPlan) -> set[str]:
+    """Room ids with a door on the building perimeter."""
+    if plan.plot.boundary is not None:
+        outline = polygon.plot_to_polygon(plan.plot)
+
+        def on_outline(x: float, y: float) -> bool:
+            return polygon.is_on_boundary((x, y), outline)
+    else:
+        frame = plan.footprint
+        x0, y0 = (frame.x, frame.y) if frame else (0.0, 0.0)
+        x1 = frame.x + frame.w if frame else plan.plot.width_m
+        y1 = frame.y + frame.h if frame else plan.plot.depth_m
+
+        def on_outline(x: float, y: float) -> bool:
+            return (
+                (abs(x - x0) <= _TOUCH_EPS and y0 - _TOUCH_EPS <= y <= y1 + _TOUCH_EPS)
+                or (abs(x - x1) <= _TOUCH_EPS and y0 - _TOUCH_EPS <= y <= y1 + _TOUCH_EPS)
+                or (abs(y - y0) <= _TOUCH_EPS and x0 - _TOUCH_EPS <= x <= x1 + _TOUCH_EPS)
+                or (abs(y - y1) <= _TOUCH_EPS and x0 - _TOUCH_EPS <= x <= x1 + _TOUCH_EPS)
+            )
+
+    walls_by_id = {wall.id: wall for wall in plan.walls}
+    result: set[str] = set()
+    for door in plan.doors:
+        wall = walls_by_id.get(door.wall_ref)
+        if wall is None or wall.floor != door.floor:
+            continue
+        x, y = _door_point(door, wall)
+        if on_outline(x, y):
+            result.update(
+                room.id for room in plan.rooms
+                if room.floor == door.floor and _touches(room, x, y)
+            )
+    return result
+
+
+_GARAGE_ALLOWED_NEIGHBORS = frozenset({"foyer", "utility", "laundry", "mudroom"})
+_GARAGE_FORBIDDEN_NEIGHBORS = frozenset({
+    "living_room", "open_plan_living", "dining", "dining_area", "dining_room",
+})
+
+
+def _garage_access_violations(
+    plan: LayoutPlan,
+    adjacency: dict[str, set[str]],
+    requirements: RequirementsSpec | None,
+) -> list[Violation]:
+    if requirements is None or requirements.building_type.value not in RESIDENTIAL_BUILDINGS:
+        return []
+    kinds = {room.id: resolve_alias(room.type) or room.type for room in plan.rooms}
+    labels = {room.id: room.label for room in plan.rooms}
+    exterior = _exterior_door_rooms(plan)
+    violations: list[Violation] = []
+    for room in plan.rooms:
+        if kinds[room.id] != "garage":
+            continue
+        neighbors = adjacency.get(room.id, set())
+        forbidden = sorted(
+            (neighbor for neighbor in neighbors if kinds.get(neighbor) in _GARAGE_FORBIDDEN_NEIGHBORS),
+            key=lambda neighbor: labels[neighbor],
+        )
+        has_allowed_access = room.id in exterior or any(
+            kinds.get(neighbor) in _GARAGE_ALLOWED_NEIGHBORS for neighbor in neighbors
+        )
+        reasons = []
+        if forbidden:
+            names = ", ".join(labels[neighbor] for neighbor in forbidden)
+            reasons.append(f"must not open directly into {names}")
+        if not has_allowed_access:
+            reasons.append("needs direct access to the entry, a utility room, or outside")
+        if reasons:
+            violations.append(Violation(
+                code="garage_access",
+                room_ids=[room.id, *forbidden],
+                message=f"{room.label} {'; '.join(reasons)}",
             ))
     return violations
 
@@ -293,6 +488,51 @@ def _staircase_alignment_violations(
     )]
 
 
+def touches_outside(room: PlanRoom, plan: LayoutPlan) -> bool:
+    """Does the room have an outside wall (the building outline)?"""
+    if room.vertices is not None or plan.plot.boundary is not None:
+        shared = polygon.room_to_polygon(room).boundary.intersection(
+            polygon.plot_to_polygon(plan.plot).boundary
+        )
+        return shared.length > EPS
+    # The building's outline: its footprint when it sits inside a yard,
+    # otherwise the plot itself.
+    frame = plan.footprint
+    x0, y0 = (frame.x, frame.y) if frame else (0.0, 0.0)
+    x1 = frame.x + frame.w if frame else plan.plot.width_m
+    y1 = frame.y + frame.h if frame else plan.plot.depth_m
+    return (
+        room.x <= x0 + EPS
+        or room.y <= y0 + EPS
+        or room.x + room.w >= x1 - EPS
+        or room.y + room.h >= y1 - EPS
+    )
+
+
+# Rooms that only make sense against the outside of the house. A courtyard
+# is outdoor too, but enclosed on purpose, so it is not listed.
+_NEEDS_OUTSIDE = frozenset({"balcony", "terrace", "porch", "veranda"})
+
+
+def _inland_violations(plan: LayoutPlan) -> list[Violation]:
+    violations: list[Violation] = []
+    for room in plan.rooms:
+        kind = resolve_alias(room.type) or room.type  # the catalog calls an entry 'foyer'
+        if kind in _NEEDS_OUTSIDE and not touches_outside(room, plan):
+            violations.append(Violation(
+                code="outdoor_room_inland",
+                room_ids=[room.id],
+                message=f"{room.label} is boxed in by other rooms: it needs an outside wall",
+            ))
+        elif kind == "foyer" and (room.floor or 0) == 0 and not touches_outside(room, plan):
+            violations.append(Violation(
+                code="entry_inland",
+                room_ids=[room.id],
+                message=f"{room.label} has no outside wall, so there is no front door into it",
+            ))
+    return violations
+
+
 def validate(
     plan: LayoutPlan, requirements: RequirementsSpec | None = None
 ) -> list[Violation]:
@@ -358,6 +598,57 @@ def validate(
             ))
 
     # (e) privacy-chain check (workflow Phase 4.5) — see module docstring.
-    violations.extend(_through_room_access_violations(plan, adjacency, start, seen, requirements))
+    privacy = _through_room_access_violations(plan, adjacency, start, seen, requirements)
+    violations.extend(privacy)
 
+    # (f) every "must connect" pair in the brief actually connects.
+    if requirements is not None:
+        violations.extend(_unmet_must_connections(rooms, adjacency, requirements))
+
+    # (g) no room only behind a bedroom, bathroom, kitchen, laundry, garage or store.
+    violations.extend(_walk_through_violations(
+        plan, adjacency, start, seen, requirements,
+        already_flagged={rid for v in privacy for rid in v.room_ids},
+    ))
+
+    # (h) garages use a service/entry/exterior access path, never a living or
+    # dining room as their direct interior connection.
+    violations.extend(_garage_access_violations(plan, adjacency, requirements))
+
+    # (i) balconies and the entry reach the outside of the house.
+    violations.extend(_inland_violations(plan))
+
+    return violations
+
+
+def _unmet_must_connections(
+    rooms: list[PlanRoom], adjacency: dict[str, set[str]], requirements: RequirementsSpec
+) -> list[Violation]:
+    """A brief's "must connect A and B" is met when some A and some B are
+    joined by a door or an open edge. A type missing from the plan is left to
+    ``missing_requested_room``."""
+    by_type: dict[str, list[PlanRoom]] = {}
+    for room in rooms:
+        by_type.setdefault(resolve_alias(room.type) or room.type, []).append(room)
+    violations: list[Violation] = []
+    seen: set[frozenset] = set()
+    for pref in requirements.adjacency:
+        if pref.strength != "must":
+            continue
+        a = resolve_alias(pref.room_a) or pref.room_a
+        b = resolve_alias(pref.room_b) or pref.room_b
+        if frozenset((a, b)) in seen or a not in by_type or b not in by_type:
+            continue
+        seen.add(frozenset((a, b)))
+        met = any(
+            rb.id in adjacency.get(ra.id, ())
+            for ra in by_type[a] for rb in by_type[b] if ra.id != rb.id
+        )
+        if not met:
+            label_a, label_b = by_type[a][0].label, by_type[b][0].label
+            violations.append(Violation(
+                code="unmet_must_connection",
+                room_ids=[by_type[a][0].id, by_type[b][0].id],
+                message=f"The brief asks for {label_a} to connect to {label_b}, but they don't.",
+            ))
     return violations

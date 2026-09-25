@@ -143,16 +143,3 @@ async def get_current_user(db: AsyncSession, token: str) -> UserOut:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     return UserOut.model_validate(user)
-
-
-async def get_current_admin_user(db: AsyncSession, token: str) -> UserOut:
-    """Like get_current_user, but rejects non-admins with 403.
-
-    Used to gate operator-only surfaces (the scraper/data pipeline). Admin
-    status is read from the database on every request, never encoded in the
-    token, so revoking a user's admin flag takes effect immediately.
-    """
-    user = await get_current_user(db, token)
-    if not user.is_admin:
-        raise HTTPException(status_code=403, detail="Admin access required")
-    return user

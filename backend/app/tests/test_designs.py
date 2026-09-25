@@ -2,10 +2,10 @@ from httpx import AsyncClient
 from sqlalchemy import func, select
 
 from app.models.activity_log import ActivityLog
-from app.models.design import Design
 from app.models.design_version import DesignVersion
 from app.models.project import Project
 from app.tests.conftest import TestSessionLocal
+from app.tests.conftest import generate_design
 
 
 async def _register_and_token(client: AsyncClient, email: str) -> str:
@@ -14,63 +14,6 @@ async def _register_and_token(client: AsyncClient, email: str) -> str:
         json={"name": "Design User", "email": email, "password": "password123"},
     )
     return resp.json()["access_token"]
-
-
-async def test_generate_design_returns_multi_floor_layout_and_logs_activity(client: AsyncClient):
-    token = await _register_and_token(client, "design@example.com")
-    project = await client.post(
-        "/api/projects",
-        json={"title": "Generated Project", "description": None},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    project_id = project.json()["id"]
-
-    response = await client.post(
-        "/api/design/generate",
-        json={
-            "projectId": project_id,
-            "prompt": "2 floor, 3 bedroom layout with kitchen, living room, bathroom",
-        },
-        headers={"Authorization": f"Bearer {token}"},
-    )
-
-    assert response.status_code == 200
-    data = response.json()
-    assert data["metadata"]["totalFloors"] == 2
-    assert len(data["floors"]) == 2
-    assert any(room["roomType"] == "stairs" for room in data["rooms"])
-    assert data["designId"]
-    assert data["designVersionId"]
-    assert data["metadata"]["program"]["requestedSpaceCount"] > 0
-    assert data["metadata"]["programValidation"]["spaces"]
-    assert isinstance(
-        data["metadata"]["programValidation"]["constraintChecks"],
-        list,
-    )
-
-    async with TestSessionLocal() as session:
-        activity_result = await session.scalars(select(ActivityLog.action))
-        assert "design.generated" in activity_result.all()
-
-        design = await session.get(Design, data["designId"])
-        version = await session.get(DesignVersion, data["designVersionId"])
-        assert design is not None
-        assert version is not None
-        assert design.layout_json["metadata"]["totalFloors"] == 2
-        assert design.layout_json["metadata"]["program"]["requestedSpaceCount"] > 0
-        assert design.layout_json["metadata"]["programValidation"]["spaces"]
-        assert version.layout_json["metadata"]["totalFloors"] == 2
-        assert version.version_number == 1
-
-
-async def test_generate_design_requires_auth(client: AsyncClient):
-    response = await client.post(
-        "/api/design/generate",
-        json={"prompt": "2 bedroom apartment with kitchen"},
-    )
-
-    assert response.status_code == 401
-    assert response.json()["code"] == "UNAUTHORIZED"
 
 
 async def test_latest_design_returns_saved_layout(client: AsyncClient):
@@ -82,11 +25,7 @@ async def test_latest_design_returns_saved_layout(client: AsyncClient):
     )
     project_id = project.json()["id"]
 
-    generated = await client.post(
-        "/api/design/generate",
-        json={"projectId": project_id, "prompt": "2 bedroom apartment with kitchen"},
-        headers={"Authorization": f"Bearer {token}"},
-    )
+    generated = await generate_design(client, {"Authorization": f"Bearer {token}"}, project_id)
 
     latest = await client.get(
         f"/api/design/project/{project_id}/latest",
@@ -106,11 +45,7 @@ async def test_save_design_updates_layout_and_creates_new_version(client: AsyncC
         headers={"Authorization": f"Bearer {token}"},
     )
     project_id = project.json()["id"]
-    generated = await client.post(
-        "/api/design/generate",
-        json={"projectId": project_id, "prompt": "2 bedroom apartment with kitchen"},
-        headers={"Authorization": f"Bearer {token}"},
-    )
+    generated = await generate_design(client, {"Authorization": f"Bearer {token}"}, project_id)
     data = generated.json()
     data["rooms"][0]["label"] = "Edited Room"
 
@@ -143,11 +78,7 @@ async def test_manual_save_stores_version_metadata_and_thumbnail(client: AsyncCl
         headers={"Authorization": f"Bearer {token}"},
     )
     project_id = project.json()["id"]
-    generated = await client.post(
-        "/api/design/generate",
-        json={"projectId": project_id, "prompt": "1 bedroom apartment with kitchen"},
-        headers={"Authorization": f"Bearer {token}"},
-    )
+    generated = await generate_design(client, {"Authorization": f"Bearer {token}"}, project_id)
     layout = generated.json()
     layout["rooms"][0]["label"] = "Named Save Room"
 
@@ -190,11 +121,7 @@ async def test_save_design_accepts_legacy_layout_metadata(client: AsyncClient):
         headers={"Authorization": f"Bearer {token}"},
     )
     project_id = project.json()["id"]
-    generated = await client.post(
-        "/api/design/generate",
-        json={"projectId": project_id, "prompt": "2 bedroom apartment with kitchen"},
-        headers={"Authorization": f"Bearer {token}"},
-    )
+    generated = await generate_design(client, {"Authorization": f"Bearer {token}"}, project_id)
     layout = generated.json()
     layout["metadata"] = {"totalFloors": 1, "totalRooms": len(layout["rooms"])}
 
@@ -232,11 +159,7 @@ async def test_all_supported_component_types_survive_save_latest_version_and_sha
         headers={"Authorization": f"Bearer {token}"},
     )
     project_id = project.json()["id"]
-    generated = await client.post(
-        "/api/design/generate",
-        json={"projectId": project_id, "prompt": "1 bedroom apartment with kitchen"},
-        headers={"Authorization": f"Bearer {token}"},
-    )
+    generated = await generate_design(client, {"Authorization": f"Bearer {token}"}, project_id)
     layout = generated.json()
     layout["rooms"] = [
         {
@@ -303,180 +226,6 @@ async def test_all_supported_component_types_survive_save_latest_version_and_sha
             assert len(openings) == 2
             assert all(room["hostWallId"] == "wall-1" for room in openings)
 
-    refined = await client.post(
-        "/api/design/refine",
-        json={"designId": layout["designId"], "prompt": "add a study", "currentLayout": latest.json()},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert refined.status_code == 200, refined.text
-    assert all(room["hostWallId"] == "wall-1" for room in refined.json()["rooms"] if room["objectType"] in ("door", "window"))
-
-
-async def test_refine_creates_new_version_and_logs_activity(client: AsyncClient):
-    token = await _register_and_token(client, "refine@example.com")
-    project = await client.post(
-        "/api/projects",
-        json={"title": "Refine Project", "description": None},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    project_id = project.json()["id"]
-    generated = await client.post(
-        "/api/design/generate",
-        json={"projectId": project_id, "prompt": "2 bedroom apartment with kitchen"},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    design_id = generated.json()["designId"]
-    bedrooms_before = sum(
-        1 for r in generated.json()["rooms"] if r["roomType"] == "bedroom"
-    )
-
-    response = await client.post(
-        "/api/design/refine",
-        json={"designId": design_id, "prompt": "add a bedroom"},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-
-    assert response.status_code == 200
-    data = response.json()
-    bedrooms_after = sum(1 for r in data["rooms"] if r["roomType"] == "bedroom")
-    assert bedrooms_after == bedrooms_before + 1
-    assert "Added 1 bedroom" in data["refinementSummary"]
-    assert len(data["refinementChanges"]) == 1
-    added_change = data["refinementChanges"][0]
-    assert added_change["action"] == "add"
-    assert added_change["objectId"] in {room["id"] for room in data["rooms"]}
-    assert added_change["description"] == "Add Bedroom"
-
-    async with TestSessionLocal() as session:
-        version_count = await session.scalar(
-            select(func.count()).select_from(DesignVersion).where(
-                DesignVersion.design_id == design_id
-            )
-        )
-        assert version_count == 2
-        latest = await session.scalar(
-            select(DesignVersion)
-            .where(DesignVersion.design_id == design_id)
-            .order_by(DesignVersion.version_number.desc())
-        )
-        assert latest.version_type == "refined"
-        assert "Added 1 bedroom" in (latest.change_summary or "")
-
-        activity_actions = await session.scalars(select(ActivityLog.action))
-        assert "design.refined" in activity_actions.all()
-
-
-async def test_refine_uses_current_unsaved_geometry(client: AsyncClient):
-    token = await _register_and_token(client, "refine-current@example.com")
-    headers = {"Authorization": f"Bearer {token}"}
-    project = await client.post("/api/projects", json={"title": "Current geometry"}, headers=headers)
-    generated = await client.post("/api/design/generate", json={"projectId": project.json()["id"], "prompt": "2 bedroom apartment with kitchen"}, headers=headers)
-    current = generated.json()
-    design_id = current["designId"]
-    moved = next(room for room in current["rooms"] if room["roomType"] == "bedroom")
-    moved["position"]["x"] += 0.5
-    moved_id = moved["id"]
-    for floor in current.get("floors", []):
-        for room in floor.get("rooms", []):
-            if room["id"] == moved_id:
-                room["position"] = moved["position"].copy()
-
-    response = await client.post("/api/design/refine", json={"designId": design_id, "prompt": "add a study", "currentLayout": current}, headers=headers)
-    assert response.status_code == 200, response.text
-    result = response.json()
-    assert next(room for room in result["rooms"] if room["id"] == moved_id)["position"] == moved["position"]
-    assert result["designId"] == design_id
-    latest = await client.get(f"/api/design/project/{project.json()['id']}/latest", headers=headers)
-    assert next(room for room in latest.json()["rooms"] if room["id"] == moved_id)["position"] == moved["position"]
-
-
-async def test_refine_rejects_malformed_current_geometry(client: AsyncClient):
-    token = await _register_and_token(client, "refine-malformed@example.com")
-    response = await client.post("/api/design/refine", json={"designId": "missing", "prompt": "add a study", "currentLayout": {"rooms": "invalid"}}, headers={"Authorization": f"Bearer {token}"})
-    assert response.status_code == 422
-
-
-async def test_refine_unparsable_prompt_returns_422(client: AsyncClient):
-    token = await _register_and_token(client, "refine-unparse@example.com")
-    project = await client.post(
-        "/api/projects",
-        json={"title": "Unparse", "description": None},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    generated = await client.post(
-        "/api/design/generate",
-        json={"projectId": project.json()["id"], "prompt": "2 bedroom apartment with kitchen"},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-
-    response = await client.post(
-        "/api/design/refine",
-        json={"designId": generated.json()["designId"], "prompt": "hello world"},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-
-    assert response.status_code == 422
-    assert "Couldn't understand" in response.json()["error"]
-
-
-async def test_refine_other_users_design_returns_403(client: AsyncClient):
-    token_a = await _register_and_token(client, "refine-owner@example.com")
-    token_b = await _register_and_token(client, "refine-intruder@example.com")
-    project = await client.post(
-        "/api/projects",
-        json={"title": "Owned", "description": None},
-        headers={"Authorization": f"Bearer {token_a}"},
-    )
-    generated = await client.post(
-        "/api/design/generate",
-        json={"projectId": project.json()["id"], "prompt": "2 bedroom apartment with kitchen"},
-        headers={"Authorization": f"Bearer {token_a}"},
-    )
-
-    response = await client.post(
-        "/api/design/refine",
-        json={"designId": generated.json()["designId"], "prompt": "add a bedroom"},
-        headers={"Authorization": f"Bearer {token_b}"},
-    )
-
-    assert response.status_code == 403
-
-
-async def test_refine_after_manual_save_does_not_crash(client: AsyncClient):
-    """Regression: layout JSON persisted by PUT /api/design/{id} contains designId/designVersionId
-    keys (the frontend's serializeLayout writes them). A subsequent refine must not collide
-    when the endpoint spreads new_layout into RefineResponse."""
-    token = await _register_and_token(client, "refine-after-save@example.com")
-    project = await client.post(
-        "/api/projects",
-        json={"title": "Save Then Refine", "description": None},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    generated = await client.post(
-        "/api/design/generate",
-        json={"projectId": project.json()["id"], "prompt": "2 bedroom apartment with kitchen"},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    layout = generated.json()
-    design_id = layout["designId"]
-
-    saved = await client.put(
-        f"/api/design/{design_id}",
-        json={"layout": layout, "versionName": "Manual"},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert saved.status_code == 200
-
-    refined = await client.post(
-        "/api/design/refine",
-        json={"designId": design_id, "prompt": "add a bedroom"},
-        headers={"Authorization": f"Bearer {token}"},
-    )
-
-    assert refined.status_code == 200, refined.json()
-    assert refined.json()["designId"] == design_id
-    assert "Added 1 bedroom" in refined.json()["refinementSummary"]
-
 
 async def test_fetch_version_returns_correct_layout(client: AsyncClient):
     token = await _register_and_token(client, "fetch-version@example.com")
@@ -486,11 +235,7 @@ async def test_fetch_version_returns_correct_layout(client: AsyncClient):
         headers={"Authorization": f"Bearer {token}"},
     )
     project_id = project.json()["id"]
-    generated = await client.post(
-        "/api/design/generate",
-        json={"projectId": project_id, "prompt": "2 bedroom apartment with kitchen"},
-        headers={"Authorization": f"Bearer {token}"},
-    )
+    generated = await generate_design(client, {"Authorization": f"Bearer {token}"}, project_id)
     design_id = generated.json()["designId"]
     version_id = generated.json()["designVersionId"]
 
@@ -515,11 +260,7 @@ async def test_fetch_version_wrong_user_returns_403(client: AsyncClient):
         json={"title": "Protected Version Project", "description": None},
         headers={"Authorization": f"Bearer {token_a}"},
     )
-    generated = await client.post(
-        "/api/design/generate",
-        json={"projectId": project.json()["id"], "prompt": "2 bedroom apartment with kitchen"},
-        headers={"Authorization": f"Bearer {token_a}"},
-    )
+    generated = await generate_design(client, {"Authorization": f"Bearer {token_a}"}, project.json()["id"])
     version_id = generated.json()["designVersionId"]
 
     response = await client.get(

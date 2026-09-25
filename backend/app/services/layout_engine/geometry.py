@@ -89,3 +89,33 @@ class Rect:
                 if x_hi - x_lo > eps:
                     return Segment(x_lo, y[0], x_hi, y[0])
         return None
+
+
+def uncovered_edges(rect: Rect, others: list[Rect]) -> list[Segment]:
+    """Parts of ``rect``'s four edges (left, right, top, bottom — the order
+    the old plot-edge rule used) that no neighbour shares."""
+    def remaining(lo: float, hi: float, covers: list[tuple[float, float]]) -> list[tuple[float, float]]:
+        spans = [(lo, hi)]
+        for c_lo, c_hi in covers:
+            spans = [
+                piece
+                for s_lo, s_hi in spans
+                for piece in ((s_lo, min(s_hi, c_lo)), (max(s_lo, c_hi), s_hi))
+                if piece[1] - piece[0] > EPS
+            ] if c_hi > lo + EPS and c_lo < hi - EPS else spans
+        return spans
+
+    def along_y(x: float, touching) -> list[Segment]:
+        covers = [(o.y, o.y2) for o in others if touching(o)]
+        return [Segment(x, lo, x, hi) for lo, hi in remaining(rect.y, rect.y2, covers)]
+
+    def along_x(y: float, touching) -> list[Segment]:
+        covers = [(o.x, o.x2) for o in others if touching(o)]
+        return [Segment(lo, y, hi, y) for lo, hi in remaining(rect.x, rect.x2, covers)]
+
+    return [
+        *along_y(rect.x, lambda o: abs(o.x2 - rect.x) <= EPS),
+        *along_y(rect.x2, lambda o: abs(o.x - rect.x2) <= EPS),
+        *along_x(rect.y, lambda o: abs(o.y2 - rect.y) <= EPS),
+        *along_x(rect.y2, lambda o: abs(o.y - rect.y2) <= EPS),
+    ]

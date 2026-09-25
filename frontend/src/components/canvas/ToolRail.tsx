@@ -235,7 +235,7 @@ export function ToolRail({ modelStage = false }: { modelStage?: boolean }) {
     },
     {
       key: 'more',
-      label: 'More components',
+      label: 'More', // the full name was cut off under a 48 px button
       active: moreOpen,
       onClick: () => setMoreOpen((value) => !value),
     },
@@ -265,7 +265,7 @@ export function ToolRail({ modelStage = false }: { modelStage?: boolean }) {
   return (
     <div
       aria-label="Editor tools"
-      className={`absolute ${modelStage ? 'bottom-12' : 'bottom-36 sm:bottom-28'} left-1/2 z-20 flex max-w-[calc(100%-1.5rem)] -translate-x-1/2 items-center rounded-xl border border-ink/10 bg-[#1b1c1d]/95 px-1 py-1.5 shadow-xl backdrop-blur`}
+      className={`absolute bottom-12 left-1/2 z-20 flex max-w-[calc(100%-1.5rem)] -translate-x-1/2 items-center rounded-xl border border-ink/10 bg-[#1b1c1d]/95 px-1 py-1.5 shadow-xl backdrop-blur`}
     >
       <div className="flex items-center gap-0.5">
         {primaryTools.map((tool) => (

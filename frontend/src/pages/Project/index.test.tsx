@@ -33,7 +33,7 @@ vi.mock('../../components/canvas/Inspector', () => ({
 vi.mock('../../services/project.service', () => ({
   default: {
     get: vi.fn(),
-    list: vi.fn(),
+    list: vi.fn().mockResolvedValue([]),
     create: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
@@ -191,6 +191,39 @@ describe('ProjectPage canvas views', () => {
       throw Object.assign(new Error('not found'), { response: { status: 404 } })
     })
   })
+  it('renames the project from the title, with the form below the bar', async () => {
+    vi.mocked(projectService.update).mockResolvedValue({ ...PROJECT_FIXTURE, title: 'Villa, east plot' } as never)
+    renderProjectPage()
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: /Test Project/ }))
+
+    const name = screen.getByRole('textbox', { name: 'Project name' })
+    expect(name).toHaveValue('Test Project')
+    await user.clear(name)
+    await user.type(name, 'Villa, east plot{Enter}')
+
+    expect(projectService.update).toHaveBeenCalledWith('p1', expect.objectContaining({ title: 'Villa, east plot' }))
+    expect(await screen.findByRole('button', { name: /Villa, east plot/ })).toBeInTheDocument()
+    expect(screen.queryByRole('form', { name: 'Project details' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the brief out of the way once a plan exists, and reopens it from Edit', async () => {
+    renderProjectPage()
+    const user = userEvent.setup()
+    await screen.findByRole('tab', { name: '2D Plan' })
+    expect(screen.queryByLabelText('Layout prompt')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('menuitem', { name: 'Edit' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit brief…' }))
+    // Starts from the brief this plan was made from.
+    expect(screen.getByLabelText('Layout prompt')).toHaveValue('starter')
+    expect(screen.queryByRole('tab', { name: '2D Plan' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Back to plan' }))
+    expect(screen.queryByLabelText('Layout prompt')).not.toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: '2D Plan' })).toBeInTheDocument()
+  })
+
   it('enters the model stage and returns without losing geometry or undo history', async () => {
     renderProjectPage()
     const user = userEvent.setup()
@@ -222,33 +255,6 @@ describe('ProjectPage canvas views', () => {
     expect(projectService.activity).not.toHaveBeenCalled()
   })
 
-  it('returns from model review to the editable refinement prompt', async () => {
-    renderProjectPage()
-    const user = userEvent.setup()
-    await screen.findByRole('tab', { name: '2D Plan' })
-    act(() => useCanvasStore.getState().updateRoom(INITIAL_ROOMS[0].id, { label: 'Lounge' }))
-    await user.click(screen.getByRole('button', { name: 'Create a 3D model →' }))
-    await user.click(screen.getByRole('button', { name: /change made this session/ }))
-    await user.click(screen.getByRole('button', { name: 'Describe a refinement' }))
-    expect(screen.getByLabelText('Layout prompt')).toBeInTheDocument()
-    expect(useCanvasStore.getState().viewMode).toBe('floor_plan')
-    expect(useCanvasStore.getState().rooms[0].label).toBe('Lounge')
-  })
-
-  it('submits current edits and preserves them when refinement fails', async () => {
-    vi.mocked(api.post).mockRejectedValue(new Error('network down'))
-    renderProjectPage()
-    const user = userEvent.setup()
-    await screen.findByRole('tab', { name: 'Refine' })
-    act(() => useCanvasStore.getState().updateRoom(INITIAL_ROOMS[0].id, { position: { ...INITIAL_ROOMS[0].position, x: 2.25 } }))
-    const current = useCanvasStore.getState().serializeLayout()
-    await user.type(screen.getByLabelText('Layout prompt'), 'add a study')
-    await user.click(screen.getByRole('button', { name: 'Refine' }))
-    await screen.findByRole('alert')
-    expect(api.post).toHaveBeenCalledWith('/api/design/refine', { designId: 'd1', prompt: 'add a study', currentLayout: current })
-    expect(useCanvasStore.getState().serializeLayout()).toEqual(current)
-    expect(useCanvasStore.getState().hasUnsavedChanges).toBe(true)
-  })
   it('switches the 2D Plan tab to the shared-state SVG floor plan', async () => {
     renderProjectPage()
     const user = userEvent.setup()
@@ -276,7 +282,7 @@ describe('ProjectPage canvas views', () => {
     await user.click(screen.getByRole('tab', { name: 'Room Graph' }))
     expect(useCanvasStore.getState().viewMode).toBe('graph')
     expect(
-      screen.getByRole('application', { name: 'Room relationship graph' }),
+      screen.getByRole('application', { name: 'Room access graph' }),
     ).toBeInTheDocument()
   })
 
@@ -336,7 +342,7 @@ describe('ProjectPage canvas views', () => {
   })
 })
 
-describe('ProjectPage refine flow', () => {
+describe('ProjectPage generation flow', () => {
   const reviewFixture = {
     requirements: { building_type: 'school', floors: 1, rooms: [{ type: 'study', count: 4 }], adjacency: [], avoid_adjacency: [], plot: { width_m: 20, depth_m: 20 }, facing: 'east', missing_info: [] },
     route: 'generate', questions: [], optional_missing: [], understood_summary: ['4 studies'],
@@ -347,7 +353,7 @@ describe('ProjectPage refine flow', () => {
     renderProjectPage()
     const user = userEvent.setup()
     await user.type(await screen.findByLabelText('Layout prompt'), 'a small school')
-    await user.click(screen.getByRole('button', { name: 'Generate' }))
+    await user.click(screen.getByRole('button', { name: 'Review brief' }))
     await user.type(await screen.findByLabelText('Answer 1'), 'five')
     await user.type(screen.getByLabelText('Additional requirements'), 'and a library')
     await user.click(screen.getByRole('button', { name: 'Re-check brief' }))
@@ -361,7 +367,7 @@ describe('ProjectPage refine flow', () => {
     renderProjectPage()
     const user = userEvent.setup()
     await user.type(await screen.findByLabelText('Layout prompt'), 'a school with four classrooms')
-    await user.click(screen.getByRole('button', { name: 'Generate' }))
+    await user.click(screen.getByRole('button', { name: 'Review brief' }))
     await user.click(await screen.findByRole('button', { name: 'Generate layout' }))
     const signal = vi.mocked(api.post).mock.calls[1][2]?.signal as AbortSignal
     await user.click(screen.getByRole('button', { name: 'Cancel generation' }))
@@ -376,6 +382,36 @@ describe('ProjectPage refine flow', () => {
     await screen.findByLabelText('Layout prompt')
     expect(screen.queryByRole('tab', { name: 'Refine' })).not.toBeInTheDocument()
     expect(screen.queryByRole('tab', { name: '2D Plan' })).not.toBeInTheDocument()
+  })
+
+  it('reads a brief from /projects/new back for review on arrival', async () => {
+    vi.mocked(api.post).mockImplementation(async (url: string) => {
+      if (url === '/api/extract') {
+        return {
+          data: {
+            requirements: {
+              building_type: 'apartment', floors: 1, rooms: [{ type: 'bedroom', count: 1 }],
+              adjacency: [], avoid_adjacency: [], plot: { width_m: null, depth_m: null }, facing: null, missing_info: [],
+            },
+            route: 'generate', questions: [], optional_missing: [],
+            understood_summary: ['Building: Apartment', '1 floor', '1 bedroom'],
+          },
+        }
+      }
+      throw new Error('unexpected POST ' + url)
+    })
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/projects/p1', state: { initialPrompt: 'apartment with a bedroom', review: true } }]}>
+        <Routes>
+          <Route path="/projects/:id" element={<ProjectPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    // Straight to review: nothing is generated until the user confirms.
+    expect(await screen.findByRole('button', { name: 'Generate layout' })).toBeInTheDocument()
+    expect(api.post).toHaveBeenCalledWith('/api/extract', expect.objectContaining({ prompt: 'apartment with a bedroom' }), expect.anything())
+    expect(api.post).not.toHaveBeenCalledWith('/api/generate', expect.anything(), expect.anything())
   })
 
   it('sends reviewed overrides to canonical multi-floor generation', async () => {
@@ -427,7 +463,7 @@ describe('ProjectPage refine flow', () => {
     await user.type(screen.getByLabelText(/Floors/), '2')
     await user.selectOptions(screen.getByLabelText('Entry faces'), 'N')
     await user.type(screen.getByLabelText('Layout prompt'), 'studio apartment')
-    await user.click(screen.getByRole('button', { name: 'Generate' }))
+    await user.click(screen.getByRole('button', { name: 'Review brief' }))
     expect(await screen.findByText('2 floors')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Generate layout' }))
 
@@ -453,7 +489,7 @@ describe('ProjectPage refine flow', () => {
   it('shows the option gallery after generating and lets the user pick an alternative', async () => {
     const extracted = {
       requirements: {
-        building_type: 'school',
+        building_type: 'house',
         floors: 1,
         rooms: [{ type: 'study', count: 1 }],
         adjacency: [],
@@ -465,17 +501,20 @@ describe('ProjectPage refine flow', () => {
       route: 'generate',
       questions: [],
       optional_missing: [],
-      understood_summary: ['Building: School', '1 floor', '1 study'],
+      understood_summary: ['Building: House', '1 floor', '1 study'],
     }
     const winner = {
-      version: '1.0',
+      requirements: extracted.requirements,
+      layout: {
+        plot: { width_m: 9, depth_m: 12, facing: 'east' },
+        rooms: [{ id: 'study-1', type: 'study', label: 'Study', x: 0, y: 0, w: 9, h: 12, rotation: 0 }],
+        walls: [],
+        doors: [],
+      },
+      quality: { valid: true, score: 90, hard_violations: [], warnings: [] },
+      defaults_applied: [],
       designId: 'd1',
       designVersionId: 'v1',
-      metadata: { prompt: 'apartment', building_type: 'apartment', room_count: 1, placementEngine: 'tile' },
-      building: { floorHeight: 3.2 },
-      floors: SAVED_DESIGN_FIXTURE.floors,
-      rooms: SAVED_DESIGN_FIXTURE.rooms,
-      insights: { score: 90, reasons: [], warnings: [], appliedRules: [] },
       alternatives: [
         {
           version: '1.0',
@@ -517,7 +556,7 @@ describe('ProjectPage refine flow', () => {
     }
     vi.mocked(api.post).mockImplementation(async (url: string) => {
       if (url === '/api/extract') return { data: extracted }
-      if (url === '/api/design/generate') return { data: winner }
+      if (url === '/api/generate') return { data: winner }
       throw new Error('unexpected POST ' + url)
     })
 
@@ -525,12 +564,14 @@ describe('ProjectPage refine flow', () => {
     const user = userEvent.setup()
 
     await user.type(await screen.findByLabelText('Layout prompt'), 'apartment with bedroom')
-    await user.click(screen.getByRole('button', { name: 'Generate' }))
+    await user.click(screen.getByRole('button', { name: 'Review brief' }))
     await user.click(await screen.findByRole('button', { name: 'Generate layout' }))
 
-    const options = await screen.findByRole('combobox', { name: 'Layout option' })
     expect(useCanvasStore.getState().viewMode).toBe('floor_plan')
-    await user.selectOptions(options, '1')
+    await user.click(await screen.findByRole('menuitem', { name: 'Plan' }))
+    ;(await screen.findByRole('menuitem', { name: 'Layout options' })).focus()
+    await user.keyboard('{ArrowRight}')
+    await user.click(await screen.findByRole('menuitemradio', { name: 'Option 2' }))
 
     expect(useCanvasStore.getState().rooms.map((room) => room.label)).toEqual(['Bedroom'])
     expect(useCanvasStore.getState().saveStatus).toBe('unsaved')
@@ -602,7 +643,7 @@ describe('ProjectPage refine flow', () => {
     renderProjectPage()
     const user = userEvent.setup()
     await user.type(await screen.findByLabelText('Layout prompt'), 'one bedroom house')
-    await user.click(screen.getByRole('button', { name: 'Generate' }))
+    await user.click(screen.getByRole('button', { name: 'Review brief' }))
     expect(await screen.findByText('Your brief, understood.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Generate with defaults' }))
 
@@ -626,180 +667,6 @@ describe('ProjectPage refine flow', () => {
     expect(useCanvasStore.getState().designId).toBe('mvp-design-1')
     expect(await screen.findByText(/Assumed: 9x12 m plot/)).toBeInTheDocument()
   })
-
-  it('posts to /api/design/refine when Refine mode is active', async () => {
-    const designFixture = {
-      ...SAVED_DESIGN_FIXTURE,
-      version: '1.0',
-      designId: 'd1',
-      designVersionId: 'v1',
-      metadata: { prompt: 'starter', building_type: 'apartment', room_count: 1 },
-      building: { floorHeight: 3.2 },
-      floors: SAVED_DESIGN_FIXTURE.floors,
-      rooms: SAVED_DESIGN_FIXTURE.rooms,
-    }
-    vi.mocked(api.get).mockImplementation(async (url: string) => {
-      if (url === '/api/design/project/p1/latest') return { data: designFixture }
-      if (url === '/api/design/d1/draft') {
-        const err: any = new Error('not found')
-        err.response = { status: 404 }
-        throw err
-      }
-      throw new Error('unexpected URL ' + url)
-    })
-    vi.mocked(api.post).mockImplementation(async (url: string) => {
-      if (url === '/api/design/refine') {
-        return {
-          data: {
-            ...designFixture,
-            refinementSummary: 'Added 1 bedroom',
-          },
-        }
-      }
-      throw new Error('unexpected POST ' + url)
-    })
-
-    renderProjectPage()
-    const user = userEvent.setup()
-
-    const refineTab = await screen.findByRole('tab', { name: 'Refine' })
-    await waitFor(() => expect(refineTab).not.toBeDisabled())
-    await user.click(refineTab)
-
-    const textarea = screen.getByLabelText('Layout prompt')
-    await user.type(textarea, 'add a bedroom')
-    const submitButton = screen.getByRole('button', { name: 'Refine' })
-    await user.click(submitButton)
-
-    await waitFor(() =>
-      expect(api.post).toHaveBeenCalledWith('/api/design/refine', {
-        designId: 'd1',
-        prompt: 'add a bedroom',
-        currentLayout: expect.objectContaining({ rooms: expect.any(Array) }),
-      }),
-    )
-  })
-
-  it('renders and dismisses the refinement summary banner', async () => {
-    const designFixture = {
-      version: '1.0',
-      designId: 'd1',
-      designVersionId: 'v1',
-      metadata: { prompt: 'starter', building_type: 'apartment', room_count: 1 },
-      building: { floorHeight: 3.2 },
-      floors: SAVED_DESIGN_FIXTURE.floors,
-      rooms: SAVED_DESIGN_FIXTURE.rooms,
-    }
-    vi.mocked(api.get).mockImplementation(async (url: string) => {
-      if (url === '/api/design/project/p1/latest') return { data: designFixture }
-      if (url === '/api/design/d1/draft') {
-        const err: any = new Error('not found')
-        err.response = { status: 404 }
-        throw err
-      }
-      throw new Error('unexpected URL ' + url)
-    })
-    vi.mocked(api.post).mockResolvedValue({
-      data: {
-        ...designFixture,
-        refinementSummary: 'Added 1 bedroom',
-      },
-    })
-
-    renderProjectPage()
-    const user = userEvent.setup()
-
-    const refineTab = await screen.findByRole('tab', { name: 'Refine' })
-    await waitFor(() => expect(refineTab).not.toBeDisabled())
-    await user.click(refineTab)
-    await user.type(screen.getByLabelText('Layout prompt'), 'add a bedroom')
-    await user.click(screen.getByRole('button', { name: 'Refine' }))
-
-    const banner = await screen.findByRole('status')
-    expect(banner).toHaveTextContent('Added 1 bedroom')
-
-    await user.click(screen.getByRole('button', { name: 'Dismiss' }))
-    expect(screen.queryByRole('status')).toBeNull()
-  })
-
-  it('applies authoritative refinement changes visibly before settling on the saved result', async () => {
-    const addedBedroom = {
-      ...INITIAL_ROOMS[3],
-      id: 'refined-bedroom',
-      label: 'Bedroom 2',
-      floorId: 'floor_0',
-      floorLevel: 0,
-    }
-    const refinedRooms = [...SAVED_DESIGN_FIXTURE.rooms, addedBedroom]
-    vi.mocked(api.get).mockImplementation(async (url: string) => {
-      if (url === '/api/design/project/p1/latest') return { data: SAVED_DESIGN_FIXTURE }
-      if (url === '/api/design/d1/draft') {
-        const err: any = new Error('not found')
-        err.response = { status: 404 }
-        throw err
-      }
-      throw new Error('unexpected URL ' + url)
-    })
-    vi.mocked(api.post).mockResolvedValue({
-      data: {
-        ...SAVED_DESIGN_FIXTURE,
-        designVersionId: 'v2',
-        metadata: {
-          ...SAVED_DESIGN_FIXTURE.metadata,
-          room_count: refinedRooms.length,
-        },
-        floors: [
-          {
-            ...SAVED_DESIGN_FIXTURE.floors[0],
-            rooms: refinedRooms,
-          },
-        ],
-        rooms: refinedRooms,
-        refinementSummary: 'Added 1 bedroom',
-        refinementChanges: [
-          {
-            action: 'add',
-            objectId: addedBedroom.id,
-            roomType: 'bedroom',
-            label: addedBedroom.label,
-            floorLevel: 0,
-            description: 'Add Bedroom 2',
-          },
-        ],
-      },
-    })
-
-    renderProjectPage()
-    const user = userEvent.setup()
-    const refineTab = await screen.findByRole('tab', { name: 'Refine' })
-    await waitFor(() => expect(refineTab).not.toBeDisabled())
-    await user.click(refineTab)
-    await user.type(screen.getByLabelText('Layout prompt'), 'add a bedroom')
-    await user.click(screen.getByRole('button', { name: 'Refine' }))
-
-    expect(
-      await screen.findByRole('status', { name: 'Refinement progress' }),
-    ).toHaveTextContent('Add Bedroom 2')
-    expect(useCanvasStore.getState().rooms.some((room) => room.id === addedBedroom.id)).toBe(false)
-
-    await waitFor(
-      () =>
-        expect(
-          useCanvasStore.getState().rooms.some((room) => room.id === addedBedroom.id),
-        ).toBe(true),
-      { timeout: 2500 },
-    )
-    await waitFor(
-      () =>
-        expect(
-          screen.queryByRole('status', { name: 'Refinement progress' }),
-        ).not.toBeInTheDocument(),
-      { timeout: 2500 },
-    )
-    expect(useCanvasStore.getState().designVersionId).toBe('v2')
-    expect(useCanvasStore.getState().selectedId).toBe(addedBedroom.id)
-    expect(await screen.findByText('Added 1 bedroom')).toBeInTheDocument()
-  })
 })
 
 describe('ProjectPage history drawer', () => {
@@ -807,8 +674,8 @@ describe('ProjectPage history drawer', () => {
     renderProjectPage()
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('button', { name: 'More actions' }))
-    await user.click(screen.getByRole('button', { name: 'History' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Plan' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Version history' }))
 
     expect(screen.getByRole('dialog', { name: 'Version history' })).toBeInTheDocument()
   })
@@ -817,8 +684,8 @@ describe('ProjectPage history drawer', () => {
     renderProjectPage()
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('button', { name: 'More actions' }))
-    await user.click(screen.getByRole('button', { name: 'History' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Plan' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Version history' }))
 
     const closeButton = screen.getByRole('button', { name: 'Close history' })
     await userEvent.click(closeButton)
@@ -832,8 +699,8 @@ describe('ProjectPage history drawer', () => {
     renderProjectPage()
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('button', { name: 'More actions' }))
-    await user.click(screen.getByRole('button', { name: 'Activity' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Plan' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Activity' }))
 
     expect(screen.getByRole('dialog', { name: 'Project activity' })).toBeInTheDocument()
   })

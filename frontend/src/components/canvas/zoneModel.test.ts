@@ -22,6 +22,9 @@ describe('zoneForRoom', () => {
     expect(zoneForRoom(room({ roomType: 'bedroom' }))).toBe('private')
     expect(zoneForRoom(room({ roomType: 'kitchen' }))).toBe('service')
     expect(zoneForRoom(room({ roomType: 'hallway' }))).toBe('circulation')
+    // Every type the layout engine emits (backend RoomType) has a zone.
+    expect(zoneForRoom(room({ roomType: 'dining' }))).toBe('public')
+    expect(zoneForRoom(room({ roomType: 'parking' }))).toBe('service')
     expect(zoneForRoom(room({ roomType: 'storage' }))).toBe('utility')
     expect(zoneForRoom(room({ roomType: 'office' }))).toBe('collaborative')
   })

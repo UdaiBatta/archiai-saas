@@ -174,6 +174,47 @@ def _corridor_served_groups(
     return clusters, flex
 
 
+def _stack_wet_rooms(
+    clusters: list[list[RoomNeed]], must_adjacent: list[tuple[str, str]],
+) -> tuple[list[list[RoomNeed]], frozenset[int]]:
+    """Pair each attached bathroom with a common one in a single comb slot,
+    one behind the other: the common bathroom at the corridor, the attached
+    one behind it opening into its bedroom (which is right next to the slot).
+    Two bathrooms each taking a full-depth slot of their own come out as
+    1.6 m-wide strips; stacked, each is close to square. Returns the new
+    clusters and the indices of the stacked (wet) ones."""
+    must = {frozenset(pair) for pair in must_adjacent}
+
+    def sanitary(need: RoomNeed) -> bool:
+        return (catalog.resolve_alias(need.type) or need.type) in _SANITARY_TYPES
+
+    clusters = [list(c) for c in clusters]
+    attached = [
+        (ci, need) for ci, c in enumerate(clusters) for need in c[1:]
+        if sanitary(need) and frozenset((c[0].key, need.key)) in must
+    ]
+    common = [
+        (ci, need) for ci, c in enumerate(clusters) for need in c
+        if sanitary(need) and not (need is not c[0] and frozenset((c[0].key, need.key)) in must)
+    ]
+    pairs = list(zip(attached, common))
+    if not pairs:
+        return clusters, frozenset()
+    for (ci, ensuite), (cj, shared) in pairs:
+        clusters[ci].remove(ensuite)
+        clusters[cj].remove(shared)
+    result: list[list[RoomNeed]] = []
+    wet: set[int] = set()
+    stacks = {ci: [shared, ensuite] for (ci, ensuite), (_, shared) in pairs}
+    for ci, cluster in enumerate(clusters):
+        if cluster:
+            result.append(cluster)
+        if ci in stacks:
+            wet.add(len(result))
+            result.append(stacks[ci])
+    return result, frozenset(wet)
+
+
 def _balance_two_ways(groups: list[list[RoomNeed]]) -> tuple[list[list[RoomNeed]], list[list[RoomNeed]]]:
     """Split ``groups`` (e.g. corridor-served clusters) into two lists
     balanced by required corridor frontage. Preferred area breaks ties; it
@@ -276,19 +317,43 @@ def macro_zone(zone: str) -> str:
     return MACRO_ZONE.get(zone, "private")
 
 
+# Zones whose rooms belong wherever their MUST partner is: an attached
+# bathroom sits in its bedroom's band, a balcony off the living room in the
+# public band. Left alone, outdoor rooms fold into "private" and end up as a
+# thin strip along the back of the plot, nowhere near the room they serve.
+_FOLLOWER_ZONES = frozenset({"service", "outdoor"})
+
+
 def _redistribute_service(program: EngineProgram) -> dict[str, str]:
-    """``zone_of``, with each service-zoned node reassigned to its
-    must-adjacent partner's zone when one exists (an attached bathroom moves
-    into its bedroom's band) — otherwise it keeps its own service zone and
-    forms its own band with other unattached service rooms."""
+    """``zone_of``, with each follower-zoned node (service, outdoor)
+    reassigned to its must-adjacent partner's zone when one exists —
+    otherwise it keeps its own zone and forms its own band."""
     zone_of = dict(program.zone_of)
     reassign: dict[str, str] = {}
     for a, b in program.must_adjacent:
         za, zb = zone_of.get(a), zone_of.get(b)
-        if za == "service" and zb and zb != "service":
+        if za in _FOLLOWER_ZONES and zb and zb not in _FOLLOWER_ZONES:
             reassign[a] = zb
-        if zb == "service" and za and za != "service":
+        if zb in _FOLLOWER_ZONES and za and za not in _FOLLOWER_ZONES:
             reassign[b] = za
+    # An outdoor room with no MUST partner still belongs to a room: its
+    # SHOULD partner if it has one, else the public rooms (a balcony off the
+    # living area) — never a strip of its own along the back of the plot.
+    has_public = any(zone == "public" for zone in zone_of.values())
+    for key, zone in program.zone_of.items():
+        if zone != "outdoor" or key in reassign:
+            continue
+        partner_zone = next(
+            (
+                zone_of[other]
+                for a, b in program.should_adjacent
+                for other in ((b,) if a == key else (a,) if b == key else ())
+                if zone_of.get(other) not in (None, *_FOLLOWER_ZONES)
+            ),
+            None,
+        )
+        if partner_zone or has_public:
+            reassign[key] = partner_zone or "public"
     zone_of.update(reassign)
     return zone_of
 
@@ -404,6 +469,7 @@ def _split_rect(
     *,
     flatten_groups: bool = False,
     minimum_spans: list[float] | None = None,
+    stacked: frozenset[int] = frozenset(),
 ) -> list[Rect]:
     """Split ``rect`` into one sub-rect per group along ``axis`` ("w" or
     "d"), same floor-then-slack allocation as :func:`_facing_progression_bands`
@@ -412,11 +478,14 @@ def _split_rect(
     side to anchor against, just a left-to-right/top-to-bottom order."""
     span = rect.w if axis == "w" else rect.d
     other = rect.d if axis == "w" else rect.w
+    # A flattened group lays its rooms side by side along this axis, so its
+    # floor is the sum of theirs; a ``stacked`` group puts them one behind
+    # the other across it, so it only needs the widest one's floor.
     floors = [
         sum(_band_floor([need], other) for need in group)
-        if flatten_groups and len(group) > 1
+        if flatten_groups and len(group) > 1 and index not in stacked
         else _band_floor(group, other)
-        for group in groups
+        for index, group in enumerate(groups)
     ]
     if minimum_spans is not None:
         floors = [max(floor, minimum) for floor, minimum in zip(floors, minimum_spans)]
@@ -506,6 +575,7 @@ def zoned_bands(program: EngineProgram, plot_w: float, plot_d: float, facing: Fa
     # gets its own ordinary band (appended after the comb) instead of
     # wasting comb length on rooms that never needed it.
     clusters, flex = _corridor_served_groups(served_group, program.must_adjacent)
+    clusters, wet = _stack_wet_rooms(clusters, program.must_adjacent)
 
     if not clusters:
         # No genuinely private room at all — nothing needs the guarantee;
@@ -530,12 +600,21 @@ def zoned_bands(program: EngineProgram, plot_w: float, plot_d: float, facing: Fa
         perp_axis,
         clusters,
         flatten_groups=True,
+        stacked=wet,
     )
-    comb_bands = [
-        flat
-        for rect, cluster in zip(cluster_rects, clusters)
-        for flat in _flatten_cluster_band(rect, cluster, axis=perp_axis)
-    ]
+    depth_axis = "w" if perp_axis == "d" else "d"
+    corridor_first = (
+        corridor_rect.x < served_rect.x if depth_axis == "w" else corridor_rect.y < served_rect.y
+    )
+    comb_bands = []
+    for index, (rect, cluster) in enumerate(zip(cluster_rects, clusters)):
+        if index in wet:
+            # Corridor-side room first along the depth axis.
+            order = cluster if corridor_first else cluster[::-1]
+            parts = _split_rect(rect, depth_axis, [[n] for n in order])
+            comb_bands.extend(zip(parts, [[n] for n in order]))
+        else:
+            comb_bands.extend(_flatten_cluster_band(rect, cluster, axis=perp_axis))
 
     final_bands = bands[:insert_at] + [bands[insert_at]] + comb_bands + bands[insert_at + 2:]
     return BandPlan(bands=final_bands, corridor_rects=[(corridor.key, corridor_rect)])
@@ -613,12 +692,32 @@ def double_loaded_corridor(program: EngineProgram, plot_w: float, plot_d: float,
     # band, so it doesn't pay a second band's own floor overhead on top of
     # the wings' (found live: a separate flex band left too little depth for
     # the wings to comb-arrange their clusters in on several real fixtures).
-    wing_a, wing_b = _balance_two_ways(clusters)
+    # Stack attached + common bathrooms (see _stack_wet_rooms). A wet stack
+    # must stay beside the bedroom its en-suite serves, so the pair is
+    # balanced across the wings as one unit and split apart again after.
+    clusters, wet_index = _stack_wet_rooms(clusters, program.must_adjacent)
+    wet_ids = {id(clusters[i]) for i in wet_index}
+    units: list[list[list[RoomNeed]]] = []
+    for cluster in clusters:
+        if id(cluster) in wet_ids and units:
+            units[-1].append(cluster)
+        else:
+            units.append([cluster])
+    fused = [[n for c in unit for n in c] for unit in units]
+    unit_of = {id(f): unit for f, unit in zip(fused, units)}
+    wing_a_fused, wing_b_fused = _balance_two_ways(fused)
+    wing_a = [c for f in wing_a_fused for c in unit_of[id(f)]]
+    wing_b = [c for f in wing_b_fused for c in unit_of[id(f)]]
     clusters_footprint = [n for cluster in clusters for n in cluster]
     public_and_flex = public + flex
     skeleton = [public_and_flex, clusters_footprint]
+
+    def cluster_span(cluster: list[RoomNeed]) -> float:
+        spans = [min(n.min_w, n.min_d) for n in cluster]
+        return max(spans) if id(cluster) in wet_ids else sum(spans)
+
     wing_span = max(
-        sum(min(n.min_w, n.min_d) for cluster in wing for n in cluster)
+        sum(cluster_span(cluster) for cluster in wing)
         for wing in (wing_a, wing_b)
     )
     progression_bands = _facing_progression_bands(
@@ -648,22 +747,23 @@ def double_loaded_corridor(program: EngineProgram, plot_w: float, plot_d: float,
         wings_rect, perp_axis, [wing_a_footprint, [corridor], wing_b_footprint]
     )
     along_axis = "w" if perp_axis == "d" else "d"
-    comb_a = [
-        flat
-        for rect, cluster in zip(
-            _split_rect(wing_a_rect, along_axis, wing_a, flatten_groups=True),
-            wing_a,
-        )
-        for flat in _flatten_cluster_band(rect, cluster, axis=along_axis)
-    ]
-    comb_b = [
-        flat
-        for rect, cluster in zip(
-            _split_rect(wing_b_rect, along_axis, wing_b, flatten_groups=True),
-            wing_b,
-        )
-        for flat in _flatten_cluster_band(rect, cluster, axis=along_axis)
-    ]
+
+    def comb(wing_rect: Rect, wing: list[list[RoomNeed]], corridor_high: bool):
+        stacked = frozenset(i for i, c in enumerate(wing) if id(c) in wet_ids)
+        rects = _split_rect(wing_rect, along_axis, wing, flatten_groups=True, stacked=stacked)
+        out: list[tuple[Rect, list[RoomNeed]]] = []
+        for i, (rect, cluster) in enumerate(zip(rects, wing)):
+            if i in stacked:
+                # cluster = [common, ensuite]; the common one on the corridor.
+                order = cluster[::-1] if corridor_high else cluster
+                parts = _split_rect(rect, perp_axis, [[n] for n in order])
+                out.extend(zip(parts, [[n] for n in order]))
+            else:
+                out.extend(_flatten_cluster_band(rect, cluster, axis=along_axis))
+        return out
+
+    comb_a = comb(wing_a_rect, wing_a, corridor_high=True)
+    comb_b = comb(wing_b_rect, wing_b, corridor_high=False)
 
     bands = [public_band] + comb_a + [(corridor_rect, [corridor])] + comb_b + trailing_bands
     return BandPlan(bands=bands, corridor_rects=[(corridor.key, corridor_rect)])

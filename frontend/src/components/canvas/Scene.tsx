@@ -254,7 +254,7 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
             center
             style={{ pointerEvents: 'none' }}
           >
-            <div className="rounded bg-warn px-2 py-0.5 text-[11px] font-semibold text-graphite-900 shadow">
+            <div className="whitespace-nowrap rounded bg-warn px-2 py-0.5 text-[11px] font-semibold text-graphite-900 shadow">
               {Math.hypot(
                 measurePoints[1].x - measurePoints[0].x,
                 measurePoints[1].z - measurePoints[0].z,

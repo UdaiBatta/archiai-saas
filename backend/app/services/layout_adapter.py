@@ -10,9 +10,36 @@ from math import hypot, radians
 
 from app.config.mvp_defaults import WALL_HEIGHT_M
 from app.schemas.layout_plan import Door, LayoutPlan, PlanRoom, Wall
-from app.services.layout_service import ROOM_COLORS
 from app.services.parser.vastu import is_vastu_requested
 
+ROOM_COLORS: dict[str, str] = {
+    "living_room":    "#b3b8e9",
+    "kitchen":        "#6bc0a1",
+    "master_bedroom": "#dea97d",
+    "bedroom":        "#e4a6c6",
+    "bathroom":       "#9abbe4",
+    "dining_room":    "#d6bd5d",
+    "office":         "#c8bced",
+    "study":          "#d2b7ed",
+    "workspace":      "#ac95e1",
+    "meeting_room":   "#9977d4",
+    "reception":      "#3cb4a6",
+    "waiting_room":   "#66bfb4",
+    "consultation_room": "#79bddb",
+    "classroom":      "#d0a254",
+    "retail_display": "#50bb77",
+    "checkout":       "#cead48",
+    "storage":        "#b7b4b2",
+    "entry":          "#7d8795",
+    "hallway":        "#afb6c1",
+    "balcony":        "#80cc9c",
+    "garage":         "#888380",
+    "utility":        "#e4e7ec",
+    "stairs":         "#b3b6bc",
+    "wall":           "#475569",
+    "door":           "#a0702c",
+    "window":         "#79bddb",
+}
 _FALLBACK_COLOR = "#94a3b8"
 _ROOM_COLOR_ALIASES = {
     "dining": "dining_room",
@@ -73,7 +100,25 @@ def _wall_object(wall: Wall, index: int) -> dict:
         },
         "rotation": _rotation(),
         "color": ROOM_COLORS["wall"],
+        **({"betweenRooms": list(wall.rooms)} if wall.rooms else {}),
     }
+
+
+def room_edges(plan: LayoutPlan) -> list[dict]:
+    """Every adjacent room pair and how it meets: open / door / wall.
+    Mirrors ``edgesFromLayout`` in the frontend adapter."""
+    doored = {door.wall_ref for door in plan.doors}
+    by_pair: dict[tuple[str, str], str] = {}
+    for wall in plan.walls:
+        if not wall.rooms:
+            continue
+        pair = tuple(sorted(wall.rooms))
+        kind = "open" if wall.kind == "open" else ("door" if wall.id in doored else "wall")
+        previous = by_pair.get(pair)
+        # A pair can share several wall segments; any door wins over solid wall.
+        if previous is None or (previous == "wall" and kind == "door"):
+            by_pair[pair] = kind
+    return [{"rooms": list(pair), "kind": kind} for pair, kind in by_pair.items()]
 
 
 def _door_object(door: Door, wall: Wall, index: int) -> dict:
@@ -143,6 +188,7 @@ def layout_plan_to_canvas(
     wall_objects = [
         _wall_object(wall, index)
         for index, wall in enumerate(plan.walls, start=1)
+        if wall.kind != "open"  # open-plan edge: no physical wall
     ]
     walls_by_id = {wall.id: wall for wall in plan.walls}
     door_objects = [
@@ -177,6 +223,9 @@ def layout_plan_to_canvas(
         # The frontend needs the original opt-in intent when it re-scores an
         # edited plan after save/reload. Never infer Vastu from room content.
         "mvpVastuEnabled": is_vastu_requested(prompt or ""),
+        "mvpEdges": room_edges(plan),
+        "mvpConnections": [c.model_dump(mode="json") for c in plan.connections],
+        **({"mvpFootprint": plan.footprint.model_dump(mode="json")} if plan.footprint else {}),
     }
     if requirements is not None:
         metadata["mvpRequirements"] = requirements

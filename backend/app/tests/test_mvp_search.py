@@ -25,8 +25,9 @@ def _load(name: str) -> RequirementsSpec:
 
 @pytest.mark.parametrize("name", FIXTURE_NAMES)
 def test_every_candidate_is_a_valid_plan(name):
-    for candidate in generate_candidates(_load(name), n=16, seed=0):
-        assert validate(candidate.plan) == []
+    spec = _load(name)
+    for candidate in generate_candidates(spec, n=16, seed=0):
+        assert validate(candidate.plan, spec) == []
 
 
 @pytest.mark.parametrize("name", FIXTURE_NAMES)
@@ -130,15 +131,15 @@ def test_best_candidate_raises_when_the_plot_genuinely_cannot_fit_anything():
 def test_search_finds_a_meaningfully_better_layout_than_single_shot():
     """Pin the measured gain among plans that pass sanitary circulation.
 
-    The former 91-point candidate left one bathroom reachable only through a
-    private room. Once that became a hard violation, the best valid candidate
-    is 81; the search still improves materially over the 72-point baseline.
+    Stacking the attached and the common bathroom back to back, keeping the
+    balcony with the living room, and sizing the house to its rooms (not the
+    plot) lifted the single shot from 72 to 90; the search reaches 100.
     """
     spec = _load("3bhk_adjacencies")
     single_shot_score = score(generate_plan(spec), spec).score
     best_score = score(best_candidate(spec, n=64, seed=0), spec).score
-    assert single_shot_score == 72
-    assert best_score == 81
+    assert single_shot_score == 90
+    assert best_score == 100
     assert best_score - single_shot_score >= 8
 
 
@@ -148,7 +149,7 @@ def test_annealing_never_scores_worse_than_best_of_n_alone(name):
     plain = generate_candidates(spec, n=64, seed=0)
     annealed = generate_candidates(spec, n=64, seed=0, anneal_iterations=50)
     assert annealed[0].energy <= plain[0].energy
-    assert validate(annealed[0].plan) == []
+    assert validate(annealed[0].plan, spec) == []
 
 
 def test_annealing_is_deterministic_for_a_fixed_seed():

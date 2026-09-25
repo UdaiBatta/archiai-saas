@@ -7,28 +7,22 @@ connected by **relationship edges** (adjacency, separation, circulation,
 service dependency, …), independent of any residential vocabulary — an office,
 clinic, or warehouse program is expressed exactly like a house.
 
-Crucially it is *additive*: it sits alongside the existing
-``parse_prompt -> RoomSpec -> generate_layout`` path via a lossless bridge
-(:func:`from_parser_output` / :func:`to_room_specs`), so wiring it in does not
-change any generated layout. See ``docs/NON_ML_GRAPH_LAYOUT_ENGINE.md``.
+Built from a ``RequirementsSpec`` (:func:`from_requirements`) and lowered
+to the engine's ``EngineProgram`` (:func:`to_engine_program`).
 
 No ML anywhere — this is plain typed data + deterministic classification rules.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Iterable, Optional
+from typing import TYPE_CHECKING, Optional
 
 from app.config.mvp_defaults import ROOM_SIZING
-from app.schemas.requirements import RequirementsSpec, RoomType
+from app.schemas.requirements import RequirementsSpec
 from app.services import catalog
-from app.services.prompt_service import RoomSpec
 
 if TYPE_CHECKING:  # avoid any import cost / cycles at runtime
-    from app.services.building_template_service import BuildingTemplate
     from app.services.layout_engine.subdivision import RoomNeed
-    from app.services.parser.constraint_extractor import AdjacencyConstraint
-    from app.services.prompt_service import ParsedRequirements
 
 # ── Vocabularies (building-type-agnostic classification) ─────────────────────
 
@@ -82,7 +76,12 @@ def _classify_node_type(space_type: str) -> NodeType:
     return "space"
 
 
+_OUTDOOR_TYPES = frozenset({"balcony", "terrace", "patio", "deck", "garden", "courtyard", "veranda"})
+
+
 def _classify_zone(space_type: str) -> Zone:
+    if space_type in _OUTDOOR_TYPES:
+        return "outdoor"
     if space_type in _CIRCULATION_TYPES:
         return "circulation"
     if space_type in _SERVICE_TYPES:
@@ -197,136 +196,7 @@ def _apply_type_semantics(node: Node) -> Node:
     return node
 
 
-def _constraint_nodes(
-    graph: ProgramGraph,
-    space_type: str,
-    *,
-    include_family: bool,
-) -> list[Node]:
-    types = (
-        _AVOID_TYPE_FAMILIES.get(space_type, frozenset({space_type}))
-        if include_family
-        else frozenset({space_type})
-    )
-    return [node for node in graph.nodes if node.space_type in types]
-
-
 # ── Adapters ─────────────────────────────────────────────────────────────────
-
-
-def from_room_specs(room_specs: Iterable[RoomSpec], *, source: str = "prompt") -> ProgramGraph:
-    """Build a graph whose buildable nodes are 1:1 with the given RoomSpecs, in
-    order. This is the minimal, always-lossless construction."""
-    graph = ProgramGraph()
-    for spec in room_specs:
-        node = Node(
-            type=_classify_node_type(spec.room_type),
-            space_type=spec.room_type,
-            label=spec.label,
-            zone=_classify_zone(spec.room_type),
-            width=spec.w,
-            depth=spec.d,
-            height=spec.h,
-            target_area_sqm=round(spec.w * spec.d, 2),
-            source=source,
-        )
-        graph.add_node(_apply_type_semantics(node))
-    return graph
-
-
-def from_parser_output(parsed: "ParsedRequirements", room_specs: list[RoomSpec]) -> ProgramGraph:
-    """Build a graph from the parser output.
-
-    Buildable nodes are 1:1 with ``room_specs`` (preserving order/labels/dims),
-    which is what makes :func:`to_room_specs` a lossless inverse. The parser's
-    per-requirement zone/floor hints and adjacency constraints are attached as
-    node attributes and edges — richer information that the bridge ignores but
-    later graph-driven phases use.
-    """
-    graph = from_room_specs(room_specs, source="prompt")
-
-    # Enrich nodes with the parser's per-room-type zone & floor preference.
-    by_type: dict[str, object] = {}
-    for req in getattr(parsed, "rooms", []) or []:
-        by_type.setdefault(req.room_type, req)
-    for node in graph.nodes:
-        req = by_type.get(node.space_type)
-        if req is not None:
-            node.zone = getattr(req, "zone", node.zone) or node.zone
-            node.floor_preference = getattr(req, "floor_preference", node.floor_preference)
-            node.target_area_sqm = getattr(req, "area_m2", node.target_area_sqm)
-            if node.target_area_sqm is not None:
-                node.min_area_sqm = round(node.target_area_sqm * 0.6, 2)
-                node.max_area_sqm = round(node.target_area_sqm * 1.5, 2)
-            if node.width is not None:
-                node.min_width_m = round(max(1.5, node.width * 0.6), 2)
-            if node.depth is not None:
-                node.min_depth_m = round(max(1.5, node.depth * 0.6), 2)
-            if node.width and node.depth:
-                node.preferred_aspect_ratio = round(
-                    max(node.width, node.depth) / min(node.width, node.depth),
-                    2,
-                )
-            _apply_type_semantics(node)
-
-    explicit_daylight_types = set(getattr(parsed, "daylight_rooms", []) or [])
-    for node in graph.nodes:
-        if node.space_type in explicit_daylight_types:
-            node.daylight_need = "high"
-            node.requires_external_wall = True
-
-    # Preserve every affected instance. The previous first-node-only bridge
-    # silently ignored repeated bedrooms, classrooms, consultation rooms, and
-    # other counted spaces during validation.
-    for constraint in getattr(parsed, "adjacency_constraints", []) or []:
-        include_family = constraint.strength == "AVOID"
-        nodes_a = _constraint_nodes(
-            graph,
-            constraint.room_a,
-            include_family=include_family,
-        )
-        nodes_b = _constraint_nodes(
-            graph,
-            constraint.room_b,
-            include_family=include_family,
-        )
-        for a in nodes_a:
-            for b in nodes_b:
-                if a.id == b.id:
-                    continue
-                graph.add_edge(
-                    Edge(
-                        node_a=a.id,
-                        node_b=b.id,
-                        relation_type="adjacent",
-                        strength=constraint.strength,
-                        door_required=constraint.strength == "MUST",
-                        reason=(
-                            f"parser adjacency "
-                            f"{constraint.room_a}~{constraint.room_b}"
-                        ),
-                    )
-                )
-
-    for room_a, room_b in getattr(parsed, "separation_constraints", []) or []:
-        for a in graph.nodes_of_space_type(room_a):
-            for b in graph.nodes_of_space_type(room_b):
-                if a.id == b.id:
-                    continue
-                graph.add_edge(
-                    Edge(
-                        node_a=a.id,
-                        node_b=b.id,
-                        relation_type="separated",
-                        strength="MUST",
-                        reason=f"parser separation {room_a}~{room_b}",
-                    )
-                )
-    return graph
-
-
-def _catalog_key(room_type: RoomType) -> str:
-    return catalog.get(room_type.value).key
 
 
 def _numbered_label(base: str, index: int, count: int) -> str:
@@ -447,19 +317,27 @@ def from_requirements(spec: RequirementsSpec) -> ProgramGraph:
                 return nodes
         return []
 
+    def pairs_for(pref) -> list[tuple[Node, Node]]:
+        a_nodes, b_nodes = nodes_for(pref.room_a), nodes_for(pref.room_b)
+        if pref.strength.upper() != "MUST":
+            return [(a, b) for a in a_nodes for b in b_nodes]
+        # "Master bedroom must connect to a bathroom" attaches ONE bathroom,
+        # not every bathroom in the house: pair instances one to one, the
+        # smaller side's rooms each getting a partner.
+        return list(zip(a_nodes, b_nodes))
+
     for pref in spec.adjacency:
         strength = pref.strength.upper()
-        for a in nodes_for(pref.room_a):
-            for b in nodes_for(pref.room_b):
-                if a.id == b.id:
-                    continue
-                graph.add_edge(Edge(
-                    node_a=a.id, node_b=b.id,
-                    relation_type="adjacent",
-                    strength=strength,
-                    door_required=strength == "MUST",
-                    reason=f"requirements adjacency {pref.room_a}~{pref.room_b}",
-                ))
+        for a, b in pairs_for(pref):
+            if a.id == b.id:
+                continue
+            graph.add_edge(Edge(
+                node_a=a.id, node_b=b.id,
+                relation_type="adjacent",
+                strength=strength,
+                door_required=strength == "MUST",
+                reason=f"requirements adjacency {pref.room_a}~{pref.room_b}",
+            ))
 
     for pair in spec.avoid_adjacency:
         for a in nodes_for(pair.room_a):
@@ -474,132 +352,6 @@ def from_requirements(spec: RequirementsSpec) -> ProgramGraph:
                 ))
 
     return graph
-
-
-def from_building_template(template: "BuildingTemplate") -> ProgramGraph:
-    """Build a graph from a building template's default rooms + adjacency
-    priorities. Useful as a starting program when the prompt is sparse."""
-    graph = ProgramGraph()
-    for room in template.default_rooms:
-        for _ in range(max(1, room.minimum_count)):
-            node = Node(
-                type=_classify_node_type(room.room_type),
-                space_type=room.room_type,
-                label=room.label,
-                zone=_classify_zone(room.room_type),
-                width=room.w,
-                depth=room.d,
-                height=3.0,
-                target_area_sqm=round(room.w * room.d, 2),
-                source="template",
-            )
-            graph.add_node(_apply_type_semantics(node))
-    for a_type, b_type in template.adjacency_priorities:
-        a = graph.first_of_space_type(a_type)
-        b = graph.first_of_space_type(b_type)
-        if a is not None and b is not None and a.id != b.id:
-            graph.add_edge(
-                Edge(node_a=a.id, node_b=b.id, relation_type="adjacent", strength="SHOULD",
-                     reason=f"template adjacency {a_type}~{b_type}")
-            )
-    return graph
-
-
-def from_user_objects(canvas_objects: Iterable[dict]) -> ProgramGraph:
-    """Build a graph from canvas objects (the editor's serialized rooms). Each
-    object carries id/label/objectType/roomType/size."""
-    graph = ProgramGraph()
-    for obj in canvas_objects:
-        size = obj.get("size") or {}
-        space_type = obj.get("roomType") or obj.get("objectType") or "generic"
-        node = Node(
-            id=str(obj.get("id") or ""),
-            type=_classify_node_type(space_type),
-            space_type=space_type,
-            label=obj.get("label") or space_type.replace("_", " ").title(),
-            zone=_classify_zone(space_type),
-            width=size.get("w"),
-            depth=size.get("d"),
-            height=size.get("h"),
-            source="user_added",
-        )
-        if node.width and node.depth:
-            node.target_area_sqm = round(node.width * node.depth, 2)
-        graph.add_node(_apply_type_semantics(node))
-    return graph
-
-
-def merge(base: ProgramGraph, other: ProgramGraph) -> ProgramGraph:
-    """Merge two graphs, de-duplicating nodes by id and re-basing colliding ids
-    from ``other`` so no node is silently dropped."""
-    merged = ProgramGraph(nodes=list(base.nodes), edges=list(base.edges))
-    seen = {n.id for n in merged.nodes}
-    remap: dict[str, str] = {}
-    for node in other.nodes:
-        new_id = node.id
-        if not new_id or new_id in seen:
-            # Keep bumping: `node-{len}` can land on the very id it is meant
-            # to replace (base ["node-0", "node-2"] + other "node-2" -> len is
-            # 2 -> "node-2" again), which appended a SECOND "node-2" and made
-            # one of them unreachable through get_node/edges — the exact
-            # silent drop this function's docstring promises not to do.
-            index = len(merged.nodes)
-            while f"node-{index}" in seen:
-                index += 1
-            new_id = f"node-{index}"
-        if new_id != node.id:
-            remap[node.id] = new_id
-        node.id = new_id
-        seen.add(new_id)
-        merged.nodes.append(node)
-    for edge in other.edges:
-        merged.edges.append(
-            Edge(
-                node_a=remap.get(edge.node_a, edge.node_a),
-                node_b=remap.get(edge.node_b, edge.node_b),
-                relation_type=edge.relation_type,
-                strength=edge.strength,
-                preferred_relative_position=edge.preferred_relative_position,
-                min_shared_wall_m=edge.min_shared_wall_m,
-                door_required=edge.door_required,
-                access_required=edge.access_required,
-                visibility_required=edge.visibility_required,
-                reason=edge.reason,
-            )
-        )
-    return merged
-
-
-# ── Bridge back to RoomSpec (lossless for the prompt path) ───────────────────
-
-
-def to_room_specs(graph: ProgramGraph) -> list[RoomSpec]:
-    """Convert a graph's buildable nodes back into RoomSpecs, preserving order.
-
-    For a graph built via :func:`from_parser_output` / :func:`from_room_specs`
-    this reproduces the original RoomSpec list exactly, so
-    ``generate_layout(to_room_specs(from_parser_output(parsed, specs)))`` equals
-    ``generate_layout(specs)``.
-    """
-    specs: list[RoomSpec] = []
-    for node in graph.buildable_nodes():
-        width = node.width
-        depth = node.depth
-        if width is None or depth is None:
-            # Derive a square footprint from the target area when dims are absent.
-            side = (node.target_area_sqm ** 0.5) if node.target_area_sqm else 3.0
-            width = width if width is not None else round(side, 2)
-            depth = depth if depth is not None else round(side, 2)
-        specs.append(
-            RoomSpec(
-                label=node.label or node.space_type.replace("_", " ").title(),
-                room_type=node.space_type,
-                w=width,
-                h=node.height if node.height is not None else 3.0,
-                d=depth,
-            )
-        )
-    return specs
 
 
 # ── Bridge to EngineProgram (Phase 2.1 — additive; engine.py does not consume

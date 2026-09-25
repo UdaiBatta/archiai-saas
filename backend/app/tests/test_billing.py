@@ -12,6 +12,7 @@ from app.models.billing import Entitlement, PaymentEvent, PaymentOrder, Plan, Su
 from app.models.user import User
 from app.services import entitlement_service
 from app.tests.conftest import TestSessionLocal
+from app.tests.conftest import generate_design
 
 WEBHOOK_SECRET = "test-webhook-secret"
 
@@ -136,9 +137,8 @@ async def test_generation_quota_returns_402_when_exceeded(client: AsyncClient, m
         ))
         await s.commit()
 
-    payload = {"prompt": "2 bedroom apartment with kitchen and living room"}
-    first = await client.post("/api/design/generate", json=payload, headers=_headers(token))
-    second = await client.post("/api/design/generate", json=payload, headers=_headers(token))
+    first = await generate_design(client, _headers(token))
+    second = await generate_design(client, _headers(token))
 
     assert first.status_code == 200
     assert second.status_code == 402

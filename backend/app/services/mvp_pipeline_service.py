@@ -73,6 +73,10 @@ def understood_summary(spec: RequirementsSpec) -> list[str]:
         a = edge.room_a.replace("_", " ")
         b = edge.room_b.replace("_", " ")
         summary.append(f"{relation}: {a} ↔ {b}")
+    for edge in sorted(spec.avoid_adjacency, key=lambda item: (item.room_a, item.room_b)):
+        a = edge.room_a.replace("_", " ")
+        b = edge.room_b.replace("_", " ")
+        summary.append(f"Keep apart: {a} ↔ {b}")
     return summary
 
 

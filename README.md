@@ -14,7 +14,6 @@ The current MVP does not call paid AI APIs for generation. Brief extraction (pla
 - View version history and project/workspace activity.
 - Export the current canvas as PNG or a basic project-summary PDF.
 - Create and revoke public token-based read-only project links.
-- Use the internal data pipeline to collect permitted public-text layout references when explicitly enabled.
 
 Exports are concept handoffs, not CAD/BIM or construction documents.
 
@@ -59,11 +58,11 @@ LLM_BASE_URL=http://localhost:1234/v1
 LLM_TIMEOUT_S=30
 LLM_MODEL=
 LLM_API_KEY=
+LLM_REASONING_EFFORT=
 VITE_API_URL=http://localhost:8000
-VITE_SHOW_DEV_TOOLS=false
 ```
 
-Never commit `.env` or real credentials. Keep `VITE_SHOW_DEV_TOOLS=false` for the normal product UI.
+Never commit `.env` or real credentials. Keep Jev's `TYPESAFE_API_KEY` in `backend/.env` for local project tooling, and export it into the process environment when running Jev directly.
 
 ## Run Locally
 
@@ -124,10 +123,10 @@ Brief extraction runs through any OpenAI-compatible chat-completions endpoint. P
 | LM Studio (default, local) | `http://localhost:1234/v1` | *(blank — auto-detected)* | Free, uses your GPU |
 | AWS Bedrock | `https://bedrock-runtime.<region>.amazonaws.com/openai/v1` | `amazon.nova-micro-v1:0` | Pay per token (fractions of a cent per extraction) |
 | Groq | `https://api.groq.com/openai/v1` | `llama-3.3-70b-versatile` | Free tier (~1k requests/day) |
-| Google Gemini | `https://generativelanguage.googleapis.com/v1beta/openai` | `gemini-2.5-flash` | Free tier |
+| Google Gemini | `https://generativelanguage.googleapis.com/v1beta/openai` | `gemini-3.6-flash` | Free tier |
 | OpenRouter | `https://openrouter.ai/api/v1` | `meta-llama/llama-3.3-70b-instruct` | Free models / pay per token |
 
-Set `LLM_API_KEY` to the provider's bearer key and restart the backend. With a key set, the backend skips local-model discovery when `LLM_MODEL` is explicit and allows concurrent requests. Bedrock API keys come from the AWS Bedrock console (short- or long-term bearer keys — no SigV4 signing needed). Generation geometry never calls the provider; only brief extraction does.
+Set `LLM_API_KEY` to the provider's bearer key and restart the backend. With a key set, the backend skips local-model discovery when `LLM_MODEL` is explicit and allows concurrent requests. Bedrock API keys come from the AWS Bedrock console (short- or long-term bearer keys — no SigV4 signing needed). Generation geometry never calls the provider; only brief extraction does. For Gemini also set `LLM_REASONING_EFFORT=none`: its default thinking otherwise uses up the output budget and the JSON arrives cut off.
 
 ## Run Everything With Docker Compose
 
@@ -249,27 +248,6 @@ docker compose build backend frontend
 
 Treat share links as sensitive. The MVP does not yet support passwords, expiry dates, link analytics, or cloud file storage.
 
-## Internal Layout Pattern Data
-
-Layout generation works immediately with built-in fallback rules. Optional seed and source-derived `LayoutPattern` records improve deterministic sizing, zoning, and adjacency defaults.
-
-Seed local sample patterns:
-
-```powershell
-cd backend
-..\.venv311\Scripts\python.exe -m scripts.seed_layout_patterns --user-email you@example.com
-```
-
-The scraper/data-pipeline UI is internal tooling and is hidden from normal navigation. To enable it for local development:
-
-```powershell
-cd frontend
-$env:VITE_SHOW_DEV_TOOLS='true'
-npm run dev
-```
-
-Then open http://localhost:5173/scraper. See [docs/PATTERN_DATA_WORKFLOW.md](docs/PATTERN_DATA_WORKFLOW.md).
-
 ## API Highlights
 
 | Method | Route | Description |
@@ -279,7 +257,9 @@ Then open http://localhost:5173/scraper. See [docs/PATTERN_DATA_WORKFLOW.md](doc
 | GET | `/api/auth/me` | Load current user |
 | POST | `/api/projects` | Create project |
 | GET | `/api/projects/{id}` | Load project |
-| POST | `/api/design/generate` | Generate and persist layout |
+| POST | `/api/extract` | Brief text to structured requirements (LLM + fallback rules) |
+| POST | `/api/generate` | Generate and persist a layout from requirements |
+| POST | `/api/validate` | Re-derive walls/doors and quality-check an edited layout |
 | PUT | `/api/design/{id}` | Manual save and create named version |
 | PUT | `/api/design/{id}/draft` | Save/update separate auto-draft |
 | POST | `/api/projects/{id}/export/image` | Record image export |
@@ -335,14 +315,14 @@ Authenticated errors use:
 
 ## Future AI Scope
 
-The MVP intentionally avoids paid AI APIs and model training. Future work may add an optional provider behind a strict interface while retaining deterministic parsing, fallback rules, provenance, and testable layout generation. See [docs/PROJECT_STRATEGY.md](docs/PROJECT_STRATEGY.md).
+The MVP intentionally avoids paid AI APIs and model training. Future work may add an optional provider behind a strict interface while retaining deterministic parsing, fallback rules, provenance, and testable layout generation.
 
 ## Contribution Workflow
 
 - Never push directly to `main`.
 - Create a focused feature branch.
 - Write tests before or alongside implementation.
-- Keep frontend, backend, generation, scraper, and logging concerns separate.
+- Keep frontend, backend, generation, and logging concerns separate.
 - Run relevant checks before each commit and use a clear commit message.
 - Open a pull request for review.
 

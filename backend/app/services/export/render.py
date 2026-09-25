@@ -65,6 +65,8 @@ def layout_to_svg(plan: LayoutPlan, title: str | None = None) -> str:
             )
 
     for wall in plan.walls:
+        if wall.kind == "open":
+            continue
         parts.append(
             f'<line x1="{_MARGIN + _px(wall.x1)}" y1="{top + _px(wall.y1)}" '
             f'x2="{_MARGIN + _px(wall.x2)}" y2="{top + _px(wall.y2)}" '

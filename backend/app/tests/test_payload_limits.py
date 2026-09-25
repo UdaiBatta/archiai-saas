@@ -14,10 +14,10 @@ async def _token(client: AsyncClient, email: str) -> str:
     return response.json()["access_token"]
 
 
-async def test_generate_rejects_oversize_prompt(client: AsyncClient):
+async def test_extract_rejects_oversize_prompt(client: AsyncClient):
     token = await _token(client, "big-prompt@example.com")
     response = await client.post(
-        "/api/design/generate",
+        "/api/extract",
         json={"prompt": "a" * 2001},
         headers={"Authorization": f"Bearer {token}"},
     )

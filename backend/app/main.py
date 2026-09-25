@@ -13,7 +13,6 @@ from app.api.billing.router import router as billing_router
 from app.api.designs.router import router as designs_router
 from app.api.mvp.router import router as mvp_router
 from app.api.projects.router import router as projects_router
-from app.api.scraper.router import router as scraper_router
 from app.api.shares.router import router as shares_router
 from app.api.workspaces.router import router as workspaces_router
 
@@ -128,7 +127,6 @@ app.include_router(projects_router)
 app.include_router(workspaces_router)
 app.include_router(designs_router)
 app.include_router(mvp_router)
-app.include_router(scraper_router)
 app.include_router(shares_router)
 app.include_router(billing_router)
 

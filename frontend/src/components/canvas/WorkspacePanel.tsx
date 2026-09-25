@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useCanvasStore } from '../../store/canvasStore'
 import { COMPONENT_REGISTRY } from '../../store/componentRegistry'
 import { InspectorProperties } from './Inspector'
+import { RoomConnections } from './RoomConnections'
 import { QualityPanel } from './QualityPanel'
 import { parseMvpQuality } from './qualityModel'
 import { displayRoomColor } from './editorPalette'
@@ -12,13 +13,12 @@ interface WorkspacePanelProps {
   reviewChanges: boolean
   onReviewChanges: (value: boolean) => void
   onCreateModel: () => void
-  onRefine: () => void
   open: boolean
   onClose: () => void
   busy: boolean
 }
 
-export function WorkspacePanel({ modelStage, reviewChanges, onReviewChanges, onCreateModel, onRefine, open, onClose, busy }: WorkspacePanelProps) {
+export function WorkspacePanel({ modelStage, reviewChanges, onReviewChanges, onCreateModel, open, onClose, busy }: WorkspacePanelProps) {
   const [search, setSearch] = useState('')
   const rooms = useCanvasStore((s) => s.rooms)
   const selectedId = useCanvasStore((s) => s.selectedId)
@@ -45,7 +45,7 @@ export function WorkspacePanel({ modelStage, reviewChanges, onReviewChanges, onC
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {reviewChanges ? (
           <>
-            <p className="mb-3 text-xs leading-relaxed text-muted">Review your edits, or describe another change below. Refinement uses the layout currently on screen.</p>
+            <p className="mb-3 text-xs leading-relaxed text-muted">Review your edits made this session.</p>
             {activityLog.length ? (
               <ol className="space-y-2" aria-label="Session changes">
                 {activityLog.map((entry) => (
@@ -56,7 +56,6 @@ export function WorkspacePanel({ modelStage, reviewChanges, onReviewChanges, onC
                 ))}
               </ol>
             ) : <p className="rounded-lg bg-ink/5 p-3 text-xs text-muted">No manual changes in this session yet.</p>}
-            <button type="button" onClick={onRefine} disabled={busy} className="mt-3 w-full rounded-lg border border-accent/50 px-3 py-2 text-xs font-semibold text-accent-bright">Describe a refinement</button>
             <button type="button" onClick={() => onReviewChanges(false)} className="mt-2 w-full py-2 text-xs text-muted">Back to rooms</button>
           </>
         ) : selected ? (
@@ -64,6 +63,7 @@ export function WorkspacePanel({ modelStage, reviewChanges, onReviewChanges, onC
             <button type="button" onClick={deselectAll} className="mb-3 text-xs text-muted hover:text-ink">← {modelStage ? 'Model overview' : 'All rooms'}</button>
             <h3 className="mb-3 truncate text-sm font-semibold text-ink">{selected.label}</h3>
             <fieldset disabled={busy} className="min-w-0"><InspectorProperties room={selected} /></fieldset>
+            {selected.objectType === 'room' && <RoomConnections roomId={selected.id} disabled={busy} />}
           </>
         ) : (
           <>
@@ -87,7 +87,7 @@ export function WorkspacePanel({ modelStage, reviewChanges, onReviewChanges, onC
       </div>
       <div className="border-t border-ink/10 p-3">
         {!modelStage && !reviewChanges && <button type="button" onClick={() => onReviewChanges(true)} className="mb-2 w-full rounded-lg border border-ink/15 px-3 py-2 text-xs text-ink">Review & refine{activityLog.length ? ` · ${activityLog.length}` : ''}</button>}
-        <button type="button" data-testid="create-3d-model" disabled={busy} onClick={modelStage ? () => setPlacementMode(placementMode === 'furniture' ? null : 'furniture') : onCreateModel} className="w-full rounded-lg bg-accent px-3 py-2.5 text-xs font-semibold text-white hover:bg-accent-bright disabled:opacity-50">
+        <button type="button" data-testid="create-3d-model" disabled={busy} onClick={modelStage ? () => setPlacementMode(placementMode === 'furniture' ? null : 'furniture') : onCreateModel} className="w-full rounded-lg bg-accent px-3 py-2.5 text-xs font-semibold text-graphite-950 hover:bg-accent-bright disabled:opacity-50">
           {modelStage ? placementMode === 'furniture' ? 'Cancel furniture placement' : '+ Add furniture' : 'Create a 3D model →'}
         </button>
         <p className="mt-2 text-center text-[10px] leading-relaxed text-muted-light">{modelStage ? placementMode === 'furniture' ? 'Click on a room floor to place a proxy. Esc cancels.' : 'Generic furniture proxies · a type library comes later' : 'Happy with the layout? Continue to walls & furniture.'}</p>

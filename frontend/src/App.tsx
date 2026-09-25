@@ -1,17 +1,15 @@
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom'
 
-import Dashboard from './pages/Dashboard'
+import ProjectsPage from './pages/Projects'
+import NewProjectPage from './pages/NewProject'
 import ProjectPage from './pages/Project'
 import Landing from './pages/Landing'
 import Login from './pages/Login'
 import PricingPage from './pages/Pricing'
-import CheckoutPage from './pages/Checkout'
 import Register from './pages/Register'
-import ScraperPage from './pages/Scraper'
 import SharedProjectPage from './pages/SharedProject'
 import WorkspacePage from './pages/Workspace'
 import WorkspacesPage from './pages/Workspaces'
-import { isInternalDataPipelineEnabled } from './config/internalTools'
 import { useAuthStore } from './store/authStore'
 
 function ProtectedRoute() {
@@ -21,11 +19,7 @@ function ProtectedRoute() {
 
 function PublicOnlyRoute() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
-  return isAuthenticated ? <Navigate to="/dashboard" replace /> : <Outlet />
-}
-
-function InternalToolsRoute() {
-  return isInternalDataPipelineEnabled() ? <Outlet /> : <Navigate to="/dashboard" replace />
+  return isAuthenticated ? <Navigate to="/projects" replace /> : <Outlet />
 }
 
 export default function App() {
@@ -34,18 +28,17 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/pricing" element={<PricingPage />} />
-        <Route path="/checkout" element={<CheckoutPage />} />
         <Route path="/share/:token" element={<SharedProjectPage />} />
         <Route element={<PublicOnlyRoute />}>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
         </Route>
         <Route element={<ProtectedRoute />}>
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/projects" element={<ProjectsPage />} />
+          <Route path="/projects/new" element={<NewProjectPage />} />
+          {/* Old links and bookmarks. */}
+          <Route path="/dashboard" element={<Navigate to="/projects" replace />} />
           <Route path="/projects/:id" element={<ProjectPage />} />
-          <Route element={<InternalToolsRoute />}>
-            <Route path="/scraper" element={<ScraperPage />} />
-          </Route>
           <Route path="/workspaces" element={<WorkspacesPage />} />
           <Route path="/workspaces/:id" element={<WorkspacePage />} />
         </Route>

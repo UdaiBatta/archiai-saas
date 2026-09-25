@@ -95,6 +95,9 @@ export interface Wall {
   y2: number
   thickness: number
   floor?: number
+  kind?: 'wall' | 'open'
+  /** The two room ids an interior wall separates; absent on the boundary. */
+  rooms?: string[]
 }
 export interface Door {
   id: string
@@ -110,6 +113,26 @@ export interface LayoutPlan {
   walls: Wall[]
   doors: Door[]
   archetype_reasons?: ArchetypeReason[]
+  connections?: Connection[]
+  /** The building's outline on the plot; absent when it fills the plot. */
+  footprint?: PlanZoneSpan
+}
+
+export type ConnectionKind = 'wall' | 'door' | 'open'
+
+/** A user's choice for how two adjacent rooms meet (overrides the engine). */
+export interface Connection {
+  room_a: string
+  room_b: string
+  kind: ConnectionKind
+  /** Door centre as a 0..1 fraction along the shared edge; null = centred. */
+  at?: number | null
+}
+
+/** How two adjacent rooms currently meet, as last derived by the server. */
+export interface RoomEdge {
+  rooms: [string, string]
+  kind: ConnectionKind
 }
 
 export interface Violation { code: string; room_ids: string[]; message: string }
