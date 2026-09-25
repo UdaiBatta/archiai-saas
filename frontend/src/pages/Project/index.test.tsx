@@ -191,6 +191,22 @@ describe('ProjectPage canvas views', () => {
       throw Object.assign(new Error('not found'), { response: { status: 404 } })
     })
   })
+  it('renames the project from the title, with the form below the bar', async () => {
+    vi.mocked(projectService.update).mockResolvedValue({ ...PROJECT_FIXTURE, title: 'Villa, east plot' } as never)
+    renderProjectPage()
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: /Test Project/ }))
+
+    const name = screen.getByRole('textbox', { name: 'Project name' })
+    expect(name).toHaveValue('Test Project')
+    await user.clear(name)
+    await user.type(name, 'Villa, east plot{Enter}')
+
+    expect(projectService.update).toHaveBeenCalledWith('p1', expect.objectContaining({ title: 'Villa, east plot' }))
+    expect(await screen.findByRole('button', { name: /Villa, east plot/ })).toBeInTheDocument()
+    expect(screen.queryByRole('form', { name: 'Project details' })).not.toBeInTheDocument()
+  })
+
   it('keeps the brief out of the way once a plan exists, and reopens it from Edit', async () => {
     renderProjectPage()
     const user = userEvent.setup()

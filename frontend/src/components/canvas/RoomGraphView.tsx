@@ -87,7 +87,9 @@ export function RoomGraphView({ className }: RoomGraphViewProps) {
 
   return (
     <div className={`relative overflow-hidden bg-graphite-900 ${className ?? ''}`}>
-      <div className="h-full w-full overflow-auto" data-testid="room-graph-canvas">
+      {/* Clear the top bar + view switcher (top-28) and the reasoning panel
+          on the right, so no node or column header hides under the chrome. */}
+      <div className="h-full w-full overflow-auto pb-12 pt-28 sm:pr-80" data-testid="room-graph-canvas">
         <svg
           role="application"
           aria-label="Room access graph"

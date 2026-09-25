@@ -62,7 +62,8 @@ export function ZoningView({ className }: ZoningViewProps) {
         role="application"
         aria-label="Zoning view"
         data-testid="zoning-canvas"
-        className="h-full w-full select-none"
+        // Padding keeps the drawing clear of the top bar and the zone panel.
+        className="box-border h-full w-full select-none pb-12 pt-28 sm:pr-80"
         viewBox={`${bounds.x} ${bounds.z} ${bounds.w} ${bounds.d}`}
         preserveAspectRatio="xMidYMid meet"
         onPointerDown={(event) => {
