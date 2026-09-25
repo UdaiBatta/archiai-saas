@@ -41,6 +41,7 @@ describe('RoomConnections', () => {
     expect(useCanvasStore.getState().layoutMetadata.mvpConnections).toEqual([
       { room_a: 'living', room_b: 'kitchen', kind: 'wall', at: null },
     ])
+    expect(kitchen.querySelector('[aria-checked="true"]')).toHaveTextContent('Wall')
   })
 
   it('renders nothing for a room with no neighbours', () => {

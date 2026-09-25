@@ -679,7 +679,7 @@ export function RightPanel({ onCreateModel, open = true, onClose }: { onCreateMo
             type="button"
             data-testid="create-3d-model"
             onClick={onCreateModel}
-            className="w-full rounded-lg bg-accent px-3 py-2 text-sm font-bold text-white shadow-[0_4px_16px_-4px_rgba(255,59,31,0.45)] hover:bg-accent-bright"
+            className="w-full rounded-lg bg-accent px-3 py-2 text-sm font-bold text-graphite-950 shadow-[0_4px_16px_-4px_rgba(255,59,31,0.45)] hover:bg-accent-bright"
           >
             Create a 3D model →
           </button>

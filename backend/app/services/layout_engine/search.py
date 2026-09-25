@@ -44,6 +44,7 @@ from app.services.layout_engine.engine import (
     DoesNotFitError,
     _build_program,
     _guard_program_size,
+    _require_home_garage_entry,
     generate_plan,
     plan_on_plot,
 )
@@ -200,7 +201,30 @@ def generate_candidates(
         scored.append((candidate, program))
 
     if not scored and last_error is not None:
-        raise last_error
+        # Some room orders can route a residential garage through a kitchen or
+        # public room. Only after the ordinary search finds no valid plan do
+        # we retry with the engine's direct garage-to-entry default; a brief's
+        # explicit garage-to-utility MUST edge is preserved by the helper.
+        garage_program = _require_home_garage_entry(base_program, spec)
+        if garage_program is base_program:
+            raise last_error
+        fallback_rng = random.Random(seed)
+        seen_orders.clear()
+        for i in range(max(0, n)):
+            program = garage_program if i == 0 else _shuffled(garage_program, fallback_rng)
+            order = tuple(need.key for need in program.needs)
+            if order in seen_orders:
+                continue
+            seen_orders.add(order)
+            try:
+                plan = plan_on_plot(spec, program, plot_w, plot_d, facing)
+            except DoesNotFitError as exc:
+                last_error = exc
+                continue
+            candidate = Candidate(plan=plan, energy=energy(plan, spec, graph), seed=seed + i)
+            scored.append((candidate, program))
+        if not scored:
+            raise last_error
     scored.sort(key=lambda pair: pair[0].energy)
 
     if anneal_iterations > 0 and scored:

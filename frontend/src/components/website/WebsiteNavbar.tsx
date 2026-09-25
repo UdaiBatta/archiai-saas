@@ -100,7 +100,7 @@ export function WebsiteNavbar() {
           )}
           <Link
             to={startTarget}
-            className={`rounded-full bg-ember px-4 py-2 text-sm font-bold text-ink shadow-[0_6px_24px_rgba(255,59,31,0.35)] transition-transform hover:-translate-y-px ${focusRing}`}
+            className={`rounded-full bg-ember px-4 py-2 text-sm font-bold text-graphite-950 shadow-[0_6px_24px_rgba(255,59,31,0.35)] transition-transform hover:-translate-y-px ${focusRing}`}
           >
             {isAuthenticated ? 'Your projects' : 'Start designing'}
           </Link>
@@ -144,7 +144,7 @@ export function WebsiteNavbar() {
             <Link
               to={startTarget}
               onClick={() => setMenuOpen(false)}
-              className="rounded-full bg-ember px-3 py-2 text-center text-sm font-bold text-ink"
+              className="rounded-full bg-ember px-3 py-2 text-center text-sm font-bold text-graphite-950"
             >
               {isAuthenticated ? 'Your projects' : 'Start designing'}
             </Link>

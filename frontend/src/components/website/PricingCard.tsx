@@ -19,7 +19,7 @@ export function PricingCard({ plan, cycle, compact = false, onSelect }: PricingC
       }`}
     >
       {plan.highlighted && (
-        <span className="absolute -top-2.5 left-5 rounded-full bg-ember px-2.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-ink">
+        <span className="absolute -top-2.5 left-5 rounded-full bg-ember px-2.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-graphite-950">
           Most popular
         </span>
       )}
@@ -46,7 +46,7 @@ export function PricingCard({ plan, cycle, compact = false, onSelect }: PricingC
         onClick={() => onSelect(plan)}
         className={`mt-6 w-full rounded-full px-3 py-2.5 text-sm font-bold transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/50 disabled:cursor-not-allowed ${
           plan.available
-            ? 'bg-ember text-ink shadow-[0_8px_28px_rgba(255,59,31,0.35)] hover:-translate-y-px'
+            ? 'bg-ember text-graphite-950 shadow-[0_8px_28px_rgba(255,59,31,0.35)] hover:-translate-y-px'
             : 'border border-dashed border-ink/20 font-mono text-xs font-medium uppercase tracking-[0.14em] text-muted-light'
         }`}
       >

@@ -217,6 +217,45 @@ def _build_program(spec: RequirementsSpec, *, inject_corridor: bool = True) -> E
     return _remap_program(to_engine_program(graph))
 
 
+def _require_home_garage_entry(
+    program: EngineProgram, spec: RequirementsSpec
+) -> EngineProgram:
+    """Add garage-to-entry edges for the residential recovery search.
+
+    An explicit garage-to-utility MUST edge takes precedence, while exterior
+    access remains valid for edited/imported plans.
+    """
+    if spec.building_type not in {
+        BuildingType.house, BuildingType.apartment, BuildingType.villa, BuildingType.duplex,
+    } or not program.entry_node:
+        return program
+    garages = [
+        need.key for need in program.needs
+        if (catalog.resolve_alias(need.type) or need.type) == "garage"
+    ]
+    type_by_key = {
+        need.key: (catalog.resolve_alias(need.type) or need.type)
+        for need in program.needs
+    }
+    existing = {frozenset(pair) for pair in program.must_adjacent}
+    added = [
+        (garage, program.entry_node) for garage in garages
+        if garage != program.entry_node
+        and frozenset((garage, program.entry_node)) not in existing
+        and not any(
+            garage in pair
+            and any(
+                key != garage and type_by_key.get(key) in {"utility", "laundry", "mudroom"}
+                for key in pair
+            )
+            for pair in program.must_adjacent
+        )
+    ]
+    if not added:
+        return program
+    return dataclasses.replace(program, must_adjacent=[*program.must_adjacent, *added])
+
+
 def _programs_by_floor(spec: RequirementsSpec) -> list[EngineProgram]:
     _guard_program_size(spec)
     try:
@@ -1134,7 +1173,9 @@ def _stack_floors(
     return plan
 
 
-def _generate_plan_polygon(spec: RequirementsSpec) -> LayoutPlan:
+def _generate_plan_polygon(
+    spec: RequirementsSpec, program: EngineProgram | None = None
+) -> LayoutPlan:
     """Polygon counterpart of `generate_plan`'s tail — same validation order,
     same error types, no zone/archetype banding (Phase 8 scope: `zoned_bands`
     already collapses to one band for a single zone group, so subdividing the
@@ -1145,7 +1186,7 @@ def _generate_plan_polygon(spec: RequirementsSpec) -> LayoutPlan:
     if not plot_polygon.is_valid or not plot_polygon.is_simple or plot_polygon.area <= EPS:
         raise DoesNotFitError("plot boundary is not a valid simple polygon")
 
-    program = _build_program(spec)
+    program = program or _build_program(spec)
     needs = program.needs
     if not needs:
         raise DoesNotFitError("no rooms requested")
@@ -1201,7 +1242,7 @@ def _generate_plan_polygon(spec: RequirementsSpec) -> LayoutPlan:
         ))
 
     plot_minx, plot_miny, plot_maxx, plot_maxy = plot_polygon.bounds
-    return LayoutPlan(
+    plan = LayoutPlan(
         plot=PlanPlot(
             width_m=plot_maxx - plot_minx,
             depth_m=plot_maxy - plot_miny,
@@ -1212,6 +1253,31 @@ def _generate_plan_polygon(spec: RequirementsSpec) -> LayoutPlan:
         walls=walls,
         doors=doors,
     )
+    from app.services.quality.hard_constraints import validate
+
+    violations = validate(plan, spec)
+    if violations:
+        raise DoesNotFitError("; ".join(violation.message for violation in violations))
+    return plan
+
+
+def _polygon_program_orders(program: EngineProgram, limit: int = 64):
+    """Try the original room order, then bounded single swaps.
+
+    Polygon cuts are sensitive to order, just like rectangular subdivision.
+    A full permutation search grows factorially, so keep this rescue pass
+    bounded while still covering small programs exhaustively by one swap.
+    """
+    yield program
+    tried = 1
+    for i in range(len(program.needs)):
+        for j in range(i + 1, len(program.needs)):
+            if tried >= limit:
+                return
+            needs = list(program.needs)
+            needs[i], needs[j] = needs[j], needs[i]
+            yield dataclasses.replace(program, needs=needs)
+            tried += 1
 
 
 # ── Building footprint ───────────────────────────────────────────────────────
@@ -1306,10 +1372,52 @@ def generate_plan(spec: RequirementsSpec) -> LayoutPlan:
     if spec.floors > 1:
         return _generate_plan_multifloor(spec)
     if spec.plot.boundary is not None:
-        return _generate_plan_polygon(spec)
+        program = _build_program(spec)
+        first_error: DoesNotFitError | None = None
+        for candidate_program in _polygon_program_orders(program):
+            try:
+                return _generate_plan_polygon(spec, candidate_program)
+            except DoesNotFitError as exc:
+                if first_error is None:
+                    first_error = exc
+        garage_program = _require_home_garage_entry(program, spec)
+        garage_labels = {
+            need.label.casefold() for need in program.needs
+            if (catalog.resolve_alias(need.type) or need.type) == "garage"
+        }
+        if garage_program is not program and any(
+            label in str(first_error).casefold() for label in garage_labels
+        ):
+            for candidate_program in _polygon_program_orders(garage_program):
+                try:
+                    return _generate_plan_polygon(spec, candidate_program)
+                except DoesNotFitError:
+                    continue
+        assert first_error is not None
+        raise first_error
 
     plot_w = spec.plot.width_m or DEFAULT_PLOT_WIDTH_M
     plot_d = spec.plot.depth_m or DEFAULT_PLOT_DEPTH_M
     facing = spec.facing or DEFAULT_FACING
     program = _build_program(spec)
-    return plan_on_plot(spec, program, plot_w, plot_d, facing)
+    try:
+        return plan_on_plot(spec, program, plot_w, plot_d, facing)
+    except DoesNotFitError as first_error:
+        garage_labels = {
+            need.label.casefold() for need in program.needs
+            if (catalog.resolve_alias(need.type) or need.type) == "garage"
+        }
+        if not garage_labels or not any(label in str(first_error).casefold() for label in garage_labels):
+            raise
+        # The garage access rule can invalidate the default ordering even when
+        # another room ordering fits. Reuse the existing bounded candidate
+        # search as the fallback.
+        from app.services.layout_engine.search import generate_candidates
+
+        try:
+            candidates = generate_candidates(spec)
+        except DoesNotFitError:
+            raise first_error
+        if candidates:
+            return candidates[0].plan
+        raise first_error

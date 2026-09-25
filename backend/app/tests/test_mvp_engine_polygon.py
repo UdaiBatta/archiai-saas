@@ -1,9 +1,7 @@
 """generate_plan()'s polygon-boundary path (workflow Phase 8). Kept separate
 from test_mvp_engine.py's fixture-driven suite since these specs are built
-in-line (no polygon fixtures exist yet) and the soundness checks below are
-independent of `services.quality.validate`, which is not yet polygon-aware
-(that's Slice B) — asserting `validate(plan) == []` here would be checking a
-property this slice doesn't guarantee, not the geometry it actually produces.
+in-line (no polygon fixtures exist yet). Real polygon overlap, containment,
+and tiling checks supplement the engine's topology validation.
 """
 import pytest
 from hypothesis import given, settings
@@ -226,16 +224,6 @@ def test_polygon_editor_sync_rebuilds_real_edges_without_losing_vertices():
     assert validate(rebuilt, spec) == validate(plan, spec)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Known issue: the polygon path places one layout with no search over "
-        "room orders, and on this trapezoid the living room's only neighbours "
-        "are the kitchen and two bedrooms, so it can only be reached through "
-        "the kitchen (walk_through_room). Needs an ordering search on the "
-        "polygon path like the rectangular one has."
-    ),
-)
 def test_polygon_home_has_no_room_behind_the_kitchen():
     spec = _spec(_TRAPEZOID)
     assert validate(generate_plan(spec), spec) == []

@@ -92,7 +92,7 @@ function ExampleStep({ n, title, children }: { n: string; title: string; childre
 }
 
 const RULE_BADGE: Record<string, string> = {
-  'Must connect': 'bg-ember text-ink',
+  'Must connect': 'bg-ember text-graphite-950',
   'Prefer nearby': 'text-ember-soft ring-1 ring-ember-soft/50',
   'Keep apart': 'text-graphite-100 ring-1 ring-ink/25',
 }
@@ -145,7 +145,7 @@ export default function Landing() {
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Link
                 to={startTarget}
-                className="rounded-full bg-ember px-6 py-3 text-sm font-bold text-ink shadow-[0_10px_40px_rgba(255,59,31,0.45)] transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/60"
+                className="rounded-full bg-ember px-6 py-3 text-sm font-bold text-graphite-950 shadow-[0_10px_40px_rgba(255,59,31,0.45)] transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/60"
               >
                 Start designing — free
               </Link>
@@ -181,11 +181,11 @@ export default function Landing() {
               <span className="relative flex h-full w-full rotate-12 items-center justify-center rounded-full bg-ember shadow-[0_12px_40px_rgba(255,59,31,0.5)] transition-transform hover:scale-105">
                 <svg viewBox="0 0 100 100" className="absolute inset-1 motion-safe:animate-spin-slow" aria-hidden="true">
                   <path id="badge-ring" d="M 50,50 m -37,0 a 37,37 0 1,1 74,0 a 37,37 0 1,1 -74,0" fill="none" />
-                  <text className="fill-ink text-[11px] font-black uppercase">
+                  <text className="fill-graphite-950 text-[11px] font-black uppercase">
                     <textPath href="#badge-ring" textLength="228" lengthAdjust="spacing">Start designing • free • </textPath>
                   </text>
                 </svg>
-                <svg viewBox="0 0 24 24" className="h-9 w-9 text-ink" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <svg viewBox="0 0 24 24" className="h-9 w-9 text-graphite-950" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M7 17L17 7M17 7H8M17 7v9" />
                 </svg>
               </span>
@@ -327,7 +327,7 @@ export default function Landing() {
             </p>
             <Link
               to={startTarget}
-              className="mt-2 rounded-full bg-ember px-7 py-3.5 text-sm font-bold text-ink shadow-[0_10px_40px_rgba(255,59,31,0.45)] transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/60"
+              className="mt-2 rounded-full bg-ember px-7 py-3.5 text-sm font-bold text-graphite-950 shadow-[0_10px_40px_rgba(255,59,31,0.45)] transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/60"
             >
               Start designing — free
             </Link>

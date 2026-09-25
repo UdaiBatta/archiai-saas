@@ -45,11 +45,28 @@ describe('RoomGraphView', () => {
     const panel = screen.getByRole('complementary', { name: 'Access reasoning' })
     expect(panel).toHaveTextContent('Checking how the rooms connect…')
     expect(panel).not.toHaveTextContent(/can't be reached|has no route|Every room is reachable/)
+    expect(screen.getByRole('button', { name: 'Bed, Private zone, checking connections' })).toBeInTheDocument()
+    expect(screen.queryByText('Unreachable')).not.toBeInTheDocument()
   })
 
   it('shows the route to the selected room', () => {
     useCanvasStore.setState({ selectedId: 'Bed' })
     render(<RoomGraphView />)
     expect(screen.getByTestId('graph-route')).toHaveTextContent('Route: Living → Bed')
+  })
+
+  it('supports keyboard selection and connection changes', () => {
+    render(<RoomGraphView />)
+    const node = screen.getByRole('button', { name: /Bed, Private zone, depth 1/ })
+    node.focus()
+    fireEvent.keyDown(node, { key: 'Enter' })
+    expect(useCanvasStore.getState().selectedId).toBe('Bed')
+
+    const edge = screen.getByRole('button', { name: 'Bed to Living: door. Change to open' })
+    edge.focus()
+    fireEvent.keyDown(edge, { key: ' ' })
+    expect(useCanvasStore.getState().layoutMetadata.mvpConnections).toEqual([
+      { room_a: 'Bed', room_b: 'Living', kind: 'open', at: null },
+    ])
   })
 })

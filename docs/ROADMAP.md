@@ -19,12 +19,8 @@ At most three things are "now". Finished items are deleted, not archived.
 
 ## Next
 
-- Polygon plots place one layout with no search over room orders, so a bad
-  arrangement can't be avoided (known case: a trapezoid where the living room
-  is only reachable through the kitchen; `test_polygon_home_has_no_room_behind_the_kitchen`
-  is an xfail). Give the polygon path the same ordering search as rectangles.
-- Garage access: a garage should open onto the entry, a utility room or the
-  outside, not a dining or living room.
+- Polygon plots try the original room order and up to 63 single swaps; broader
+  order search is still deferred, so some valid arrangements may be missed.
 - A Playwright test of the core loop: brief → generate → drag a room → save → reload.
 - Front-door placement as a user connection (today only interior pairs can be overridden).
 - Draw the building footprint / yard in the 2D editor (the data is already in `mvpFootprint`).

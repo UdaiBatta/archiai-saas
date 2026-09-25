@@ -58,10 +58,11 @@ LLM_BASE_URL=http://localhost:1234/v1
 LLM_TIMEOUT_S=30
 LLM_MODEL=
 LLM_API_KEY=
+LLM_REASONING_EFFORT=
 VITE_API_URL=http://localhost:8000
 ```
 
-Never commit `.env` or real credentials.
+Never commit `.env` or real credentials. Keep Jev's `TYPESAFE_API_KEY` in `backend/.env` for local project tooling, and export it into the process environment when running Jev directly.
 
 ## Run Locally
 

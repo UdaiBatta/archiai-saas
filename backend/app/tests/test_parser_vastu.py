@@ -16,4 +16,3 @@ def test_no_vastu_keyword():
 
 def test_vastu_not_triggered_on_unrelated_text():
     assert is_vastu_requested("vast open living space") is False
-

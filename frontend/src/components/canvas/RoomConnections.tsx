@@ -1,5 +1,6 @@
 import { useCanvasStore } from '../../store/canvasStore'
-import type { ConnectionKind, RoomEdge } from '../../types/contracts'
+import type { Connection, ConnectionKind, RoomEdge } from '../../types/contracts'
+import { effectiveEdges } from './roomGraphModel'
 
 const KINDS: { kind: ConnectionKind; label: string; hint: string }[] = [
   { kind: 'wall', label: 'Wall', hint: 'Solid wall, no way through' },
@@ -10,10 +11,14 @@ const KINDS: { kind: ConnectionKind; label: string; hint: string }[] = [
 /** How the selected room meets each neighbour, with a wall/door/open switch. */
 export function RoomConnections({ roomId, disabled = false }: { roomId: string; disabled?: boolean }) {
   const edges = useCanvasStore((s) => s.layoutMetadata.mvpEdges)
+  const connections = useCanvasStore((s) => s.layoutMetadata.mvpConnections)
   const rooms = useCanvasStore((s) => s.rooms)
   const setConnection = useCanvasStore((s) => s.setConnection)
 
-  const neighbours = (Array.isArray(edges) ? (edges as RoomEdge[]) : [])
+  const neighbours = effectiveEdges(
+    Array.isArray(edges) ? (edges as RoomEdge[]) : [],
+    Array.isArray(connections) ? (connections as Connection[]) : [],
+  )
     .filter((edge) => edge.rooms.includes(roomId))
     .map((edge) => {
       const otherId = edge.rooms[0] === roomId ? edge.rooms[1] : edge.rooms[0]
@@ -41,7 +46,7 @@ export function RoomConnections({ roomId, disabled = false }: { roomId: string; 
                   disabled={disabled}
                   onClick={() => kind !== option.kind && setConnection(roomId, otherId, option.kind)}
                   className={`px-2 py-1 text-[10.5px] font-medium disabled:opacity-50 ${
-                    kind === option.kind ? 'bg-accent text-white' : 'text-muted hover:bg-ink/5 hover:text-ink'
+                    kind === option.kind ? 'bg-accent text-graphite-950' : 'text-muted hover:bg-ink/5 hover:text-ink'
                   }`}
                 >
                   {option.label}

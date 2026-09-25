@@ -87,7 +87,7 @@ export function WorkspacePanel({ modelStage, reviewChanges, onReviewChanges, onC
       </div>
       <div className="border-t border-ink/10 p-3">
         {!modelStage && !reviewChanges && <button type="button" onClick={() => onReviewChanges(true)} className="mb-2 w-full rounded-lg border border-ink/15 px-3 py-2 text-xs text-ink">Review & refine{activityLog.length ? ` · ${activityLog.length}` : ''}</button>}
-        <button type="button" data-testid="create-3d-model" disabled={busy} onClick={modelStage ? () => setPlacementMode(placementMode === 'furniture' ? null : 'furniture') : onCreateModel} className="w-full rounded-lg bg-accent px-3 py-2.5 text-xs font-semibold text-white hover:bg-accent-bright disabled:opacity-50">
+        <button type="button" data-testid="create-3d-model" disabled={busy} onClick={modelStage ? () => setPlacementMode(placementMode === 'furniture' ? null : 'furniture') : onCreateModel} className="w-full rounded-lg bg-accent px-3 py-2.5 text-xs font-semibold text-graphite-950 hover:bg-accent-bright disabled:opacity-50">
           {modelStage ? placementMode === 'furniture' ? 'Cancel furniture placement' : '+ Add furniture' : 'Create a 3D model →'}
         </button>
         <p className="mt-2 text-center text-[10px] leading-relaxed text-muted-light">{modelStage ? placementMode === 'furniture' ? 'Click on a room floor to place a proxy. Esc cancels.' : 'Generic furniture proxies · a type library comes later' : 'Happy with the layout? Continue to walls & furniture.'}</p>

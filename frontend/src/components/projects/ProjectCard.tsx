@@ -68,7 +68,7 @@ export function ProjectCard({ project, onClick, onDuplicate }: ProjectCardProps)
         <button
           type="button"
           onClick={onClick}
-          className="rounded-full bg-accent px-4 py-1.5 text-xs font-bold text-ink shadow-lg"
+          className="rounded-full bg-accent px-4 py-1.5 text-xs font-bold text-graphite-950 shadow-lg"
         >
           Open
         </button>

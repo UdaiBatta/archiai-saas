@@ -48,10 +48,12 @@ export function RoomGraphView({ className }: RoomGraphViewProps) {
 
   const { columns, placed, width, height } = useMemo(() => {
     const maxDepth = Math.max(0, ...graph.nodes.map((node) => node.depth ?? 0))
-    const unreachable = graph.nodes.some((node) => node.depth === null)
+    const unreachable = graph.hasConnectionData && graph.nodes.some((node) => node.depth === null)
     const columnCount = maxDepth + 1 + (unreachable ? 1 : 0)
     const byColumn: RoomGraphNode[][] = Array.from({ length: columnCount }, () => [])
-    for (const node of graph.nodes) byColumn[node.depth ?? columnCount - 1].push(node)
+    for (const node of graph.nodes) {
+      byColumn[node.depth ?? (unreachable ? columnCount - 1 : 0)].push(node)
+    }
     const zoneRank = (node: RoomGraphNode) => ZONE_ORDER.indexOf(node.zone)
     const index = new Map<string, PlacedNode>()
     byColumn.forEach((column, c) => {
@@ -68,7 +70,13 @@ export function RoomGraphView({ className }: RoomGraphViewProps) {
     const tallest = Math.max(1, ...byColumn.map((column) => column.length))
     return {
       columns: byColumn.map((column, c) => ({
-        label: unreachable && c === columnCount - 1 ? 'Unreachable' : c === 0 ? 'Entrance' : `Depth ${c}`,
+        label: !graph.hasConnectionData
+          ? 'Checking'
+          : unreachable && c === columnCount - 1
+            ? 'Unreachable'
+            : c === 0
+              ? 'Entrance'
+              : `Depth ${c}`,
         x: PAD + c * (NODE_W + COL_GAP),
         empty: column.length === 0,
       })),
@@ -76,7 +84,7 @@ export function RoomGraphView({ className }: RoomGraphViewProps) {
       width: PAD * 2 + columnCount * NODE_W + (columnCount - 1) * COL_GAP,
       height: PAD * 2 + HEADER + tallest * (NODE_H + ROW_GAP),
     }
-  }, [graph.nodes])
+  }, [graph.hasConnectionData, graph.nodes])
 
   const labelOf = (id: string) => placed.get(id)?.label ?? id
   const route = selectedId ? graph.routes.get(selectedId) : undefined
@@ -147,12 +155,19 @@ export function RoomGraphView({ className }: RoomGraphViewProps) {
                   stroke="transparent"
                   strokeWidth={14}
                   role="button"
+                  tabIndex={0}
                   aria-label={`${labelOf(edge.source)} to ${labelOf(edge.target)}: ${edge.kind}. Change to ${next}`}
                   data-testid={`graph-edge-${edge.source}-${edge.target}`}
                   style={{ cursor: 'pointer' }}
                   onPointerDown={(event) => {
                     event.stopPropagation()
                     if (event.button === 0) setConnection(edge.source, edge.target, next)
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      setConnection(edge.source, edge.target, next)
+                    }
                   }}
                 >
                   <title>{`${labelOf(edge.source)} ↔ ${labelOf(edge.target)}: ${edge.kind} (click for ${next})`}</title>
@@ -168,13 +183,21 @@ export function RoomGraphView({ className }: RoomGraphViewProps) {
               <g
                 key={node.id}
                 role="button"
-                aria-label={`${node.label}, ${ZONE_META[node.zone].label} zone, ${node.depth === null ? 'unreachable' : `depth ${node.depth}`}`}
+                tabIndex={0}
+                aria-pressed={selected}
+                aria-label={`${node.label}, ${ZONE_META[node.zone].label} zone, ${!graph.hasConnectionData ? 'checking connections' : node.depth === null ? 'unreachable' : `depth ${node.depth}`}`}
                 data-testid={`graph-node-${node.id}`}
                 transform={`translate(${node.x} ${node.y})`}
                 style={{ cursor: 'pointer' }}
                 onPointerDown={(event) => {
                   event.stopPropagation()
                   if (event.button === 0) selectRoom(node.id)
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    selectRoom(node.id)
+                  }
                 }}
               >
                 <rect

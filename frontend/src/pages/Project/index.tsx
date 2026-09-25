@@ -852,7 +852,6 @@ export default function ProjectPage() {
               <div className="absolute inset-x-3 top-16 z-30 flex flex-wrap items-center justify-between gap-2">
                 {modelStage ? <div className="flex items-center gap-3"><button type="button" onClick={leaveModelStage} disabled={generating} className="rounded-lg border border-ink/15 bg-graphite-800/95 px-3 py-2 text-xs text-ink">← Back to layout</button><span className="text-xs font-semibold text-ink">3D model</span></div> : <ViewModeSwitcher disabled={generating} />}
                 <div className="flex items-center gap-2">
-                  
                   <button type="button" aria-expanded={panelOpen} onClick={() => setPanelOpen(!panelOpen)} className="rounded-lg border border-ink/15 bg-graphite-800 px-3 py-2 text-xs text-ink lg:hidden">Rooms & details</button>
                 </div>
               </div>

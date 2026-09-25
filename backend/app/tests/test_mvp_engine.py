@@ -885,6 +885,67 @@ def test_a_garage_behind_a_bedroom_is_rejected():
     assert _walk_through(plan, spec) == ["Garage can only be reached by walking through the Bedroom"]
 
 
+@pytest.mark.parametrize("public_room", ["living_room", "dining_room"])
+def test_a_garage_must_not_open_directly_into_living_or_dining(public_room):
+    plan, spec = _row_plan(["entry", public_room, "garage"])
+
+    violations = [v for v in validate(plan, spec) if v.code == "garage_access"]
+
+    assert len(violations) == 1
+    assert "must not open directly" in violations[0].message
+
+
+@pytest.mark.parametrize("types", [["entry", "garage"], ["entry", "utility", "garage"]])
+def test_a_garage_may_connect_to_entry_or_utility(types):
+    plan, spec = _row_plan(types)
+
+    assert "garage_access" not in {v.code for v in validate(plan, spec)}
+
+
+def test_a_garage_may_have_direct_exterior_access():
+    from app.schemas.layout_plan import Door, Wall
+
+    plan, spec = _row_plan(["entry", "corridor", "garage"])
+    plan.walls.append(Wall(id="garage_exterior", x1=9, y1=0, x2=9, y2=4))
+    plan.doors.append(Door(id="garage_exterior_door", wall_ref="garage_exterior", offset=1))
+
+    assert "garage_access" not in {v.code for v in validate(plan, spec)}
+
+
+def test_home_generation_connects_a_garage_to_the_entry_by_default():
+    from app.services.quality.hard_constraints import _door_adjacency
+    from app.services.catalog import resolve_alias
+
+    plan = generate_plan(_load("4bhk"))
+    adjacency = _door_adjacency(plan)
+    entries = {r.id for r in plan.rooms if (resolve_alias(r.type) or r.type) == "foyer"}
+    garages = {r.id for r in plan.rooms if (resolve_alias(r.type) or r.type) == "garage"}
+
+    assert garages
+    assert all(adjacency[garage] & entries for garage in garages)
+
+
+def test_home_garage_utility_must_edge_takes_precedence_over_default_entry_edge():
+    from app.schemas.requirements import AdjacencyPref
+    from app.services.catalog import resolve_alias
+    from app.services.layout_engine.engine import _build_program
+
+    spec = _load("4bhk")
+    spec = spec.model_copy(update={
+        "adjacency": [
+            *spec.adjacency,
+            AdjacencyPref(room_a="garage", room_b="utility", strength="must"),
+        ]
+    })
+    program = _build_program(spec)
+    pairs = {frozenset(pair) for pair in program.must_adjacent}
+    garage = next(n.key for n in program.needs if (resolve_alias(n.type) or n.type) == "garage")
+    utility = next(n.key for n in program.needs if (resolve_alias(n.type) or n.type) in {"utility", "laundry"})
+
+    assert frozenset((garage, utility)) in pairs
+    assert frozenset((garage, program.entry_node)) not in pairs
+
+
 def test_closets_and_attached_rooms_may_sit_behind_the_room_they_serve():
     plan, spec = _row_plan(["entry", "kitchen", "pantry"])
     assert _walk_through(plan, spec) == []

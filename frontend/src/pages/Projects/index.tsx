@@ -8,7 +8,7 @@ import { getApiErrorMessage } from '../../services/apiError'
 import projectService, { type Project } from '../../services/project.service'
 
 const newProjectClass =
-  'rounded-full bg-accent px-5 py-2 text-sm font-bold text-ink shadow-[0_6px_24px_rgba(255,59,31,0.3)] transition-transform hover:-translate-y-px focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50'
+  'rounded-full bg-accent px-5 py-2 text-sm font-bold text-graphite-950 shadow-[0_6px_24px_rgba(255,59,31,0.3)] transition-transform hover:-translate-y-px focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50'
 
 function SkeletonCard() {
   return (

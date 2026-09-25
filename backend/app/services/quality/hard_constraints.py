@@ -7,7 +7,8 @@ must stay fast), and the reject tier of the scorer (Phase 6).
 
 Violation codes (stable API): overlap, out_of_bounds, below_min_size,
 unreachable, missing_requested_room, through_room_access, unmet_must_connection,
-staircase_alignment, outdoor_room_inland, entry_inland, walk_through_room.
+staircase_alignment, outdoor_room_inland, entry_inland, walk_through_room,
+garage_access.
 
 Reachability walks the access graph derived from doors: each door's midpoint
 connects every room whose boundary touches that point (interior doors connect
@@ -288,7 +289,13 @@ def _walk_through_violations(
             continue
         blocked = frozenset(
             b for b in blockers
-            if b != rid and not (rid in dependent and frozenset((rid, b)) in exempt)
+            if b != rid
+            and not (rid in dependent and frozenset((rid, b)) in exempt)
+            and not (
+                kinds[rid] == "garage"
+                and b in adjacency.get(rid, set())
+                and kinds[b] in {"utility", "laundry", "mudroom"}
+            )
         )
         if rid in _walk(start, adjacency, blocked):
             continue
@@ -313,6 +320,85 @@ def _walk_through_violations(
             room_ids=[rid],
             message=f"{labels[rid]} can only be reached by walking through the {names}",
         ))
+    return violations
+
+
+def _exterior_door_rooms(plan: LayoutPlan) -> set[str]:
+    """Room ids with a door on the building perimeter."""
+    if plan.plot.boundary is not None:
+        outline = polygon.plot_to_polygon(plan.plot)
+
+        def on_outline(x: float, y: float) -> bool:
+            return polygon.is_on_boundary((x, y), outline)
+    else:
+        frame = plan.footprint
+        x0, y0 = (frame.x, frame.y) if frame else (0.0, 0.0)
+        x1 = frame.x + frame.w if frame else plan.plot.width_m
+        y1 = frame.y + frame.h if frame else plan.plot.depth_m
+
+        def on_outline(x: float, y: float) -> bool:
+            return (
+                (abs(x - x0) <= _TOUCH_EPS and y0 - _TOUCH_EPS <= y <= y1 + _TOUCH_EPS)
+                or (abs(x - x1) <= _TOUCH_EPS and y0 - _TOUCH_EPS <= y <= y1 + _TOUCH_EPS)
+                or (abs(y - y0) <= _TOUCH_EPS and x0 - _TOUCH_EPS <= x <= x1 + _TOUCH_EPS)
+                or (abs(y - y1) <= _TOUCH_EPS and x0 - _TOUCH_EPS <= x <= x1 + _TOUCH_EPS)
+            )
+
+    walls_by_id = {wall.id: wall for wall in plan.walls}
+    result: set[str] = set()
+    for door in plan.doors:
+        wall = walls_by_id.get(door.wall_ref)
+        if wall is None or wall.floor != door.floor:
+            continue
+        x, y = _door_point(door, wall)
+        if on_outline(x, y):
+            result.update(
+                room.id for room in plan.rooms
+                if room.floor == door.floor and _touches(room, x, y)
+            )
+    return result
+
+
+_GARAGE_ALLOWED_NEIGHBORS = frozenset({"foyer", "utility", "laundry", "mudroom"})
+_GARAGE_FORBIDDEN_NEIGHBORS = frozenset({
+    "living_room", "open_plan_living", "dining", "dining_area", "dining_room",
+})
+
+
+def _garage_access_violations(
+    plan: LayoutPlan,
+    adjacency: dict[str, set[str]],
+    requirements: RequirementsSpec | None,
+) -> list[Violation]:
+    if requirements is None or requirements.building_type.value not in RESIDENTIAL_BUILDINGS:
+        return []
+    kinds = {room.id: resolve_alias(room.type) or room.type for room in plan.rooms}
+    labels = {room.id: room.label for room in plan.rooms}
+    exterior = _exterior_door_rooms(plan)
+    violations: list[Violation] = []
+    for room in plan.rooms:
+        if kinds[room.id] != "garage":
+            continue
+        neighbors = adjacency.get(room.id, set())
+        forbidden = sorted(
+            (neighbor for neighbor in neighbors if kinds.get(neighbor) in _GARAGE_FORBIDDEN_NEIGHBORS),
+            key=lambda neighbor: labels[neighbor],
+        )
+        has_allowed_access = room.id in exterior or any(
+            kinds.get(neighbor) in _GARAGE_ALLOWED_NEIGHBORS for neighbor in neighbors
+        )
+        reasons = []
+        if forbidden:
+            names = ", ".join(labels[neighbor] for neighbor in forbidden)
+            reasons.append(f"must not open directly into {names}")
+        if not has_allowed_access:
+            reasons.append("needs direct access to the entry, a utility room, or outside")
+        if reasons:
+            violations.append(Violation(
+                code="garage_access",
+                room_ids=[room.id, *forbidden],
+                message=f"{room.label} {'; '.join(reasons)}",
+            ))
     return violations
 
 
@@ -525,7 +611,11 @@ def validate(
         already_flagged={rid for v in privacy for rid in v.room_ids},
     ))
 
-    # (h) balconies and the entry reach the outside of the house.
+    # (h) garages use a service/entry/exterior access path, never a living or
+    # dining room as their direct interior connection.
+    violations.extend(_garage_access_violations(plan, adjacency, requirements))
+
+    # (i) balconies and the entry reach the outside of the house.
     violations.extend(_inland_violations(plan))
 
     return violations

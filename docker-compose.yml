@@ -31,6 +31,7 @@ services:
       LLM_MODEL: ${LLM_MODEL:-}
       LLM_TIMEOUT_S: ${LLM_TIMEOUT_S:-60}
       LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_REASONING_EFFORT: ${LLM_REASONING_EFFORT:-}
     extra_hosts:
       # host.docker.internal does not resolve on Linux without this mapping.
       - "host.docker.internal:host-gateway"
@@ -52,7 +53,6 @@ services:
       - "5173:5173"
     environment:
       VITE_API_URL: ${VITE_API_URL}
-      VITE_SHOW_DEV_TOOLS: ${VITE_SHOW_DEV_TOOLS:-false}
     volumes:
       - ./frontend:/app
       - /app/node_modules
