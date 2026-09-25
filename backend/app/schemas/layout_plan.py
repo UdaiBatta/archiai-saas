@@ -155,6 +155,18 @@ class Door(BaseModel):
     floor: StrictInt = Field(default=0, ge=0, le=20)
 
 
+class Window(BaseModel):
+    """A window on an outside wall: placed by the engine, derived from the
+    room geometry like doors (re-placed on every rebuild)."""
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    wall_ref: str  # Wall.id hosting this window (always an outside wall)
+    offset: float = Field(ge=0)  # meters from the wall's (x1, y1) end
+    width: float = Field(gt=0, lt=6)
+    floor: StrictInt = Field(default=0, ge=0, le=20)
+
+
 class Connection(BaseModel):
     """A user's choice for how two adjacent rooms meet, overriding the
     engine's default when walls/doors are re-derived: a solid wall, a wall
@@ -188,6 +200,7 @@ class LayoutPlan(BaseModel):
     rooms: list[PlanRoom] = Field(default_factory=list, max_length=200)
     walls: list[Wall] = Field(default_factory=list, max_length=2000)
     doors: list[Door] = Field(default_factory=list, max_length=2000)
+    windows: list[Window] = Field(default_factory=list, max_length=2000)
     archetype_reasons: list[ArchetypeReason] | None = None
     connections: list[Connection] = Field(default_factory=list, max_length=2000)
     # The building's outline on the plot (the rest is yard). None = the

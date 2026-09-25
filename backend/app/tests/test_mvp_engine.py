@@ -976,3 +976,43 @@ def test_villa_brief_gives_every_bedroom_its_own_bathroom_and_a_corridor_door():
     assert len(ensuites) == len(bedrooms) == 4
     for b in bedrooms:
         assert any(kind[n] == "bathroom" for n in adjacency[b])
+
+
+def _windows_check(plan):
+    """Every room that needs a window has one on its own outside wall, inside
+    the wall and clear of that wall's doors."""
+    walls = {w.id: w for w in plan.walls}
+    doors_on = {}
+    for door in plan.doors:
+        doors_on.setdefault(door.wall_ref, []).append((door.offset, door.offset + door.width))
+    windowed = set()
+    for window in plan.windows:
+        wall = walls[window.wall_ref]
+        assert wall.rooms is None, "windows go on outside walls only"
+        length = ((wall.x2 - wall.x1) ** 2 + (wall.y2 - wall.y1) ** 2) ** 0.5
+        assert 0 <= window.offset and window.offset + window.width <= length + 1e-6
+        for a, b in doors_on.get(wall.id, []):
+            assert window.offset + window.width <= a + 1e-6 or window.offset >= b - 1e-6, "window overlaps a door"
+        mx = (wall.x1 + wall.x2) / 2
+        my = (wall.y1 + wall.y2) / 2
+        windowed.update(
+            r.id for r in plan.rooms
+            if r.floor == window.floor and r.x - 1e-6 <= mx <= r.x + r.w + 1e-6 and r.y - 1e-6 <= my <= r.y + r.h + 1e-6
+        )
+    needs = [r for r in plan.rooms if r.type in ("bedroom", "master_bedroom", "living_room", "kitchen")]
+    assert needs and all(r.id in windowed for r in needs), [r.label for r in needs if r.id not in windowed]
+
+
+@pytest.mark.parametrize("facing", ["north", "east"])
+def test_every_bedroom_living_room_and_kitchen_gets_a_window(facing):
+    from app.services.layout_engine.search import best_candidate
+
+    _windows_check(best_candidate(RequirementsSpec.model_validate({**_EAST_3BHK, "facing": facing})))
+    _windows_check(best_candidate(RequirementsSpec.model_validate(_VILLA["requirements"])))
+
+
+def test_editor_rebuild_re_places_windows():
+    spec = RequirementsSpec.model_validate({**_EAST_3BHK, "facing": "east"})
+    plan = generate_plan(spec)
+    rebuilt = rebuild_derived_geometry(plan.model_copy(update={"walls": [], "doors": [], "windows": []}), spec)
+    assert rebuilt.windows == plan.windows

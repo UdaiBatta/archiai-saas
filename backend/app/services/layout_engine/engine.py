@@ -55,6 +55,7 @@ from app.schemas.layout_plan import (
     PlanZoneSpan,
     Vertex,
     Wall,
+    Window,
 )
 from app.schemas.requirements import BuildingType, Facing, RequirementsSpec, RoomType
 from app.services import catalog
@@ -454,6 +455,67 @@ def _pair_priority(pair: frozenset, zone_of: dict[str, str]) -> int:
     return 2
 
 
+# One window per room that needs light (the catalog's needs_exterior types,
+# plus kitchens), on its longest outside wall, in the longest stretch clear
+# of doors. Widths (m): 1.5 by default, these where the usual size differs;
+# bathrooms get a small ventilator.
+_WINDOW_WIDTH_M = {
+    "living_room": 1.8, "open_plan_living": 1.8,
+    "master_bedroom": 1.5, "bedroom": 1.5, "kids_room": 1.5, "dining_room": 1.5,
+    "kitchen": 1.2, "study": 1.2, "office": 1.2, "classroom": 1.8, "meeting_room": 1.5,
+    "bathroom": 0.6, "ensuite": 0.6, "toilet": 0.6, "washroom": 0.6,
+}
+_WINDOW_MARGIN_M = 0.3  # clear of corners and door jambs
+_MIN_WINDOW_M = 0.6
+
+
+def _place_windows(
+    placed: list[tuple[RoomNeed, Rect]] | list[tuple[RoomNeed, object]],
+    walls: list[Wall],
+    wall_rooms: dict[str, tuple[str, str | None]],
+    doors: list[Door],
+    *,
+    id_prefix: str = "",
+) -> list[Window]:
+    door_spans: dict[str, list[tuple[float, float]]] = {}
+    for door in doors:
+        door_spans.setdefault(door.wall_ref, []).append((door.offset, door.offset + door.width))
+    windows: list[Window] = []
+    for need, _ in placed:
+        kind = catalog.resolve_alias(need.type) or need.type
+        width = _WINDOW_WIDTH_M.get(kind) or _WINDOW_WIDTH_M.get(need.type)
+        if width is None:
+            try:
+                width = 1.5 if catalog.get(kind).needs_exterior else None
+            except catalog.UnknownSpaceType:
+                width = None
+        if not width:
+            continue
+        best: tuple[float, Wall, float, float] | None = None
+        for wall in walls:
+            owner, other = wall_rooms[wall.id]
+            if owner != need.key or other is not None or wall.kind == "open":
+                continue
+            length, start = _wall_length(wall), 0.0
+            for a, b in sorted(door_spans.get(wall.id, [])) + [(length, length)]:
+                free = a - start - 2 * _WINDOW_MARGIN_M
+                if best is None or free > best[0]:
+                    best = (free, wall, start, a)
+                start = max(start, b)
+        if best is None or best[0] < _MIN_WINDOW_M:
+            continue
+        free, wall, start, end = best
+        opening = round(min(width, free), 2)
+        windows.append(Window(
+            id=f"{id_prefix}win{len(windows) + 1}",
+            wall_ref=wall.id,
+            offset=_round((start + end) / 2 - opening / 2),
+            width=opening,
+            floor=wall.floor,
+        ))
+    return windows
+
+
 def _max_matching(partners: dict[str, list[str]]) -> dict[str, str]:
     """Maximum one-to-one pairing (Kuhn's augmenting paths): left room ->
     its own right room. Tiny inputs (rooms of two types on one floor)."""
@@ -822,6 +884,7 @@ def rebuild_derived_geometry(
     multi_floor = len(floors) > 1 or floors != [0]
     all_walls: list[Wall] = []
     all_doors: list[Door] = []
+    all_windows: list[Window] = []
     polygon_mode = plan.plot.boundary is not None or any(
         room.vertices is not None for room in plan.rooms
     )
@@ -874,13 +937,14 @@ def rebuild_derived_geometry(
         adjacent_pairs.update(frozenset(pair) for pair in wall_rooms.values() if pair[1] is not None)
         all_walls.extend(walls)
         all_doors.extend(doors)
+        all_windows.extend(_place_windows(placed, walls, wall_rooms, doors, id_prefix=prefix))
     # A connection whose rooms no longer touch (the user moved one away) is
     # dropped rather than carried as a stale instruction.
     connections = [
         c for c in plan.connections if frozenset((c.room_a, c.room_b)) in adjacent_pairs
     ]
     return plan.model_copy(
-        update={"walls": all_walls, "doors": all_doors, "connections": connections}
+        update={"walls": all_walls, "doors": all_doors, "windows": all_windows, "connections": connections}
     )
 
 
@@ -1013,6 +1077,7 @@ def plan_from_program(
         program.zone_of,
         id_prefix=id_prefix,
     )
+    windows = _place_windows(placed, walls, wall_rooms, doors, id_prefix=id_prefix)
 
     # Round EDGES (not x/w independently) so adjacent rooms share the exact
     # same rounded coordinate — independent rounding lets edges drift apart by
@@ -1050,6 +1115,7 @@ def plan_from_program(
         rooms=rooms,
         walls=walls,
         doors=doors,
+        windows=windows,
         archetype_reasons=(
             [
                 ArchetypeReason(
@@ -1149,6 +1215,7 @@ def _stack_floors(
     rooms: list[PlanRoom] = []
     walls: list[Wall] = []
     doors: list[Door] = []
+    windows: list[Window] = []
     for floor, program in enumerate(programs):
         try:
             bands = vertical_core_bands(program, plot_w, plot_d, facing)
@@ -1170,12 +1237,14 @@ def _stack_floors(
         rooms.extend(floor_plan.rooms)
         walls.extend(floor_plan.walls)
         doors.extend(floor_plan.doors)
+        windows.extend(floor_plan.windows)
 
     plan = LayoutPlan(
         plot=PlanPlot(width_m=plot_w, depth_m=plot_d, facing=facing),
         rooms=rooms,
         walls=walls,
         doors=doors,
+        windows=windows,
     )
     # `plan_from_program` skips its own hard check for floors > 1 ("validated
     # after their floor-local pieces are assembled") — this is that check.
@@ -1239,6 +1308,7 @@ def _generate_plan_polygon(
 
     walls, wall_rooms = _build_walls_polygon(placed, plot_polygon)
     doors = _place_doors(placed, walls, wall_rooms, spec, facing, program.zone_of)
+    windows = _place_windows(placed, walls, wall_rooms, doors)
 
     boundary_ring = list(plot_polygon.exterior.coords)[:-1]
     boundary = [Vertex(x=_round(px), y=_round(py)) for px, py in boundary_ring]
@@ -1271,6 +1341,7 @@ def _generate_plan_polygon(
         rooms=rooms,
         walls=walls,
         doors=doors,
+        windows=windows,
     )
     from app.services.quality.hard_constraints import validate
 
