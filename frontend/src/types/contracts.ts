@@ -107,11 +107,21 @@ export interface Door {
   floor?: number
 }
 
+/** A window on an outside wall; placed by the engine, derived like doors. */
+export interface Window {
+  id: string
+  wall_ref: string
+  offset: number
+  width: number
+  floor?: number
+}
+
 export interface LayoutPlan {
   plot: PlanPlot
   rooms: PlanRoom[]
   walls: Wall[]
   doors: Door[]
+  windows?: Window[]
   archetype_reasons?: ArchetypeReason[]
   connections?: Connection[]
   /** The building's outline on the plot; absent when it fills the plot. */
