@@ -1,8 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException
+import re
+from typing import Literal
+
+from fastapi import APIRouter, Depends, HTTPException, Response
+from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.connection import get_db
+from app.models.project import Project
+from app.schemas.layout_plan import LayoutPlan
 from app.schemas.project import (
     ActivityLogOut,
     ExportRecordOut,
@@ -14,7 +21,9 @@ from app.schemas.project import (
 )
 from app.services.auth_service import get_current_user
 from app.services.entitlement_service import require_within_project_limit
+from app.services.export import EXPORTERS
 from app.services.export_share_service import create_export_record, create_share_link, revoke_share_link
+from app.utils.rate_limit import rate_limit
 from app.services.project_service import (
     create_project,
     delete_project,
@@ -104,6 +113,37 @@ async def export_pdf(
     db: AsyncSession = Depends(get_db),
 ):
     return await create_export_record(db, user_id, project_id, "pdf")
+
+
+class ExportFileRequest(BaseModel):
+    layout: LayoutPlan
+
+
+@router.post(
+    "/{project_id}/export/{fmt}",
+    dependencies=[Depends(rate_limit("export_file", limit=20, window_seconds=60))],
+)
+async def export_file(
+    project_id: str,
+    fmt: Literal["dxf", "ifc", "glb", "obj", "svg"],
+    request: ExportFileRequest,
+    user_id: str = Depends(_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """The editor's current plan as a file for another tool (see
+    services/export). Declared after /export/image and /export/pdf, which
+    keep their own routes."""
+    await create_export_record(db, user_id, project_id, fmt)  # access check + activity
+    project = await db.get(Project, project_id)
+    title = project.title if project else None
+    writer, extension, media_type = EXPORTERS[fmt]
+    data = await run_in_threadpool(writer, request.layout, title)
+    name = re.sub(r"[^A-Za-z0-9._-]+", "-", title or "archiai-plan").strip("-") or "archiai-plan"
+    return Response(
+        content=data,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{name}.{extension}"'},
+    )
 
 
 @router.post("/{project_id}/share", response_model=ProjectShareOut, status_code=201)
