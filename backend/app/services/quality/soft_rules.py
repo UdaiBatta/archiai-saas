@@ -13,7 +13,7 @@ from app.schemas.requirements import RequirementsSpec, RoomType
 from app.services import catalog
 from app.services.layout_engine import polygon
 from app.services.layout_engine.geometry import EPS, Rect
-from app.services.quality.hard_constraints import touches_outside
+from app.services.quality.hard_constraints import RESIDENTIAL_BUILDINGS, touches_outside
 
 
 @dataclass(frozen=True)
@@ -144,16 +144,22 @@ def privacy_rule(plan: LayoutPlan, _requirements: RequirementsSpec) -> SoftRuleR
 
 # Passages (an entrance hall included) are long by design.
 _LONG_BY_DESIGN = frozenset({"corridor", "hallway", "passage", "passageway", "stairs", "staircase", "landing", "foyer", "entry"})
+# Outside homes, toilets and stores are long by design too: a row of
+# cubicles or a store strip along a wing (a school's corridor comb).
+_LONG_OUTSIDE_HOMES = frozenset({"bathroom", "toilet", "washroom", "wc", "storage", "store"})
 
 
-def proportion_rule(plan: LayoutPlan, _requirements: RequirementsSpec) -> SoftRuleResult:
+def proportion_rule(plan: LayoutPlan, requirements: RequirementsSpec) -> SoftRuleResult:
     """Rooms should be usable shapes: each room loses credit in proportion to
     how far it is stretched past its type's aspect limit (a 4.6 x 1.2 m pooja
     room, a 3 x 11 m bedroom). Corridors are long by design and skipped."""
+    long_by_design = _LONG_BY_DESIGN
+    if requirements.building_type.value not in RESIDENTIAL_BUILDINGS:
+        long_by_design = long_by_design | _LONG_OUTSIDE_HOMES
     rooms = []
     for room in plan.rooms:
         kind = _canonical(room.type)
-        if kind in _LONG_BY_DESIGN or min(room.w, room.h) <= 0:
+        if kind in long_by_design or min(room.w, room.h) <= 0:
             continue
         try:
             limit = catalog.get(kind).max_aspect

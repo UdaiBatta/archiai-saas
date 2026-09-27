@@ -990,7 +990,7 @@
         }
       ]
     },
-    "quality_score": 98
+    "quality_score": 100
   },
   "family_home": {
     "layout": {
@@ -2929,7 +2929,7 @@
         }
       ]
     },
-    "quality_score": 99
+    "quality_score": 100
   },
   "office": {
     "layout": {
@@ -3560,7 +3560,7 @@
         }
       ]
     },
-    "quality_score": 82
+    "quality_score": 85
   },
   "restaurant": {
     "layout": {

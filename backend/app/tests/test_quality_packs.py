@@ -73,8 +73,9 @@ def test_clinic_uses_generic_and_healthcare_without_residential_or_vastu():
     report = score(plan, spec)
 
     assert keys == ["generic", "healthcare"]
-    # 98, not 100: the proportion rule reports its 1.6 x 11.1 m utility room.
-    assert report.score == 98
+    # 97, not 100: the proportion rule reports its 1.6 x 11.1 m utility room
+    # (toilets and stores, long by design outside homes, are not counted).
+    assert report.score == 97
     assert all(warning.rule not in {"residential", "vastu"} for warning in report.warnings)
     assert not any("bath_kitchen" in warning.code for warning in report.warnings)
 
