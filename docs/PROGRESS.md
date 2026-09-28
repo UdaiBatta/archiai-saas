@@ -2,7 +2,9 @@
 
 Build progress against the phased plan (3D-first site massing, housing and
 interior planning; AI as a secondary layer). Ticked = merged or in an open PR.
-Full plan and competitor map: the "ArchiAI Roadmap" page. Near-term engine
+Full plan and competitor map: [roadmap.html](roadmap.html) (published as the
+"ArchiAI Roadmap" page); after ticking items here, run
+`python docs/sync_progress.py` to copy them into it. Near-term engine
 work lives in [ROADMAP.md](ROADMAP.md).
 
 _Last updated: 2026-09-28_

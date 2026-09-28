@@ -1,0 +1,576 @@
+<title>ArchiAI Roadmap</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Archivo+Narrow:wght@500;600;700&display=swap');
+
+:root {
+  color-scheme: light;
+  --paper: #eef0ec;
+  --sheet: #f8f9f6;
+  --grid: #dde1da;
+  --ink: #1d2124;
+  --ink-2: #4a5157;
+  --ink-3: #7b838a;
+  --rule: #c7ccc5;
+  --accent: #1747c8;
+  --accent-soft: #dfe6fa;
+  --yes: #1d2124;
+  --part: #7b838a;
+  --no: #b4bab3;
+  --now: #1747c8;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-head: "Archivo Narrow", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #15181b;
+    --sheet: #1c2024;
+    --grid: #252a2f;
+    --ink: #e4e7e3;
+    --ink-2: #aeb5b9;
+    --ink-3: #7d858b;
+    --rule: #343a40;
+    --accent: #7fa0ff;
+    --accent-soft: #1f2a48;
+    --yes: #e4e7e3;
+    --part: #8d959b;
+    --no: #4a5157;
+    --now: #7fa0ff;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #15181b;
+  --sheet: #1c2024;
+  --grid: #252a2f;
+  --ink: #e4e7e3;
+  --ink-2: #aeb5b9;
+  --ink-3: #7d858b;
+  --rule: #343a40;
+  --accent: #7fa0ff;
+  --accent-soft: #1f2a48;
+  --yes: #e4e7e3;
+  --part: #8d959b;
+  --no: #4a5157;
+  --now: #7fa0ff;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 24px 24px;
+  color: var(--ink);
+  font: 15px/1.55 var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+.page {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 40px 16px 64px;
+}
+.sheet {
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  padding: 28px clamp(16px, 4vw, 40px);
+  margin-bottom: 24px;
+}
+a { color: var(--accent); text-underline-offset: 2px; }
+h1, h2, h3 { font-family: var(--font-head); font-weight: 600; line-height: 1.15; margin: 0; letter-spacing: .01em; }
+h1 { font-size: clamp(30px, 6vw, 44px); }
+h2 { font-size: 24px; margin-bottom: 14px; display: flex; gap: 12px; align-items: baseline; }
+h2 .no { font-family: var(--font-mono); font-size: 13px; color: var(--accent); font-weight: 500; }
+h3 { font-size: 18px; }
+p { margin: 0 0 12px; max-width: 72ch; }
+.mono { font-family: var(--font-mono); }
+.label { font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+
+/* Title block */
+.titleblock { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: end; border-bottom: 2px solid var(--ink); padding-bottom: 18px; margin-bottom: 20px; }
+.titleblock dl { display: grid; grid-template-columns: auto auto; gap: 2px 14px; margin: 0; font-family: var(--font-mono); font-size: 12px; }
+.titleblock dt { color: var(--ink-3); }
+.titleblock dd { margin: 0; }
+.lede { font-size: 17px; line-height: 1.6; color: var(--ink); max-width: 76ch; }
+.lede strong { font-weight: 600; }
+
+/* Matrix */
+.scroll { overflow-x: auto; border: 1px solid var(--rule); -webkit-overflow-scrolling: touch; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { padding: 7px 8px; border-bottom: 1px solid var(--rule); text-align: center; white-space: nowrap; }
+thead th { font-family: var(--font-mono); font-weight: 500; font-size: 11px; letter-spacing: .03em; color: var(--ink-2); vertical-align: bottom; background: var(--sheet); position: sticky; top: 0; }
+thead th a { color: inherit; text-decoration: none; border-bottom: 1px dotted var(--ink-3); }
+tbody th { text-align: left; font-weight: 400; position: sticky; left: 0; background: var(--sheet); min-width: 200px; white-space: normal; border-right: 1px solid var(--rule); }
+tr.group th { font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); padding-top: 14px; background: var(--sheet); }
+tr.group td { background: var(--sheet); }
+td.y { color: var(--yes); font-weight: 600; }
+td.p { color: var(--part); font-family: var(--font-mono); font-size: 11px; }
+td.n { color: var(--no); }
+.col-today { background: color-mix(in srgb, var(--accent-soft) 45%, transparent); }
+.col-target { background: var(--accent-soft); }
+thead th.col-today, thead th.col-target { color: var(--accent); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 10px 0 0; font-size: 12px; color: var(--ink-2); }
+
+/* Cards */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; }
+.card { border: 1px solid var(--rule); padding: 16px; background: var(--paper); }
+.card .src { font-family: var(--font-mono); font-size: 11px; color: var(--accent); letter-spacing: .04em; text-transform: uppercase; }
+.card h3 { margin: 4px 0 8px; }
+.card p { font-size: 14px; margin-bottom: 6px; color: var(--ink-2); }
+.card p b { color: var(--ink); font-weight: 600; }
+
+/* Phases */
+.phase { display: grid; grid-template-columns: 76px 1fr; border-top: 1px solid var(--rule); padding: 18px 0; gap: 0 18px; }
+.phase:first-of-type { border-top: 0; }
+.phase .id { font-family: var(--font-head); font-size: 34px; font-weight: 700; line-height: 1; color: var(--ink-3); }
+.phase.now .id { color: var(--now); }
+.phase .meta { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
+.tag { font-family: var(--font-mono); font-size: 11px; border: 1px solid var(--rule); padding: 1px 7px; color: var(--ink-2); }
+.tag.size { border-color: var(--ink-2); color: var(--ink); }
+.tag.now { border-color: var(--now); color: var(--now); background: var(--accent-soft); }
+.phase ul { margin: 6px 0 10px; padding-left: 18px; }
+.phase li { margin-bottom: 3px; }
+.done { border-left: 3px solid var(--accent); padding: 6px 12px; background: var(--paper); font-size: 14px; }
+.done b { font-family: var(--font-mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); font-weight: 500; margin-right: 6px; }
+
+/* Checklist */
+.check { list-style: none; padding-left: 0 !important; }
+.check li { position: relative; padding-left: 24px; }
+.check li::before { content: ""; position: absolute; left: 0; top: .3em; width: 13px; height: 13px; border: 1.5px solid var(--ink-3); border-radius: 2px; }
+.check li.ok { color: var(--ink-2); }
+.check li.ok::before { background: var(--accent); border-color: var(--accent); }
+.check li.ok::after { content: ""; position: absolute; left: 4.5px; top: calc(.3em + 1.5px); width: 4px; height: 8px; border: solid var(--sheet); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.tag.prog { font-variant-numeric: tabular-nums; }
+.meter { height: 4px; background: var(--rule); margin: 4px 0 8px; max-width: 320px; }
+.meter i { display: block; height: 100%; background: var(--accent); }
+
+/* Tiers */
+.tiers { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+.tier { border: 1px solid var(--rule); padding: 16px; }
+.tier.pro { border-color: var(--accent); }
+.tier h3 { display: flex; justify-content: space-between; align-items: baseline; }
+.tier h3 span { font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); font-weight: 400; }
+.tier ul { margin: 10px 0 0; padding-left: 18px; font-size: 14px; }
+
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }
+.two ul { padding-left: 18px; margin: 8px 0 0; }
+.two li { margin-bottom: 6px; }
+.sources { font-size: 13px; columns: 2 280px; column-gap: 28px; padding-left: 18px; }
+.sources li { break-inside: avoid; margin-bottom: 4px; overflow-wrap: anywhere; }
+.foot { font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); text-align: center; }
+
+@media (max-width: 560px) {
+  .page { padding-top: 16px; }
+  .titleblock { grid-template-columns: 1fr; }
+  .phase { grid-template-columns: 1fr; }
+  .phase .id { font-size: 26px; margin-bottom: 4px; }
+  tbody th { min-width: 150px; }
+}
+</style>
+
+<div class="page">
+
+<section class="sheet">
+  <div class="titleblock">
+    <div>
+      <div class="label">Product plan / Sheet A-001</div>
+      <h1>ArchiAI: feature map &amp; build plan</h1>
+    </div>
+    <dl>
+      <dt>Updated</dt><dd id="updated">2026-09-28</dd>
+      <dt>Scope</dt><dd>Site, massing, housing, interior</dd>
+      <dt>Status</dt><dd>P1 in progress</dd>
+      <dt>Progress</dt><dd id="overall">17 / 50 items</dd>
+    </dl>
+  </div>
+  <p class="lede"><strong>ArchiAI is a browser-based, 3D-first design tool for the first weeks of a residential project</strong>: draw the site, shape the mass, and fill it with homes and rooms that already obey the rules an architect would check by hand (daylight, street entry, circulation, adjacency). It is for architects and small practices doing early-stage site and housing design who today stitch together a massing tool, a plan sketcher and a spreadsheet. The engine is deterministic and explainable; AI sits on top as an optional suggestion layer. Everything leaves as clean DXF and IFC, so the work continues in AutoCAD, Revit or ArchiCAD without redrawing.</p>
+  <p class="label" style="margin:0">Evidence base: rule engine fits 26/26 home-quality briefs, mean score 98.5; DXF (AIA layers, mm), IFC4, GLB, OBJ, SVG export shipped.</p>
+</section>
+
+<section class="sheet">
+  <h2><span class="no">01</span>Feature matrix</h2>
+  <p>Desk research from vendor pages and launch coverage (sources below), Sept 2026. <em>partial</em> means limited, plugin-only or add-on. Treat competitor cells as indicative, not audited.</p>
+  <div class="scroll"><table id="matrix"></table></div>
+  <div class="legend"><span><b>&#10003;</b> supported</span><span class="mono">partial</span> <span>limited / plugin / add-on</span><span>&mdash; not offered</span></div>
+</section>
+
+<section class="sheet">
+  <h2><span class="no">02</span>Standout components to borrow</h2>
+  <div class="cards">
+    <div class="card">
+      <div class="src">Autodesk Forma</div>
+      <h3>Live analysis overlays</h3>
+      <p><b>Why:</b> sun, daylight and noise read directly on the model turn analysis into a design input, not a report.</p>
+      <p><b>Better:</b> tie overlays to our rule engine, so a failing daylight hour highlights the exact room that breaks the hard rule, not just a heatmap.</p>
+    </div>
+    <div class="card">
+      <div class="src">Arcol</div>
+      <h3>Live metrics panel</h3>
+      <p><b>Why:</b> GFA, FAR and unit counts updating on every drag is what makes massing feel fast.</p>
+      <p><b>Better:</b> metrics go down to homes and rooms (net-to-gross, unit mix, rooms with daylight), and each number links to the geometry it counts.</p>
+    </div>
+    <div class="card">
+      <div class="src">Modelur</div>
+      <h3>Interactive zoning warnings</h3>
+      <p><b>Why:</b> seeing a setback or height breach in 3D as you push a face prevents rework.</p>
+      <p><b>Better:</b> one warning model for zoning and layout rules, with a one-click fix (trim to envelope, step back top floor) and a plain-language reason.</p>
+    </div>
+    <div class="card">
+      <div class="src">TestFit</div>
+      <h3>Instant re-solve</h3>
+      <p><b>Why:</b> change the site and the yield updates in seconds; the tool keeps pace with the conversation.</p>
+      <p><b>Better:</b> re-solve respects user locks (pinned rooms, fixed cores) and shows a diff of what moved, rather than a fresh layout.</p>
+    </div>
+    <div class="card">
+      <div class="src">Snaptrude</div>
+      <h3>Mass &rarr; BIM</h3>
+      <p><b>Why:</b> the massing becomes walls, slabs and spaces without redrawing.</p>
+      <p><b>Better:</b> our masses fill with rule-checked homes and export as IFC4 spaces with areas, already a shipped path.</p>
+    </div>
+    <div class="card">
+      <div class="src">Arcol / Figma</div>
+      <h3>Pinned comments &amp; boards</h3>
+      <p><b>Why:</b> reviews happen where the model is; boards replace the export-to-slides step.</p>
+      <p><b>Better:</b> comments pin to rooms and units and survive re-solve; a board frame is a live view of the model, not a screenshot.</p>
+    </div>
+    <div class="card">
+      <div class="src">Giraffe</div>
+      <h3>Geolocated site with parcels</h3>
+      <p><b>Why:</b> starting from the real parcel, terrain and neighbours removes an hour of setup.</p>
+      <p><b>Better:</b> keep it light: import a parcel or draw on a map tile, then drop straight into 3D with setbacks applied.</p>
+    </div>
+    <div class="card">
+      <div class="src">qbiq / Hypar</div>
+      <h3>Three alternatives, side by side</h3>
+      <p><b>Why:</b> clients choose between options; a single answer invites argument.</p>
+      <p><b>Better:</b> alternatives come from the deterministic engine with scores; AI only proposes brief variations and explains trade-offs.</p>
+    </div>
+    <div class="card">
+      <div class="src">Planner 5D / Hypar</div>
+      <h3>Furniture auto-layout</h3>
+      <p><b>Why:</b> furnished plans prove a room works and sell the scheme.</p>
+      <p><b>Better:</b> furniture feeds back into the rules (bed clearances, door swings), so a furnished room is also a checked room.</p>
+    </div>
+  </div>
+</section>
+
+<section class="sheet">
+  <h2><span class="no">03</span>Phased plan</h2>
+
+  <div class="phase">
+    <div class="id">P0</div>
+    <div>
+      <h3>Foundation: layout engine quality</h3>
+      <div class="meta"><span class="tag size">PR #44</span></div>
+      <p>Goal: the rule engine every later phase builds on produces plans an architect would sign off.</p>
+      <!--P0--><div class="meter" aria-hidden="true"><i style="width:67%"></i></div><span class="tag prog">6 / 9 done</span>
+      <ul class="check">
+        <li class="ok">Home quality suite: 26 real briefs, baseline pinned in tests</li>
+        <li class="ok">Daylight hard rule: bedrooms, living rooms, kitchens touch an outside wall</li>
+        <li class="ok">Entry and outdoor rooms stay on the street side / outline</li>
+        <li class="ok">Squarer rooms: proportion score and shape-aware cutting</li>
+        <li class="ok">Windows placed by the engine (one per room that needs light)</li>
+        <li class="ok">3D sun follows a time-of-day slider</li>
+        <li>Split the shared wet slot (bathrooms ~1.5 x 4.3 m)</li>
+        <li>Stack bathrooms over wet rooms on multi-storey homes</li>
+        <li>Broader room-order search on polygon plots</li>
+      </ul><!--/P0-->
+    </div>
+  </div>
+
+  <div class="phase now">
+    <div class="id">P1</div>
+    <div>
+      <h3>Professional 3D workspace</h3>
+      <div class="meta"><span class="tag now">In progress</span><span class="tag size">Size L</span><span class="tag">Free</span></div>
+      <p>Goal: the 3D view is good enough to be the only view.</p>
+      <!--P1--><div class="meter" aria-hidden="true"><i style="width:50%"></i></div><span class="tag prog">6 / 12 done</span>
+      <ul class="check">
+        <li class="ok">White model: matte walls, crisp edges, pale room-floor tints, glass windows</li>
+        <li class="ok">Ambient occlusion and soft sun shadows fitted to the site</li>
+        <li class="ok">Site ground with grid, plot pad and boundary line, north arrow</li>
+        <li class="ok">View cube</li>
+        <li class="ok">Perspective / Axo / Top (orthographic, north up) views framing the site</li>
+        <li class="ok">Hide or ghost other floors on multi-storey plans</li>
+        <li>Setback lines on the ground (needs setback data, comes with P2)</li>
+        <li>Saved views</li>
+        <li>Dimensions and room labels in Top view</li>
+        <li>Editing handles in Top view (move, resize, walls, doors, windows)</li>
+        <li>Retire the separate 2D editor once Top view reaches parity</li>
+        <li>60 fps on a mid-range laptop for a 4-bedroom home</li>
+      </ul><!--/P1-->
+      <div class="done"><b>Done when</b>every edit possible in the 2D editor works in ortho plan view, the 2D editor is removed, and the workspace holds 60 fps on a mid-range laptop for a 4-bedroom home.</div>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="id">P2</div>
+    <div>
+      <h3>Site &amp; massing</h3>
+      <div class="meta"><span class="tag size">Size L</span><span class="tag">Free: 1 site / Pro: unlimited</span></div>
+      <p>Goal: go from a parcel to a zoning-compliant mass in minutes.</p>
+      <!--P2--><div class="meter" aria-hidden="true"><i style="width:0%"></i></div><span class="tag prog">0 / 5 done</span>
+      <ul class="check">
+        <li>Draw or import the site polygon (DXF, GeoJSON); map tile underlay</li>
+        <li>Per-edge setbacks, height limit, coverage and FAR as site rules</li>
+        <li>Push/pull masses, floor count, floor-to-floor height</li>
+        <li>Live metrics panel: GFA, FAR, coverage, height, floors</li>
+        <li>Zoning warnings in 3D with a reason and a suggested fix</li>
+      </ul><!--/P2-->
+      <div class="done"><b>Done when</b>a test user draws a site, sets four zoning rules and produces a compliant mass in under 5 minutes, and metrics update in under 100 ms per edit.</div>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="id">P3</div>
+    <div>
+      <h3>Housing + interior inside the mass</h3>
+      <div class="meta"><span class="tag size">Size L</span><span class="tag">Pro</span></div>
+      <p>Goal: the layout engine fills massing floors, not just single plots.</p>
+      <!--P3--><div class="meter" aria-hidden="true"><i style="width:0%"></i></div><span class="tag prog">0 / 4 done</span>
+      <ul class="check">
+        <li>Engine fills massing floor plates around a core</li>
+        <li>Unit mix targets with yield readout</li>
+        <li>Instant re-solve on mass edit, honouring locked rooms and units</li>
+        <li>Furniture layouts checked against clearances</li>
+      </ul><!--/P3-->
+      <div class="done"><b>Done when</b>a 6-storey mass fills with a target mix within &plusmn;5%, all units pass hard rules, the home-quality suite stays at 26/26 fit with mean &ge; 98, and re-solve completes in under 3 s.</div>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="id">P4</div>
+    <div>
+      <h3>AI assistant panel (secondary)</h3>
+      <div class="meta"><span class="tag size">Size M</span><span class="tag">Pro (metered)</span></div>
+      <p>Goal: AI speeds up decisions; it never owns the geometry.</p>
+      <!--P4--><div class="meter" aria-hidden="true"><i style="width:0%"></i></div><span class="tag prog">0 / 4 done</span>
+      <ul class="check">
+        <li>Brief to three scored options</li>
+        <li>Explain a rule violation with the engine&#x27;s fix</li>
+        <li>Suggest alternatives for a selected room or unit</li>
+        <li>Every AI action is an ordinary, undoable edit</li>
+      </ul><!--/P4-->
+      <div class="done"><b>Done when</b>the product is fully usable with the panel closed, and in testing at least 60% of AI suggestions are accepted without manual correction.</div>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="id">P5</div>
+    <div>
+      <h3>Analysis</h3>
+      <div class="meta"><span class="tag size">Size M</span><span class="tag">Pro</span></div>
+      <p>Goal: environmental checks that feed the rules.</p>
+      <!--P5--><div class="meter" aria-hidden="true"><i style="width:0%"></i></div><span class="tag prog">0 / 3 done</span>
+      <ul class="check">
+        <li>Sun-hours heatmap on facades and ground</li>
+        <li>Per-room daylight check tied to the daylight rule</li>
+        <li>View analysis per window</li>
+      </ul><!--/P5-->
+      <div class="done"><b>Done when</b>sun hours match a reference tool (e.g. Ladybug) within 10% on three test sites, and results appear in under 10 s in the browser.</div>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="id">P6</div>
+    <div>
+      <h3>Collaboration</h3>
+      <div class="meta"><span class="tag size">Size M&ndash;L</span><span class="tag">Pro: share / Studio: multiplayer</span></div>
+      <p>Goal: review and present without leaving the model.</p>
+      <!--P6--><div class="meter" aria-hidden="true"><i style="width:0%"></i></div><span class="tag prog">0 / 4 done</span>
+      <ul class="check">
+        <li>Comments pinned to 3D points, rooms and units</li>
+        <li>View-only share links with a saved camera</li>
+        <li>Boards: live model frames, metrics cards, notes</li>
+        <li>Real-time multiplayer</li>
+      </ul><!--/P6-->
+      <div class="done"><b>Done when</b>a client can open a share link on a phone, leave a pinned comment, and the architect sees it in context; multiplayer ships only after comments and boards are in daily use.</div>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="id">P7</div>
+    <div>
+      <h3>Interop polish</h3>
+      <div class="meta"><span class="tag size">Size M</span><span class="tag">Studio</span></div>
+      <p>Goal: fit into existing practice pipelines both ways. Exports are done.</p>
+      <!--P7--><div class="meter" aria-hidden="true"><i style="width:56%"></i></div><span class="tag prog">5 / 9 done</span>
+      <ul class="check">
+        <li class="ok">DXF for AutoCAD (R2013, mm, AIA layers)</li>
+        <li class="ok">IFC4 for Revit / ArchiCAD (walls, openings, doors, windows, spaces with areas, slabs)</li>
+        <li class="ok">GLB and OBJ 3D models</li>
+        <li class="ok">SVG vector plan</li>
+        <li class="ok">File &gt; Export menu for all formats, every storey</li>
+        <li>IFC import of site and context</li>
+        <li>Revit round-trip via IFC with stable GUIDs</li>
+        <li>Rhino (3DM) and SketchUp (SKP)</li>
+        <li>Spreadsheet sync for area schedules</li>
+      </ul><!--/P7-->
+      <div class="done"><b>Done when</b>a model exported to Revit, edited and re-imported keeps element identity and comments, and round-trip passes on five reference projects.</div>
+    </div>
+  </div>
+</section>
+
+<section class="sheet">
+  <h2><span class="no">04</span>Pricing tiers (hints)</h2>
+  <div class="tiers">
+    <div class="tier">
+      <h3>Free <span>solo, trying it</span></h3>
+      <ul>
+        <li>P1 3D workspace and plan view</li>
+        <li>Single-home layouts from a brief</li>
+        <li>1 active site, basic metrics</li>
+        <li>SVG, GLB export</li>
+      </ul>
+    </div>
+    <div class="tier pro">
+      <h3>Pro <span>working architect</span></h3>
+      <ul>
+        <li>Unlimited sites, zoning warnings</li>
+        <li>Mass fill, unit mix, furniture</li>
+        <li>AI panel (monthly quota)</li>
+        <li>Sun hours, daylight, views</li>
+        <li>DXF, IFC4, OBJ export; share links, comments</li>
+      </ul>
+    </div>
+    <div class="tier">
+      <h3>Studio <span>practice, per seat</span></h3>
+      <ul>
+        <li>Everything in Pro</li>
+        <li>Boards, multiplayer, team workspaces</li>
+        <li>Revit round-trip, IFC import, Rhino/SketchUp</li>
+        <li>Shared rule and zoning presets</li>
+        <li>Higher AI quota, admin and SSO</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="sheet">
+  <h2><span class="no">05</span>Risks &amp; non-goals</h2>
+  <div class="two">
+    <div>
+      <h3>Risks</h3>
+      <ul>
+        <li><b>Engine scale.</b> Rules tuned on single homes may not hold across multi-storey plates; the home-quality suite needs a multi-unit counterpart before P3 ships.</li>
+        <li><b>Browser performance.</b> AO, shadows and analysis on large sites can drop frames; budget per phase and test on mid-range hardware.</li>
+        <li><b>Zoning data.</b> Rules vary by jurisdiction; start with user-entered rules and presets rather than parsing codes.</li>
+        <li><b>Crowded market.</b> Forma and TestFit are well funded; our edge is rule-checked housing plus interiors in one model.</li>
+        <li><b>Editor complexity.</b> The editor page and store are already large; split them before P1 lands more UI.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Non-goals</h3>
+      <ul>
+        <li>Construction documents, detailing or full BIM authoring.</li>
+        <li>Wind CFD, acoustic simulation, structural design.</li>
+        <li>Photoreal rendering beyond a clean presentation look.</li>
+        <li>Commercial office test-fits (qbiq's market) in the first year.</li>
+        <li>AI-generated geometry that bypasses the rule engine.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="sheet">
+  <h2><span class="no">06</span>Sources</h2>
+  <ol class="sources">
+    <li><a href="https://www.autodesk.com/products/forma-site-design/overview">Autodesk Forma Site Design overview</a></li>
+    <li><a href="https://blogs.autodesk.com/forma/2026/08/20/what-is-forma-site-design/">Autodesk blog: What is Forma Site Design</a></li>
+    <li><a href="https://www.testfit.io/product/site-solver">TestFit Site Solver</a></li>
+    <li><a href="https://www.testfit.io/blog/testfit-2-0-building-configurator">TestFit 2.0 Building Configurator</a></li>
+    <li><a href="https://www.archdaily.com/1009121/snaptrude-the-browser-based-bim-tool-thats-changing-the-way-architects-work">ArchDaily on Snaptrude</a></li>
+    <li><a href="https://arcol.io/blog/launch-announcement-june-2025">Arcol launch announcement (June 2025)</a></li>
+    <li><a href="https://www.giraffe.build/architects/">Giraffe for architects</a></li>
+    <li><a href="https://modelur.com/features/">Modelur features</a></li>
+    <li><a href="https://www.finch3d.com/product">Finch3D product</a></li>
+    <li><a href="https://planner5d.com/use/ai-floor-plan-generator">Planner 5D AI floor plan generator</a></li>
+    <li><a href="https://www.maket.ai/blog/ai-floor-plan-generator-guide-2026">Maket AI floor plan guide 2026</a></li>
+    <li><a href="https://www.prnewswire.co.uk/news-releases/qbiq-unveils-agentic-spaceplan-for-real-time-commercial-real-estate-302886096.html">qbiq agentic space plan (PR Newswire)</a></li>
+    <li><a href="https://hypar.io/">Hypar</a></li>
+  </ol>
+</section>
+
+<p class="foot">ArchiAI planning document · Sheet A-001 · Sept 2026</p>
+</div>
+
+<script>
+// Columns: Forma, TestFit, Snaptrude, Arcol, Giraffe, Modelur, Finch3D, Planner5D/Maket, qbiq, Hypar, ArchiAI today, ArchiAI target
+// y = supported, p = partial, n = not offered
+const cols = [
+  ["Forma", "https://www.autodesk.com/products/forma-site-design/overview"],
+  ["TestFit", "https://www.testfit.io/product/site-solver"],
+  ["Snaptrude", "https://www.archdaily.com/1009121/snaptrude-the-browser-based-bim-tool-thats-changing-the-way-architects-work"],
+  ["Arcol", "https://arcol.io/blog/launch-announcement-june-2025"],
+  ["Giraffe", "https://www.giraffe.build/architects/"],
+  ["Modelur", "https://modelur.com/features/"],
+  ["Finch3D", "https://www.finch3d.com/product"],
+  ["Planner 5D / Maket", "https://planner5d.com/use/ai-floor-plan-generator"],
+  ["qbiq", "https://www.prnewswire.co.uk/news-releases/qbiq-unveils-agentic-spaceplan-for-real-time-commercial-real-estate-302886096.html"],
+  ["Hypar", "https://hypar.io/"],
+  ["ArchiAI today", null],
+  ["ArchiAI target", null]
+];
+const rows = [
+  ["Site & context"],
+  ["Geolocated map, parcels, terrain",        "yypyyynnnp nY"],
+  ["Plot boundary & setbacks",                "yypyyypnnp pY"],
+  ["Zoning rules with live warnings",         "pponyypnnn nY"],
+  ["Massing"],
+  ["Sketch / extrude / push-pull masses",     "ypyyyynnnp nY"],
+  ["Floors and levels from a mass",           "yyyyyyppny pY"],
+  ["Live GFA / FAR / coverage / height",      "yypyyypnpp pY"],
+  ["Instant re-solve on edit",                "pynnppynpy pY"],
+  ["Housing layout"],
+  ["Unit mix and yield",                      "pyppypynnp nY"],
+  ["Automatic floor-plan generation",         "nppnnnyyyy yY"],
+  ["Hard-rule checks (daylight, circulation, adjacency)", "npnnnnynpp yY"],
+  ["Parking / garage access",                 "pynnpnnnnn pP"],
+  ["Interior"],
+  ["Furniture layouts",                       "nnpnnnpyyy nY"],
+  ["Automatic windows and openings",          "nppnnnppnn yY"],
+  ["3D walkthrough / presentation render",    "ppypppnyyp pP"],
+  ["Analysis"],
+  ["Sun and shadow study",                    "ypypyypnnp pY"],
+  ["Daylight / sun hours",                    "ynpnpnpnnn pY"],
+  ["Wind, noise, embodied carbon",            "ypnnpnpnnn nP"],
+  ["Views analysis",                          "pnnnpnnnnn nY"],
+  ["Cost / financial pro forma",              "nynnypnnpn nP"],
+  ["AI layer"],
+  ["Brief or prompt to options",              "ppypnnpyyy pY"],
+  ["Explain violations, suggest fixes",       "nnpnnpnnpn pY"],
+  ["Collaboration"],
+  ["Comments and share links",                "ypyyynyyyy pY"],
+  ["Real-time multiplayer",                   "ppyyynpnpy nP"],
+  ["Presentation boards",                     "npnyynnnpn nY"],
+  ["Version history",                         "ypyyypppny yY"],
+  ["Interop"],
+  ["DXF / DWG export",                        "yyypyypppp yY"],
+  ["IFC export",                              "ppypppnnny yY"],
+  ["Revit link / round-trip",                 "yyypnnyypy nY"],
+  ["Rhino / SketchUp",                        "yyypyyynnp pY"],
+  ["Spreadsheet sync",                        "npnnpynnnn nP"]
+];
+const sym = { y: "✓", p: "partial", n: "—" };
+const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+let h = "<thead><tr><th scope='col' style='text-align:left'>Capability</th>";
+cols.forEach(([name, url], i) => {
+  const cls = i === 10 ? " class='col-today'" : i === 11 ? " class='col-target'" : "";
+  h += `<th scope="col"${cls}>${url ? `<a href="${url}">${esc(name)}</a>` : esc(name)}</th>`;
+});
+h += "</tr></thead><tbody>";
+rows.forEach(r => {
+  if (r.length === 1) { h += `<tr class="group"><th colspan="${cols.length + 1}">${esc(r[0])}</th></tr>`; return; }
+  const cells = r[1].replace(" ", "").toLowerCase().split("");
+  h += `<tr><th scope="row">${esc(r[0])}</th>`;
+  cells.forEach((c, i) => {
+    const extra = i === 10 ? " col-today" : i === 11 ? " col-target" : "";
+    h += `<td class="${c}${extra}">${sym[c]}</td>`;
+  });
+  h += "</tr>";
+});
+document.getElementById("matrix").innerHTML = h + "</tbody>";
+</script>
