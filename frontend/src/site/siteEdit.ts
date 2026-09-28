@@ -2,6 +2,7 @@
  * Pure site-editing helpers: building a site from the plot, swapping a
  * boundary while keeping rules, edge-label placement and the street edge.
  */
+import { edgeCardinals, parseOrientation, type ScreenEdge } from '../components/canvas/orientationModel'
 import { signedArea } from './siteGeometry'
 import { emptyRules, type Site, type SitePoint } from './siteTypes'
 
@@ -93,3 +94,33 @@ export const moveCorner = (site: Site, index: number, point: SitePoint): Site =>
   ...site,
   boundary: site.boundary.map((p, i) => (i === index ? point : p)),
 })
+
+const SCREEN_OUTWARD: Record<ScreenEdge, SitePoint> = {
+  top: { x: 0, z: -1 },
+  bottom: { x: 0, z: 1 },
+  left: { x: -1, z: 0 },
+  right: { x: 1, z: 0 },
+}
+const FACING_OUTWARD: Record<string, SitePoint> = {
+  north: SCREEN_OUTWARD.top,
+  south: SCREEN_OUTWARD.bottom,
+  west: SCREEN_OUTWARD.left,
+  east: SCREEN_OUTWARD.right,
+}
+
+/**
+ * Plan direction the front (street) faces: from the generator's orientation
+ * block (same screen-edge mapping as the plan labels), else the brief's
+ * `facing` with north = -z.
+ */
+export function streetDirection(metadata: Record<string, unknown>): SitePoint | null {
+  const orientation = parseOrientation(metadata)
+  if (orientation) {
+    const facing = orientation.facingDirection ?? orientation.entrySide
+    const cardinals = edgeCardinals(orientation)
+    const edge = (Object.keys(cardinals) as ScreenEdge[]).find((e) => cardinals[e] === facing)
+    if (edge) return SCREEN_OUTWARD[edge]
+  }
+  const facing = (metadata.mvpRequirements as { facing?: unknown } | undefined)?.facing
+  return typeof facing === 'string' ? FACING_OUTWARD[facing] ?? null : null
+}

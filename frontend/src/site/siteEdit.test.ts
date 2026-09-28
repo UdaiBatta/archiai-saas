@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { edgeLabels, frontEdgeIndex, moveCorner, outwardNormal, plotBoundary, withBoundary } from './siteEdit'
+import { edgeLabels, frontEdgeIndex, streetDirection, moveCorner, outwardNormal, plotBoundary, withBoundary } from './siteEdit'
 import { emptyRules, type Site } from './siteTypes'
 
 const rect = [{ x: 0, z: 0 }, { x: 20, z: 0 }, { x: 20, z: 30 }, { x: 0, z: 30 }]
@@ -46,6 +46,10 @@ describe('edges', () => {
     expect(frontEdgeIndex(rect, { x: 1, z: 0 })).toBe(1) // east
     expect(frontEdgeIndex(rect, { x: 0, z: -1 })).toBe(0) // north
     expect(frontEdgeIndex(rect, null)).toBeNull()
+    expect(streetDirection({ mvpRequirements: { facing: 'east' } })).toEqual({ x: 1, z: 0 })
+    // Orientation block wins: entry wall at the front (screen top) facing south.
+    expect(streetDirection({ orientation: { facingDirection: 'S', entryWall: 'front' }, mvpRequirements: { facing: 'east' } })).toEqual({ x: 0, z: -1 })
+    expect(streetDirection({})).toBeNull()
   })
 
   it('moves one corner', () => {
