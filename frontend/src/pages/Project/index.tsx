@@ -4,7 +4,6 @@ import { useParams, useNavigate, useLocation, useSearchParams } from 'react-rout
 import { useAuth } from '../../hooks/useAuth'
 import projectService, { Project } from '../../services/project.service'
 import { Canvas3D } from '../../components/canvas/Canvas3D'
-import { Plan2D } from '../../components/canvas/Plan2D'
 import { ZoningView } from '../../components/canvas/ZoningView'
 import { RoomGraphView } from '../../components/canvas/RoomGraphView'
 import { RightPanel } from '../../components/canvas/RightPanel'
@@ -748,21 +747,16 @@ export default function ProjectPage() {
         <div className="flex-1 flex overflow-hidden">
           <div className="relative h-full min-w-0 flex-1">
             {roomCount === 0 ? <><Canvas3D className="h-full" readOnly briefBackground /><div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_45%,rgba(25,27,32,0.75)_0%,rgba(25,27,32,0.1)_70%)]" /></> :
-            viewMode === '3d' ? (
+            viewMode === '3d' || viewMode === 'floor_plan' ? (
+              // The plan tab is the 3D Top view (Canvas3D maps floor_plan to Top).
               <Canvas3D className="h-full" readOnly={generating} modelStage={modelStage} />
             ) : (
               <>
                 {/* Hidden WebGL canvas keeps the thumbnail/PNG/PDF capture
-                    path alive while an SVG lens (plan/zoning/graph) is on. */}
+                    path alive while an SVG lens (zoning/graph) is on. */}
                 <div className="pointer-events-none invisible absolute inset-0" aria-hidden="true">
                   <Canvas3D className="h-full" readOnly />
                 </div>
-                {viewMode === 'floor_plan' && (
-                  <Plan2D
-                    className="h-full pb-48 pt-28"
-                    readOnly={generating}
-                  />
-                )}
                 {viewMode === 'zoning' && <ZoningView className="h-full" />}
                 {viewMode === 'graph' && <RoomGraphView className="h-full" />}
               </>
