@@ -9,9 +9,11 @@ from app.models.refresh_token import RefreshToken
 from app.models.user import User
 from app.schemas.auth import (
     AuthResponse,
+    ChangePasswordRequest,
     LoginRequest,
     RefreshResponse,
     RegisterRequest,
+    UpdateProfileRequest,
     UserOut,
 )
 from app.utils.hashing import hash_password, verify_password
@@ -130,7 +132,7 @@ async def revoke_refresh_token(db: AsyncSession, token: str | None) -> None:
         await db.commit()
 
 
-async def get_current_user(db: AsyncSession, token: str) -> UserOut:
+async def _user_from_token(db: AsyncSession, token: str) -> User:
     try:
         user_id = decode_access_token(token)
     except ValueError:
@@ -142,4 +144,26 @@ async def get_current_user(db: AsyncSession, token: str) -> UserOut:
     if user is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
+    return user
+
+
+async def get_current_user(db: AsyncSession, token: str) -> UserOut:
+    return UserOut.model_validate(await _user_from_token(db, token))
+
+
+async def update_profile(db: AsyncSession, token: str, data: UpdateProfileRequest) -> UserOut:
+    user = await _user_from_token(db, token)
+    user.name = data.name
+    await db.commit()
+    await db.refresh(user)
     return UserOut.model_validate(user)
+
+
+async def change_password(db: AsyncSession, token: str, data: ChangePasswordRequest) -> None:
+    # ponytail: other sessions stay signed in; revoke the user's refresh
+    # tokens here once "sign out everywhere" is wanted.
+    user = await _user_from_token(db, token)
+    if not verify_password(data.current_password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    user.hashed_password = hash_password(data.new_password)
+    await db.commit()

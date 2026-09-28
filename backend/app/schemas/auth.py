@@ -16,6 +16,32 @@ class RegisterRequest(BaseModel):
         return v
 
 
+class UpdateProfileRequest(BaseModel):
+    name: str
+
+    @field_validator("name")
+    @classmethod
+    def name_not_blank(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Name is required")
+        if len(v) > 100:
+            raise ValueError("Name must be at most 100 characters")
+        return v
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def password_min_length(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        return v
+
+
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
