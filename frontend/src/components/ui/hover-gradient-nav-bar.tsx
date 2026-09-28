@@ -134,9 +134,9 @@ export function HoverGradientNavBar({ groups, className = '', 'aria-label': aria
   return (
     <nav
       aria-label={ariaLabel}
-      className={`rounded-none border-t border-ink/10 bg-graphite-800/95 px-2 py-1.5 shadow-xl backdrop-blur-lg md:w-fit md:rounded-2xl md:border ${className}`}
+      className={`rounded-none border-t border-ink/10 bg-graphite-800/95 px-1 py-0.5 shadow-xl backdrop-blur-lg md:w-fit md:px-2 md:py-1.5 md:rounded-2xl md:border ${className}`}
     >
-      <ul className="flex items-center gap-1 overflow-x-auto md:overflow-visible">
+      <ul className="flex items-center gap-1 overflow-x-auto p-1 md:overflow-visible md:p-0">
         {groups.map((group, index) => (
           <li key={group.id} className="flex shrink-0 items-center gap-1">
             {index > 0 && <span aria-hidden className="mx-1 h-6 w-px shrink-0 bg-ink/10" />}
