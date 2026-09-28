@@ -9,7 +9,7 @@ work lives in [ROADMAP.md](ROADMAP.md).
 
 _Last updated: 2026-09-28_
 
-## Foundation: layout engine quality — PR #44
+## Foundation: layout engine quality — PR #44 (merged)
 
 - [x] Home quality suite: 26 real briefs, baseline pinned in tests
 - [x] Daylight hard rule: bedrooms, living rooms, kitchens touch an outside wall
@@ -21,7 +21,7 @@ _Last updated: 2026-09-28_
 - [ ] Stack bathrooms over wet rooms on multi-storey homes
 - [ ] Broader room-order search on polygon plots
 
-## P1: Professional 3D workspace — PR #42 (in progress)
+## P1: Professional 3D workspace — PR #45 (in progress)
 
 - [x] White model: matte walls, crisp edges, pale room-floor tints, glass windows
 - [x] Ambient occlusion and soft sun shadows fitted to the site
@@ -76,7 +76,7 @@ _Last updated: 2026-09-28_
 - [ ] Boards: live model frames, metrics cards, notes
 - [ ] Real-time multiplayer
 
-## P7: Interop — PR #43
+## P7: Interop — PR #46
 
 - [x] DXF for AutoCAD (R2013, mm, AIA layers)
 - [x] IFC4 for Revit / ArchiCAD (walls, openings, doors, windows, spaces with areas, slabs)
