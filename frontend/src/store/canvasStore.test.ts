@@ -517,18 +517,25 @@ function loadFootprintFloor() {
   })
 }
 
-describe('drag clamp to footprint', () => {
-  it('keeps a dragged room fully inside the floor footprint', () => {
+// Objects may overhang the plot (balconies, canopies); they are only kept
+// within the plot plus a 30 m working margin: here 8x8 -> [-30, 38].
+describe('drag limits', () => {
+  it('lets a room overhang the plot', () => {
     loadFootprintFloor()
-    // Try to drag far outside the 8x8 footprint.
+    useCanvasStore.getState().updateRoom('r1', { position: { x: 9, y: 1.5, z: -1 } }, { log: false })
+    const room = useCanvasStore.getState().rooms.find((r) => r.id === 'r1')!
+    expect(room.position.x).toBe(9)
+    expect(room.position.z).toBe(-1)
+  })
+
+  it('stops a room dragged far away at the working margin', () => {
+    loadFootprintFloor()
     useCanvasStore.getState().updateRoom('r1', { position: { x: 100, y: 1.5, z: -100 } }, { log: false })
 
     const room = useCanvasStore.getState().rooms.find((r) => r.id === 'r1')!
-    // Room is 4 wide/deep -> centre must stay within [2, 6] on both axes.
-    expect(room.position.x).toBeGreaterThanOrEqual(2)
-    expect(room.position.x).toBeLessThanOrEqual(6)
-    expect(room.position.z).toBeGreaterThanOrEqual(2)
-    expect(room.position.z).toBeLessThanOrEqual(6)
+    // Room is 4 wide/deep -> centre within [-28, 36] on both axes.
+    expect(room.position.x).toBe(36)
+    expect(room.position.z).toBe(-28)
   })
 
   it('leaves an in-bounds position unchanged', () => {
@@ -539,7 +546,7 @@ describe('drag clamp to footprint', () => {
     expect(room.position.z).toBe(3)
   })
 
-  it('clamps a quarter-turned room by its visible footprint', () => {
+  it('limits a quarter-turned room by its visible footprint', () => {
     loadFootprintFloor()
     useCanvasStore.getState().updateRoom(
       'r1',
@@ -552,14 +559,14 @@ describe('drag clamp to footprint', () => {
     )
 
     const room = useCanvasStore.getState().rooms.find((candidate) => candidate.id === 'r1')!
-    expect(room.position.x).toBe(6)
-    expect(room.position.z).toBe(5)
+    // World size after the turn is 4 x 6.
+    expect(room.position.x).toBe(36)
+    expect(room.position.z).toBe(35)
   })
 
-  it('clamps a rotation-only turn back inside the footprint', () => {
+  it('lets a turn overhang the plot edge', () => {
     loadFootprintFloor()
-    // 2 x 6 room parked against the right edge: it fits before the turn
-    // (world width 2 -> x in [6, 8]) but not after it (world width 6).
+    // 2 x 6 room parked against the right edge: after the turn it overhangs.
     useCanvasStore
       .getState()
       .updateRoom('r1', { size: { w: 2, h: 3, d: 6 }, position: { x: 7, y: 1.5, z: 4 } }, { log: false })
@@ -568,7 +575,7 @@ describe('drag clamp to footprint', () => {
     useCanvasStore.getState().updateRoom('r1', { rotation: { x: 0, y: 90, z: 0 } })
 
     const room = useCanvasStore.getState().rooms.find((candidate) => candidate.id === 'r1')!
-    expect(room.position.x).toBe(5)
+    expect(room.position.x).toBe(7)
     // Rotating must not move the object vertically.
     expect(room.position.y).toBe(1.5)
   })
@@ -595,29 +602,29 @@ describe('resizeRoom', () => {
     expect(room.position.y).toBe(2.5) // elevation 0 + height/2
   })
 
-  it('caps oversized dimensions to the active floor footprint', () => {
+  it('lets a room grow past the plot', () => {
     loadFootprintFloor()
-    useCanvasStore.getState().resizeRoom('r1', { w: 20, h: 3, d: 12 })
+    useCanvasStore.getState().resizeRoom('r1', { w: 10, h: 3, d: 9 })
 
     const room = useCanvasStore.getState().rooms.find((candidate) => candidate.id === 'r1')!
-    expect(room.size.w).toBe(8)
-    expect(room.size.d).toBe(8)
+    expect(room.size.w).toBe(10)
+    expect(room.size.d).toBe(9)
     expect(room.position.x).toBe(4)
     expect(room.position.z).toBe(4)
   })
 
-  it('caps quarter-turned local dimensions against the matching world axes', () => {
+  it('keeps quarter-turned local dimensions as asked', () => {
     loadFootprintFloor()
     useCanvasStore.getState().updateRoom(
       'r1',
       { rotation: { x: 0, y: 90, z: 0 } },
       { log: false },
     )
-    useCanvasStore.getState().resizeRoom('r1', { w: 20, h: 3, d: 12 })
+    useCanvasStore.getState().resizeRoom('r1', { w: 10, h: 3, d: 9 })
 
     const room = useCanvasStore.getState().rooms.find((candidate) => candidate.id === 'r1')!
-    expect(room.size.w).toBe(8)
-    expect(room.size.d).toBe(8)
+    expect(room.size.w).toBe(10)
+    expect(room.size.d).toBe(9)
     expect(room.position.x).toBe(4)
     expect(room.position.z).toBe(4)
   })
@@ -915,7 +922,7 @@ describe('history, constraints, and clipboard operations', () => {
     expect(resized.size.d).toBeLessThan(1)
   })
 
-  it('clamps movement to the selected object floor footprint', () => {
+  it('limits movement to the working area around the object floor', () => {
     const store = useCanvasStore.getState()
     store.loadLayout({
       version: '1.0',
@@ -944,7 +951,8 @@ describe('history, constraints, and clipboard operations', () => {
 
     store.updateRoom('small-room', { position: { x: 99, y: 1.5, z: -99 } })
 
-    expect(useCanvasStore.getState().rooms[0].position).toEqual({ x: 3, y: 1.5, z: 1 })
+    // 4 x 4 plot + 30 m margin -> centre of a 2 m room within [-29, 33].
+    expect(useCanvasStore.getState().rooms[0].position).toEqual({ x: 33, y: 1.5, z: -29 })
   })
 
   it('pastes copied components onto the active floor with new ids and progressive offsets', () => {

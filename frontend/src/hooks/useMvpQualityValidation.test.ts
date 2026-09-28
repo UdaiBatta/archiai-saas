@@ -151,7 +151,7 @@ describe('useMvpQualityValidation', () => {
     await advance(1)
     expect(validateAndSyncMvpLayout).toHaveBeenCalledWith(
       expect.objectContaining({
-        rooms: [expect.objectContaining({ id: 'room-1', x: 5, y: 0 })],
+        rooms: [expect.objectContaining({ id: 'room-1', x: 6, y: 0 })],
       }),
       { requirements, includeVastu: true },
     )
@@ -161,7 +161,8 @@ describe('useMvpQualityValidation', () => {
     expect(synced.rooms.find((object) => object.id === 'door-synced')).toMatchObject({
       hostWallId: 'wall-synced',
     })
-    expect(synced.rooms.find((object) => object.id === 'room-1')?.position.x).toBe(7)
+    // Rooms may overhang the plot now (balconies); the move is kept as made.
+    expect(synced.rooms.find((object) => object.id === 'room-1')?.position.x).toBe(8)
     expect(synced.past).toHaveLength(1)
     expect(synced.activityLog).toHaveLength(1)
     expect(synced.saveStatus).toBe('unsaved')
