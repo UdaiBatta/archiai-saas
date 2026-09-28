@@ -68,7 +68,7 @@ const OUTWARD: Record<ScreenEdge, PlanPoint> = {
 }
 
 /** Orthographic zoom = screen pixels per metre; re-rendered only on a real change. */
-function usePixelsPerMetre() {
+export function usePixelsPerMetre() {
   const [zoom, setZoom] = useState(30)
   const last = useRef(zoom)
   useFrame(({ camera }) => {
