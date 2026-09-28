@@ -70,6 +70,8 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # File exports name their download here; browsers hide it cross-origin otherwise.
+    expose_headers=["Content-Disposition"],
 )
 
 STATUS_CODES = {

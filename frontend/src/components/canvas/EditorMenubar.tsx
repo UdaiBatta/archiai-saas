@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 
-import projectService, { type Project } from '../../services/project.service'
+import { getApiErrorMessage } from '../../services/apiError'
+import { canvasObjectsToLayoutPlan } from '../../services/mvpLayoutAdapter'
+import projectService, { type FileExportFormat, type Project } from '../../services/project.service'
 import { useCanvasStore } from '../../store/canvasStore'
+import type { Connection, Facing, PlanZoneSpan } from '../../types/contracts'
 import { Menubar, MenubarItem, MenubarMenu, MenubarRadioGroup, MenubarSeparator, MenubarSubmenu } from '../ui/Menubar'
 import { VIEW_MODE_OPTIONS } from './ViewModeSwitcher'
 
@@ -14,6 +17,8 @@ export interface EditorMenubarProps {
   onDuplicate: () => void
   onExportImage: () => void
   onExportPdf: () => void
+  /** Reports a CAD/BIM/3D export failure (null clears it) where PNG/PDF errors show. */
+  onExportError: (message: string | null) => void
   onShare: () => void
   onProjectDetails: () => void
   onDelete: () => void
@@ -30,6 +35,24 @@ export interface EditorMenubarProps {
 }
 
 const RECENT_LIMIT = 5
+
+const FILE_EXPORTS: { format: FileExportFormat; label: string }[] = [
+  { format: 'dxf', label: 'DXF — AutoCAD' },
+  { format: 'ifc', label: 'IFC — Revit / BIM' },
+  { format: 'glb', label: 'GLB — 3D model' },
+  { format: 'obj', label: 'OBJ — 3D model (zip)' },
+  { format: 'svg', label: 'SVG — vector plan' },
+]
+
+// Same plan the post-edit validation sends (useMvpQualityValidation).
+function currentLayoutPlan() {
+  const { rooms, floors, layoutMetadata } = useCanvasStore.getState()
+  const footprint = floors[0]?.footprint // every storey shares the footprint; objects carry their floor
+  if (!footprint) return null
+  const facing = (layoutMetadata.mvpRequirements as { facing?: Facing } | undefined)?.facing
+  const connections = Array.isArray(layoutMetadata.mvpConnections) ? (layoutMetadata.mvpConnections as Connection[]) : []
+  return canvasObjectsToLayoutPlan(rooms, footprint, facing ?? 'east', connections, layoutMetadata.mvpFootprint as PlanZoneSpan | undefined)
+}
 
 /**
  * The editor's File / Edit / View / Plan menus. Everything the project page
@@ -61,7 +84,33 @@ export function EditorMenubar(props: EditorMenubarProps) {
       .catch(() => setRecent([]))
   }, [projectId])
 
-  const exporting = props.exportingImage || props.exportingPdf
+  const [exportingFile, setExportingFile] = useState(false)
+  const exporting = props.exportingImage || props.exportingPdf || exportingFile
+
+  const exportFile = async (format: FileExportFormat) => {
+    const plan = currentLayoutPlan()
+    if (!plan) {
+      props.onExportError('Generate a plan before exporting.')
+      return
+    }
+    setExportingFile(true)
+    props.onExportError(null)
+    try {
+      const { blob, filename } = await projectService.exportFile(projectId, format, plan)
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      props.onExportError(getApiErrorMessage(err, `Failed to export ${format.toUpperCase()}`))
+    } finally {
+      setExportingFile(false)
+    }
+  }
 
   return (
     <Menubar>
@@ -82,6 +131,10 @@ export function EditorMenubar(props: EditorMenubarProps) {
         <MenubarSubmenu label={exporting ? 'Exporting…' : 'Export'} disabled={!hasPlan || exporting}>
           <MenubarItem onClick={props.onExportImage}>PNG image</MenubarItem>
           <MenubarItem onClick={props.onExportPdf}>PDF sheet</MenubarItem>
+          <MenubarSeparator />
+          {FILE_EXPORTS.map(({ format, label }) => (
+            <MenubarItem key={format} onClick={() => void exportFile(format)}>{label}</MenubarItem>
+          ))}
         </MenubarSubmenu>
         <MenubarItem onClick={props.onShare}>Share link…</MenubarItem>
         <MenubarSeparator />

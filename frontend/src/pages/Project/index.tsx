@@ -795,6 +795,7 @@ export default function ProjectPage() {
                 onDuplicate: handleDuplicate,
                 onExportImage: handleExportImage,
                 onExportPdf: handleExportPdf,
+                onExportError: setExportError,
                 onShare: () => setShareOpen(true),
                 onProjectDetails: enterEditMode,
                 onDelete: handleDelete,

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import api from './api'
 import projectService from './project.service'
+import type { LayoutPlan } from '../types/contracts'
 
 vi.mock('./api', () => ({
   default: {
@@ -36,6 +37,42 @@ describe('project export service', () => {
 
     expect(api.post).toHaveBeenCalledWith('/api/projects/project-1/export/pdf')
     expect(result.export_type).toBe('pdf')
+  })
+})
+
+describe('project file export service', () => {
+  const layout = { rooms: [] } as unknown as LayoutPlan
+
+  it('posts the plan and returns the server filename', async () => {
+    const blob = new Blob(['dxf'])
+    vi.mocked(api.post).mockResolvedValue({
+      data: blob,
+      headers: { 'content-disposition': 'attachment; filename="My-House.dxf"' },
+    })
+
+    const result = await projectService.exportFile('project-1', 'dxf', layout)
+
+    expect(api.post).toHaveBeenCalledWith(
+      '/api/projects/project-1/export/dxf',
+      { layout },
+      { responseType: 'blob' },
+    )
+    expect(result).toEqual({ blob, filename: 'My-House.dxf' })
+  })
+
+  it('falls back to plan.<ext>, zip for OBJ', async () => {
+    vi.mocked(api.post).mockResolvedValue({ data: new Blob(), headers: {} })
+
+    expect((await projectService.exportFile('project-1', 'obj', layout)).filename).toBe('plan.zip')
+    expect((await projectService.exportFile('project-1', 'ifc', layout)).filename).toBe('plan.ifc')
+  })
+
+  it('decodes a JSON error body so the message can be shown', async () => {
+    const error = { response: { data: new Blob([JSON.stringify({ detail: 'Plan has no rooms' })]) } }
+    vi.mocked(api.post).mockRejectedValue(error)
+
+    await expect(projectService.exportFile('project-1', 'glb', layout)).rejects.toBe(error)
+    expect(error.response.data).toEqual({ detail: 'Plan has no rooms' })
   })
 })
 
