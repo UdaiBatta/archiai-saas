@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
-import { Canvas } from '@react-three/fiber'
+import { Canvas, useThree } from '@react-three/fiber'
 import { EffectComposer, N8AO, ToneMapping } from '@react-three/postprocessing'
 import { ToneMappingMode } from 'postprocessing'
 import { Scene } from './Scene'
@@ -183,6 +183,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
           <RoomMesh key={r.id} room={r} orbitRef={orbitRef} readOnly viewMode={viewMode} modelStage={modelStage} ghost />
         ))}
         {/* Top reads as a drawing: no ambient occlusion (and no sun shadows, see Scene). */}
+        {!(studio && !topView) && <RendererAutoClear />}
         {studio && !topView && (
           <EffectComposer multisampling={4}>
             <N8AO ref={aoRef as never} aoRadius={1.2} distanceFalloff={0.6} intensity={2.4} quality="medium" halfRes color="#1f1d1a" />
@@ -278,4 +279,17 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
       )}
     </div>
   )
+}
+
+/** The AO composer turns the renderer's autoClear off for good (postprocessing's
+ * setRenderer) and never turns it back on; without the composer (Top view,
+ * after visiting Persp/Axo) each frame would draw over the last one. */
+function RendererAutoClear() {
+  const gl = useThree((s) => s.gl)
+  const invalidate = useThree((s) => s.invalidate)
+  useEffect(() => {
+    gl.autoClear = true
+    invalidate()
+  }, [gl, invalidate])
+  return null
 }
