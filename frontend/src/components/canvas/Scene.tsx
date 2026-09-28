@@ -126,7 +126,7 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
         }
         color={isPlanView ? '#ffffff' : sun.color}
         intensity={isPlanView ? 0.55 : studio ? sun.intensity * 1.4 : sun.intensity}
-        castShadow={!isPlanView}
+        castShadow={!isPlanView && !topView}
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
         shadow-bias={-0.0001}
