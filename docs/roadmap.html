@@ -183,7 +183,7 @@ thead th.col-today, thead th.col-target { color: var(--accent); }
       <dt>Updated</dt><dd id="updated">2026-09-28</dd>
       <dt>Scope</dt><dd>Site, massing, housing, interior</dd>
       <dt>Status</dt><dd>P1 in progress</dd>
-      <dt>Progress</dt><dd id="overall">17 / 50 items</dd>
+      <dt>Progress</dt><dd id="overall">24 / 55 items</dd>
     </dl>
   </div>
   <p class="lede"><strong>ArchiAI is a browser-based, 3D-first design tool for the first weeks of a residential project</strong>: draw the site, shape the mass, and fill it with homes and rooms that already obey the rules an architect would check by hand (daylight, street entry, circulation, adjacency). It is for architects and small practices doing early-stage site and housing design who today stitch together a massing tool, a plan sketcher and a spreadsheet. The engine is deterministic and explainable; AI sits on top as an optional suggestion layer. Everything leaves as clean DXF and IFC, so the work continues in AutoCAD, Revit or ArchiCAD without redrawing.</p>
@@ -287,7 +287,7 @@ thead th.col-today, thead th.col-target { color: var(--accent); }
       <h3>Professional 3D workspace</h3>
       <div class="meta"><span class="tag now">In progress</span><span class="tag size">Size L</span><span class="tag">Free</span></div>
       <p>Goal: the 3D view is good enough to be the only view.</p>
-      <!--P1--><div class="meter" aria-hidden="true"><i style="width:50%"></i></div><span class="tag prog">6 / 12 done</span>
+      <!--P1--><div class="meter" aria-hidden="true"><i style="width:76%"></i></div><span class="tag prog">13 / 17 done</span>
       <ul class="check">
         <li class="ok">White model: matte walls, crisp edges, pale room-floor tints, glass windows</li>
         <li class="ok">Ambient occlusion and soft sun shadows fitted to the site</li>
@@ -296,11 +296,16 @@ thead th.col-today, thead th.col-target { color: var(--accent); }
         <li class="ok">Perspective / Axo / Top (orthographic, north up) views framing the site</li>
         <li class="ok">Hide or ghost other floors on multi-storey plans</li>
         <li>Setback lines on the ground (needs setback data, comes with P2)</li>
-        <li>Saved views</li>
-        <li>Dimensions and room labels in Top view</li>
-        <li>Editing handles in Top view (move, resize, walls, doors, windows)</li>
-        <li>Retire the separate 2D editor once Top view reaches parity</li>
-        <li>60 fps on a mid-range laptop for a 4-bedroom home</li>
+        <li class="ok">Saved views: named cameras saved with the project (restore, rename, delete)</li>
+        <li class="ok">Dimensions and room labels in Top view</li>
+        <li class="ok">Editing in Top view: move, 8 resize grips, polygon corners, doors and windows, undo</li>
+        <li class="ok">Keyboard selection in Top view (Tab, Enter/Space) and tooltips on small rooms</li>
+        <li class="ok">Top view reads as a drawing (no shadows or ambient occlusion)</li>
+        <li class="ok">Retire the separate 2D editor: the 2D Plan tab opens Top view</li>
+        <li class="ok">Frame budget: ~8 ms/frame orbiting the 3-bedroom example on an integrated GPU (was ~17 ms)</li>
+        <li>Re-measure on a 4-bedroom home</li>
+        <li>Rooms re-render only when they change (today one drag re-renders every room)</li>
+        <li>On-screen zoom buttons in Top view</li>
       </ul><!--/P1-->
       <div class="done"><b>Done when</b>every edit possible in the 2D editor works in ortho plan view, the 2D editor is removed, and the workspace holds 60 fps on a mid-range laptop for a 4-bedroom home.</div>
     </div>

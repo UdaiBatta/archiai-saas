@@ -30,11 +30,16 @@ _Last updated: 2026-09-28_
 - [x] Perspective / Axo / Top (orthographic, north up) views framing the site
 - [x] Hide or ghost other floors on multi-storey plans
 - [ ] Setback lines on the ground (needs setback data, comes with P2)
-- [ ] Saved views
-- [ ] Dimensions and room labels in Top view
-- [ ] Editing handles in Top view (move, resize, walls, doors, windows)
-- [ ] Retire the separate 2D editor once Top view reaches parity
-- [ ] 60 fps on a mid-range laptop for a 4-bedroom home
+- [x] Saved views: named cameras saved with the project (restore, rename, delete)
+- [x] Dimensions and room labels in Top view
+- [x] Editing in Top view: move, 8 resize grips, polygon corners, doors and windows, undo
+- [x] Keyboard selection in Top view (Tab, Enter/Space) and tooltips on small rooms
+- [x] Top view reads as a drawing (no shadows or ambient occlusion)
+- [x] Retire the separate 2D editor: the 2D Plan tab opens Top view
+- [x] Frame budget: ~8 ms/frame orbiting the 3-bedroom example on an integrated GPU (was ~17 ms)
+- [ ] Re-measure on a 4-bedroom home
+- [ ] Rooms re-render only when they change (today one drag re-renders every room)
+- [ ] On-screen zoom buttons in Top view
 
 ## P2: Site & massing
 
