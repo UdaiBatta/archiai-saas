@@ -3,11 +3,14 @@ import { Axis3d, Box, Camera, Layers, LayoutGrid, Map as MapIcon, Network, Squar
 import { HoverGradientNavBar, type HoverGradientNavGroup, type HoverGradientNavItem } from '@/components/ui/hover-gradient-nav-bar'
 import { useCanvasStore } from '../../store/canvasStore'
 import { CAMERA_PRESETS, type CameraPreset } from './modelView'
+import { useEditTools, type EditTool } from './editTools'
 
 export type DockTool = 'site' | 'views' | 'sun' | 'floors'
+type DockPopover = DockTool | 'more'
 
 const glow = (rgb: string) =>
   `radial-gradient(circle, rgba(${rgb},0.18) 0%, rgba(${rgb},0.07) 50%, rgba(${rgb},0) 100%)`
+const EDIT_LOOK = { gradient: glow('245,245,246'), iconColor: 'group-hover:text-ink' }
 const VIEW_LOOK = { gradient: glow('255,59,31'), iconColor: 'group-hover:text-accent-bright' }
 const LENS_LOOK = { gradient: glow('201,169,110'), iconColor: 'group-hover:text-warn' }
 const TOOL_LOOK = { gradient: glow('143,174,148'), iconColor: 'group-hover:text-ok' }
@@ -41,24 +44,34 @@ interface EditorDockProps {
   tools?: Partial<Record<DockTool, ReactNode>>
   /** Only the view items and Views (restore) remain. */
   readOnly?: boolean
-  /** Zoning / Room Graph (hidden on the 3D model stage). */
-  lenses?: boolean
+  /** 3D model stage: Furniture instead of Room, and no lenses. */
+  modelStage?: boolean
   className?: string
 }
 
 /**
- * The editor's bottom-centre dock: camera views, plan lenses and the
- * view tools (Site, Views, Sun, Floors), each tool in a popover above it.
+ * The editor's single bottom-centre dock: edit tools and history, camera
+ * views, plan lenses and the view tools (Site, Views, Sun, Floors); the
+ * add-object menu and each view tool open in a popover above it.
  */
-export function EditorDock({ preset, onPreset, tools = {}, readOnly = false, lenses = true, className = '' }: EditorDockProps) {
+export function EditorDock({ preset, onPreset, tools = {}, readOnly = false, modelStage = false, className = '' }: EditorDockProps) {
   const viewMode = useCanvasStore((s) => s.viewMode)
   const setViewMode = useCanvasStore((s) => s.setViewMode)
-  const [open, setOpen] = useState<DockTool | null>(null)
+  const [open, setOpen] = useState<DockPopover | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const popoverRef = useRef<HTMLDivElement>(null)
 
   const available = TOOLS.filter((tool) => tools[tool.id] && (!readOnly || tool.id === 'views'))
-  const openTool = available.some((tool) => tool.id === open) ? open : null
+  const openTool = (open === 'more' && !readOnly) || available.some((tool) => tool.id === open) ? open : null
+  const { edit, history, addMenu } = useEditTools({ modelStage, closeMenu: () => setOpen(null) })
+  const popovers: Partial<Record<DockPopover, ReactNode>> = { ...tools, more: addMenu }
+  const popoverLabel = openTool === 'more' ? 'Add object' : available.find((tool) => tool.id === openTool)?.label
+  const toggle = (id: DockPopover) => (openTool === id ? close(true) : setOpen(id))
+  const editItem = (tool: EditTool): HoverGradientNavItem => ({
+    ...EDIT_LOOK,
+    ...tool,
+    ...(tool.menu ? { active: openTool === tool.id, expanded: openTool === tool.id, onSelect: () => toggle('more') } : {}),
+  })
 
   const close = (refocus: boolean) => {
     if (refocus && openTool) {
@@ -86,7 +99,11 @@ export function EditorDock({ preset, onPreset, tools = {}, readOnly = false, len
     }
   }
 
-  const groups: HoverGradientNavGroup[] = [
+  const groups: HoverGradientNavGroup[] = readOnly ? [] : [
+    { id: 'edit', label: 'Edit', items: edit.map(editItem) },
+    { id: 'history', label: 'History', items: history.map(editItem) },
+  ]
+  groups.push(
     {
       id: 'view',
       label: 'View',
@@ -98,8 +115,8 @@ export function EditorDock({ preset, onPreset, tools = {}, readOnly = false, len
         onSelect: () => onPreset(value),
       })),
     },
-  ]
-  if (lenses && !readOnly) {
+  )
+  if (!modelStage && !readOnly) {
     groups.push({
       id: 'lenses',
       label: 'Lenses',
@@ -120,7 +137,7 @@ export function EditorDock({ preset, onPreset, tools = {}, readOnly = false, len
         ...TOOL_LOOK,
         active: openTool === tool.id,
         expanded: openTool === tool.id,
-        onSelect: () => (openTool === tool.id ? close(true) : setOpen(tool.id)),
+        onSelect: () => toggle(tool.id),
       })),
     })
   }
@@ -135,11 +152,11 @@ export function EditorDock({ preset, onPreset, tools = {}, readOnly = false, len
         <div
           ref={popoverRef}
           role="dialog"
-          aria-label={available.find((tool) => tool.id === openTool)?.label}
+          aria-label={popoverLabel}
           tabIndex={-1}
           className="absolute bottom-full left-1/2 mb-2 max-h-[60vh] w-64 max-w-[calc(100vw-1.5rem)] -translate-x-1/2 overflow-y-auto outline-none motion-safe:animate-fade-in"
         >
-          {tools[openTool]}
+          {popovers[openTool]}
         </div>
       )}
       <HoverGradientNavBar aria-label="Editor dock" groups={groups} className="w-full" />

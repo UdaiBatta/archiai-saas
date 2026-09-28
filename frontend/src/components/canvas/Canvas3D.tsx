@@ -39,9 +39,11 @@ interface Canvas3DProps {
   briefBackground?: boolean
   /** Camera to open the 3D view with (e.g. Axo chosen from a lens). */
   initialPreset?: Exclude<CameraPreset, 'top'>
+  /** False while something (e.g. the brief editor) covers the canvas. */
+  dock?: boolean
 }
 
-export function Canvas3D({ className, readOnly = false, modelStage = false, briefBackground = false, initialPreset = 'perspective' }: Canvas3DProps) {
+export function Canvas3D({ className, readOnly = false, modelStage = false, briefBackground = false, initialPreset = 'perspective', dock = true }: Canvas3DProps) {
   const orbitRef = useRef<{ enabled: boolean }>(null)
   const rooms = useCanvasStore((s) => s.rooms)
   const selectedFloor = useCanvasStore((s) => s.selectedFloor)
@@ -209,7 +211,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
         <TopPlanKeyboardLayer rooms={visibleRooms} invalidRoomIds={invalidRoomIds} onFocusRoom={setFocusedRoomId} />
       )}
       {studio && !readOnly && (
-        <div className="pointer-events-none absolute bottom-12 left-4 z-10 hidden text-[10px] leading-relaxed text-muted-light xl:block">
+        <div className="pointer-events-none absolute bottom-[6.5rem] left-4 z-10 hidden text-[10px] leading-relaxed text-muted-light xl:block">
           {topView ? (
             <>
               Click to select · drag selected to move · drag grips to resize<br />
@@ -221,13 +223,13 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
           )}
         </div>
       )}
-      {studio && (
+      {studio && dock && (
         <EditorDock
-          className="bottom-[7.25rem]"
+          className="bottom-12"
           preset={preset}
           onPreset={choosePreset}
           readOnly={readOnly}
-          lenses={!modelStage}
+          modelStage={modelStage}
           tools={{
             site: <SitePanel defaultOpen topView={topView} onRequestTop={() => applyPreset('top')} />,
             views: (!readOnly || hasSavedViews) && (

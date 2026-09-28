@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { type ReactNode } from 'react'
+import { Armchair, Ellipsis, MousePointer2, Redo2, Ruler, SquarePlus, Undo2 } from 'lucide-react'
 import { useCanvasStore } from '../../store/canvasStore'
 import {
   BEGINNER_COMPONENTS,
@@ -8,7 +9,6 @@ import {
 } from '../../store/componentRegistry'
 
 const ICONS: Record<string, JSX.Element> = {
-  select: <path d="M5 3l14 7-6 2-2 6z" />,
   room: (
     <>
       <rect x="3" y="3" width="18" height="18" rx="1.5" />
@@ -77,112 +77,37 @@ const ICONS: Record<string, JSX.Element> = {
       <path d="M9 12h6" />
     </>
   ),
-  measure: (
-    <>
-      <path d="M3 8l5-5 13 13-5 5z" />
-      <path d="M8 7l1.5 1.5M11 10l1.5 1.5M14 13l1.5 1.5" />
-    </>
-  ),
-  more: (
-    <>
-      <circle cx="5" cy="12" r="1.5" />
-      <circle cx="12" cy="12" r="1.5" />
-      <circle cx="19" cy="12" r="1.5" />
-    </>
-  ),
-  undo: <path d="M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3" />,
-  redo: <path d="M15 14l5-5-5-5M20 9H10a6 6 0 0 0 0 12h3" />,
 }
 
-interface ToolDef {
-  key: string
+/** An Edit / History item for the dock (icon and look are added there). */
+export interface EditTool {
+  id: string
   label: string
+  icon: ReactNode
   shortcut?: string
-  onClick?: () => void
   active?: boolean
   disabled?: boolean
+  /** Opens the add-object menu instead of acting. */
+  menu?: boolean
+  onSelect: () => void
 }
 
-function ToolButton({
-  tool,
-  hovered,
-  setHovered,
-  labeled,
-}: {
-  tool: ToolDef
-  hovered: string | null
-  setHovered: (key: string | null) => void
-  labeled: boolean
-}) {
+const icon = 'h-[18px] w-[18px]'
+
+function ComponentIcon({ type }: { type: string }) {
   return (
-    <div
-      className="relative flex"
-      onMouseEnter={() => setHovered(tool.key)}
-      onMouseLeave={() => setHovered(null)}
-    >
-      <button
-        type="button"
-        aria-label={tool.label}
-        onClick={tool.onClick}
-        disabled={tool.disabled}
-        className={`flex items-center justify-center rounded-md transition-colors ${
-          labeled ? 'h-10 w-12 flex-col gap-0.5' : 'h-9 w-9'
-        } ${
-          tool.active
-            ? 'bg-accent-soft text-accent-bright ring-1 ring-accent-bright/45'
-            : tool.disabled
-              ? 'text-graphite-500'
-              : 'text-muted-light hover:bg-ink/10 hover:text-ink'
-        }`}
-      >
-        <svg
-          width="17"
-          height="17"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          {ICONS[tool.key] ?? ICONS.generic}
-        </svg>
-        {labeled && (
-          <span className="max-w-full truncate px-0.5 text-[8px] font-medium leading-none">
-            {tool.label}
-          </span>
-        )}
-      </button>
-      {!labeled && hovered === tool.key && (
-        <div className="absolute left-11 top-1/2 z-20 flex -translate-y-1/2 items-center gap-2 whitespace-nowrap rounded-lg bg-ink px-2.5 py-1.5 text-graphite-900 shadow-lg">
-          <span className="text-xs font-semibold">{tool.label}</span>
-          {tool.shortcut && (
-            <span className="rounded bg-graphite-800 px-1 py-0.5 font-mono text-[10px] font-semibold text-graphite-100">
-              {tool.shortcut}
-            </span>
-          )}
-        </div>
-      )}
-    </div>
+    <svg className={icon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      {ICONS[type] ?? ICONS.generic}
+    </svg>
   )
 }
 
-function componentTool(
-  definition: ComponentDefinition,
-  placementMode: CanvasObjectType | null,
-  armPlacement: (type: CanvasObjectType) => void,
-): ToolDef {
-  return {
-    key: definition.type,
-    label: definition.label,
-    active: placementMode === definition.type,
-    onClick: () => armPlacement(definition.type),
-  }
-}
-
-export function ToolRail({ modelStage = false }: { modelStage?: boolean }) {
-  const [hovered, setHovered] = useState<string | null>(null)
-  const [moreOpen, setMoreOpen] = useState(false)
+/**
+ * The editor's edit tools (was the ToolRail): Select, Room (Furniture on the
+ * model stage), Measure, the add-object menu, Undo and Redo. `closeMenu`
+ * closes the dock popover, as picking a tool closed the old More menu.
+ */
+export function useEditTools({ modelStage = false, closeMenu }: { modelStage?: boolean; closeMenu: () => void }) {
   const placementMode = useCanvasStore((s) => s.placementMode)
   const setPlacementMode = useCanvasStore((s) => s.setPlacementMode)
   const showDimensions = useCanvasStore((s) => s.showDimensions)
@@ -203,123 +128,70 @@ export function ToolRail({ modelStage = false }: { modelStage?: boolean }) {
     if (measureMode) toggleMeasureMode()
     setShowDimensions(false)
     setPlacementMode(placementMode === type ? null : type)
-    setMoreOpen(false)
+    closeMenu()
   }
+  const componentTool = (definition: ComponentDefinition): EditTool => ({
+    id: definition.type,
+    label: definition.label,
+    icon: definition.type === 'furniture' ? <Armchair className={icon} /> : <SquarePlus className={icon} />,
+    active: placementMode === definition.type,
+    onSelect: () => armPlacement(definition.type),
+  })
 
-  const tools: ToolDef[] = [
+  const edit: EditTool[] = [
     {
-      key: 'select',
+      id: 'select',
       label: 'Select',
+      icon: <MousePointer2 className={icon} />,
       active: placementMode === null && !showDimensions && !measureMode,
-      onClick: () => {
+      onSelect: () => {
         if (measureMode) toggleMeasureMode()
         setPlacementMode(null)
         setShowDimensions(false)
-        setMoreOpen(false)
+        closeMenu()
       },
     },
-    ...BEGINNER_COMPONENTS.filter((definition) => modelStage ? definition.type === 'furniture' : definition.type === 'room').map((definition) =>
-      componentTool(definition, placementMode, armPlacement),
-    ),
+    ...BEGINNER_COMPONENTS.filter((definition) => modelStage ? definition.type === 'furniture' : definition.type === 'room').map(componentTool),
     {
-      key: 'measure',
+      id: 'measure',
       label: 'Measure',
       shortcut: 'Alt',
+      icon: <Ruler className={icon} />,
       active: measureMode,
-      onClick: () => {
+      onSelect: () => {
         setPlacementMode(null)
         setShowDimensions(false)
         toggleMeasureMode()
-        setMoreOpen(false)
+        closeMenu()
       },
     },
-    {
-      key: 'more',
-      label: 'More', // the full name was cut off under a 48 px button
-      active: moreOpen,
-      onClick: () => setMoreOpen((value) => !value),
-    },
-    {
-      key: 'undo',
-      label: 'Undo',
-      shortcut: 'Ctrl+Z',
-      disabled: !canUndo,
-      onClick: () => undo(),
-    },
-    {
-      key: 'redo',
-      label: 'Redo',
-      shortcut: 'Ctrl+Shift+Z',
-      disabled: !canRedo,
-      onClick: () => redo(),
-    },
+    { id: 'more', label: 'More', icon: <Ellipsis className={icon} />, menu: true, onSelect: () => {} },
+  ]
+  const history: EditTool[] = [
+    { id: 'undo', label: 'Undo', shortcut: 'Ctrl+Z', icon: <Undo2 className={icon} />, disabled: !canUndo, onSelect: () => undo() },
+    { id: 'redo', label: 'Redo', shortcut: 'Ctrl+Shift+Z', icon: <Redo2 className={icon} />, disabled: !canRedo, onSelect: () => redo() },
   ]
 
-  // Same labeled panel in every view — icon-only + hover tooltip used to be
-  // 3D/zoning/graph-only, which made tool selection look and behave
-  // differently per view for no functional reason.
-  const labeled = true
-  const primaryTools = tools.slice(0, -2)
-  const historyTools = tools.slice(-2)
-
-  return (
-    <div
-      aria-label="Editor tools"
-      className={`absolute bottom-12 left-1/2 z-20 flex max-w-[calc(100%-1.5rem)] -translate-x-1/2 items-center rounded-xl border border-ink/10 bg-[#1b1c1d]/95 px-1 py-1.5 shadow-xl backdrop-blur`}
-    >
-      <div className="flex items-center gap-0.5">
-        {primaryTools.map((tool) => (
-          <ToolButton
-            key={tool.key}
-            tool={tool}
-            hovered={hovered}
-            setHovered={setHovered}
-            labeled={labeled}
-          />
-        ))}
+  const addMenu = (
+    <div className="max-h-[50vh] overflow-y-auto rounded-xl border border-ink/10 bg-graphite-800 p-1.5 shadow-2xl">
+      {[...BEGINNER_COMPONENTS, ...PROFESSIONAL_COMPONENTS].filter((definition) => modelStage ? definition.type !== 'furniture' : definition.type !== 'room').map((definition) => (
+        <button
+          key={definition.type}
+          type="button"
+          aria-pressed={placementMode === definition.type}
+          onClick={() => armPlacement(definition.type)}
+          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-medium text-ink/80 hover:bg-ink/10 hover:text-ink focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent"
+        >
+          <ComponentIcon type={definition.type} />
+          <span>{definition.label}</span>
+        </button>
+      ))}
+      <div className="mt-1 border-t border-ink/10 px-2.5 pb-1 pt-2">
+        <p className="text-xs font-medium text-graphite-500">Furniture / FF&amp;E library</p>
+        <p className="text-[10px] text-graphite-500">Coming soon</p>
       </div>
-      <div className="ml-1 flex items-center gap-0.5 border-l border-ink/10 pl-1">
-        {historyTools.map((tool) => (
-          <ToolButton
-            key={tool.key}
-            tool={tool}
-            hovered={hovered}
-            setHovered={setHovered}
-            labeled={labeled}
-          />
-        ))}
-      </div>
-
-      {moreOpen && (
-        <div className="absolute bottom-16 left-0 z-30 max-h-[50vh] w-48 overflow-y-auto rounded-xl border border-ink/10 bg-graphite-800 p-1.5 shadow-2xl">
-          {[...BEGINNER_COMPONENTS, ...PROFESSIONAL_COMPONENTS].filter((definition) => modelStage ? definition.type !== 'furniture' : definition.type !== 'room').map((definition) => (
-            <button
-              key={definition.type}
-              type="button"
-              onClick={() => armPlacement(definition.type)}
-              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-medium text-ink/80 hover:bg-ink/10 hover:text-ink"
-            >
-              <svg
-                width="15"
-                height="15"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                {ICONS[definition.type] ?? ICONS.generic}
-              </svg>
-              <span>{definition.label}</span>
-            </button>
-          ))}
-          <div className="mt-1 border-t border-ink/10 px-2.5 pb-1 pt-2">
-            <p className="text-xs font-medium text-graphite-500">Furniture / FF&amp;E library</p>
-            <p className="text-[10px] text-graphite-500">Coming soon</p>
-          </div>
-        </div>
-      )}
     </div>
   )
+
+  return { edit, history, addMenu }
 }

@@ -10,7 +10,6 @@ import { RightPanel } from '../../components/canvas/RightPanel'
 import { EditorTopBar } from '../../components/canvas/EditorTopBar'
 import { EditorDock } from '../../components/canvas/EditorDock'
 import { BottomStatusBar } from '../../components/canvas/BottomStatusBar'
-import { ToolRail } from '../../components/canvas/ToolRail'
 import { MeasurePanel } from '../../components/canvas/MeasurePanel'
 import { SelectionGizmo } from '../../components/canvas/SelectionGizmo'
 import { WorkspacePanel } from '../../components/canvas/WorkspacePanel'
@@ -751,7 +750,7 @@ export default function ProjectPage() {
             {roomCount === 0 ? <><Canvas3D className="h-full" readOnly briefBackground /><div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_45%,rgba(25,27,32,0.75)_0%,rgba(25,27,32,0.1)_70%)]" /></> :
             viewMode === '3d' || viewMode === 'floor_plan' ? (
               // The plan tab is the 3D Top view (Canvas3D maps floor_plan to Top).
-              <Canvas3D className="h-full" readOnly={generating} modelStage={modelStage} initialPreset={lensExitPreset} />
+              <Canvas3D className="h-full" readOnly={generating} modelStage={modelStage} initialPreset={lensExitPreset} dock={!editingBrief} />
             ) : (
               <>
                 {/* Hidden WebGL canvas keeps the thumbnail/PNG/PDF capture
@@ -761,15 +760,16 @@ export default function ProjectPage() {
                 </div>
                 {viewMode === 'zoning' && <ZoningView className="h-full" />}
                 {viewMode === 'graph' && <RoomGraphView className="h-full" />}
-                <EditorDock
-                  className="bottom-[7.25rem]"
+                {!editingBrief && <EditorDock
+                  className="bottom-12"
                   preset={null}
                   readOnly={generating}
+                  modelStage={modelStage}
                   onPreset={(preset) => {
                     if (preset !== 'top') setLensExitPreset(preset)
                     useCanvasStore.getState().setViewMode(preset === 'top' ? 'floor_plan' : '3d')
                   }}
-                />
+                />}
               </>
             )}
 
@@ -861,7 +861,6 @@ export default function ProjectPage() {
                   <button type="button" aria-expanded={panelOpen} onClick={() => setPanelOpen(!panelOpen)} className="rounded-lg border border-ink/15 bg-graphite-800 px-3 py-2 text-xs text-ink lg:hidden">Rooms & details</button>
                 </div>
               </div>
-              {!generating && <ToolRail modelStage={modelStage} />}
               {!generating && (viewMode === 'floor_plan' || viewMode === '3d') && <MeasurePanel />}
               {!generating && (viewMode === 'floor_plan' || viewMode === '3d') && <SelectionGizmo />}
             </>}
