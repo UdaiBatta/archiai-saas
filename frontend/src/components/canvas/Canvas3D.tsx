@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { EffectComposer, N8AO, ToneMapping } from '@react-three/postprocessing'
 import { ToneMappingMode } from 'postprocessing'
 import { Scene } from './Scene'
-import { RoomMesh } from './RoomMesh'
+import { RoomMesh as RoomMeshBase } from './RoomMesh'
 import { TopPlanOverlay } from './TopPlanOverlay'
 import { TopPlanKeyboardLayer } from './TopPlanKeyboardLayer'
+import { PauseWhileMoving, PerfReadout, SHOW_PERF } from './RenderBudget'
 import { useCanvasStore } from '../../store/canvasStore'
 import { canClearSelectionFromEmptyCanvas } from '../../store/interactionModel'
 import { useCanvasKeyboardShortcuts } from './useCanvasKeyboardShortcuts'
@@ -14,6 +15,12 @@ import { EDITOR_PALETTE } from './editorPalette'
 import { hardViolationRoomIds, parseMvpQuality } from './qualityModel'
 import { SUNRISE, SUNSET, formatHour, sunAt } from './sunModel'
 import { CAMERA_PRESETS, MODEL_COLORS, floorDisplay, type CameraPreset } from './modelView'
+import { SavedViewsPanel, ViewCamera, type ViewCameraApi } from './SavedViewsPanel'
+import { restorableFloor, type SavedView } from './savedViews'
+
+// Props are stable per room, so metadata or UI-state changes in this
+// component no longer re-render every room.
+const RoomMesh = memo(RoomMeshBase)
 
 const segmentClass = (active: boolean) =>
   `flex-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors ${
@@ -36,7 +43,8 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
   // The plan tab *is* the 3D Top view: floor_plan in the store <=> Top here.
   const planLens = !briefBackground && storedViewMode === 'floor_plan'
   const viewMode = briefBackground || planLens ? '3d' : storedViewMode
-  const layoutMetadata = useCanvasStore((s) => s.layoutMetadata)
+  const mvpQuality = useCanvasStore((s) => s.layoutMetadata.mvpQuality)
+  const mvpFootprint = useCanvasStore((s) => s.layoutMetadata.mvpFootprint)
   const clipboardMessage = useCanvasStore((s) => s.clipboardMessage)
   const clearClipboardMessage = useCanvasStore((s) => s.clearClipboardMessage)
   // 10:00 by default: morning light, so an east-facing front reads as lit.
@@ -49,6 +57,17 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
   const floorHeight = useCanvasStore((s) => s.floorHeight)
   const [ghostFloors, setGhostFloors] = useState(false)
   const multiFloor = useCanvasStore((s) => s.floors.length > 1)
+  const viewCameraRef = useRef<ViewCameraApi>(null)
+  const aoRef = useRef<{ enabled: boolean }>(null)
+  const restoreView = (view: SavedView) => {
+    const state = useCanvasStore.getState()
+    applyPreset(view.preset)
+    setSunHour(view.sunHour)
+    setGhostFloors(view.ghostFloors)
+    const floor = restorableFloor(view, state.floors.map((level) => level.level))
+    state.setSelectedFloor(floor)
+    viewCameraRef.current?.restore(view, floor)
+  }
   // Architectural site presentation for the real 3D view (not the hidden
   // capture canvas behind the plan lenses, nor the empty-brief backdrop).
   const studio = viewMode === '3d' && !briefBackground
@@ -57,17 +76,21 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
   const sortedFloors = [...floors].sort((a, b) => a.level - b.level)
   const planLevel = topView && selectedFloor === 'all' ? sortedFloors[0]?.level ?? 0 : selectedFloor
   const planFloor = sortedFloors.find((floor) => floor.level === planLevel)
-  const building = layoutMetadata.mvpFootprint as { x: number; y: number; w: number; h: number } | undefined
+  const building = mvpFootprint as { x: number; y: number; w: number; h: number } | undefined
   const planBounds = building?.w && building.h
     ? { x: building.x, z: building.y, w: building.w, d: building.h }
     : planFloor?.footprint
-  const choosePreset = (value: CameraPreset) => {
-    if (value === preset) setFrameNonce((n) => n + 1)
-    else if (value === 'top' && !modelStage) setViewMode('floor_plan')
-    else {
+  const applyPreset = (value: CameraPreset) => {
+    if (value === 'top' && !modelStage) {
+      if (!planLens) setViewMode('floor_plan')
+    } else {
       setOrbitPreset(value)
       if (planLens) setViewMode('3d')
     }
+  }
+  const choosePreset = (value: CameraPreset) => {
+    if (value === preset) setFrameNonce((n) => n + 1)
+    else applyPreset(value)
   }
   const roomDisplay = (room: (typeof rooms)[number]) =>
     shouldRenderCanvasObject(room, viewMode)
@@ -76,8 +99,8 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
   const visibleRooms = rooms.filter((room) => roomDisplay(room) === 'active')
   const ghostRooms = studio ? rooms.filter((room) => roomDisplay(room) === 'ghost') : []
   const invalidRoomIds = useMemo(
-    () => hardViolationRoomIds(parseMvpQuality(layoutMetadata)),
-    [layoutMetadata],
+    () => hardViolationRoomIds(parseMvpQuality({ mvpQuality })),
+    [mvpQuality],
   )
   const camera =
     viewMode === '3d'
@@ -107,7 +130,9 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
         shadows={viewMode === '3d' ? 'percentage' : false}
         dpr={[1, 2]}
         camera={camera}
-        gl={{ preserveDrawingBuffer: true, antialias: true }}
+        // The studio composer multisamples itself; canvas MSAA there only
+        // costs fill rate (~25-40% of the frame) for a full-screen blit.
+        gl={{ preserveDrawingBuffer: true, antialias: !studio }}
         onPointerMissed={
           readOnly
             ? undefined
@@ -130,6 +155,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
         }
       >
         <Scene orbitRef={orbitRef} readOnly={readOnly} viewMode={viewMode} modelStage={modelStage} sunHour={sunHour} preset={preset} site={studio} level={planLevel} frameNonce={frameNonce} />
+        {studio && <ViewCamera apiRef={viewCameraRef} preset={preset} />}
         {visibleRooms.map((r) => (
           <RoomMesh
             key={r.id}
@@ -159,16 +185,42 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
         {/* Top reads as a drawing: no ambient occlusion (and no sun shadows, see Scene). */}
         {studio && !topView && (
           <EffectComposer multisampling={4}>
-            <N8AO aoRadius={1.2} distanceFalloff={0.6} intensity={2.4} quality="medium" halfRes color="#1f1d1a" />
+            <N8AO ref={aoRef as never} aoRadius={1.2} distanceFalloff={0.6} intensity={2.4} quality="medium" halfRes color="#1f1d1a" />
             <ToneMapping mode={ToneMappingMode.NEUTRAL} />
           </EffectComposer>
         )}
+        {studio && <PauseWhileMoving pass={aoRef} />}
+        {SHOW_PERF && <PerfReadout />}
       </Canvas>
       {topView && !readOnly && (
         <TopPlanKeyboardLayer rooms={visibleRooms} invalidRoomIds={invalidRoomIds} onFocusRoom={setFocusedRoomId} />
       )}
       {studio && (
         <div className="absolute bottom-12 left-4 z-20 flex w-56 flex-col gap-2">
+        {!readOnly && (
+          <div className="pointer-events-none hidden text-[10px] leading-relaxed text-muted-light xl:block">
+            {topView ? (
+              <>
+                Click to select · drag selected to move · drag grips to resize<br />
+                Double-click a polygon edge to add a corner, a corner to remove it<br />
+                Right or middle drag to pan · scroll to zoom · Top again to fit
+              </>
+            ) : (
+              <>Click to select · drag selected to move<br />Right drag to pan · middle drag to orbit</>
+            )}
+          </div>
+        )}
+        <SavedViewsPanel
+          readOnly={readOnly}
+          capture={() => ({
+            ...viewCameraRef.current!.capture(),
+            preset,
+            sunHour,
+            selectedFloor,
+            ghostFloors,
+          })}
+          onRestore={restoreView}
+        />
         <div className="flex flex-col gap-1.5 rounded-xl border border-ink/10 bg-graphite-800/95 px-3 py-2.5 text-[11px] text-muted shadow-lg backdrop-blur">
           <span className="font-semibold text-ink">View</span>
           <div role="group" aria-label="Camera view" className="flex gap-0.5 rounded-lg bg-graphite-900/60 p-0.5">
@@ -209,19 +261,6 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
             className="accent-accent"
           />
         </label>
-        </div>
-      )}
-      {viewMode === '3d' && !readOnly && (
-        <div className="pointer-events-none absolute bottom-[19rem] left-4 hidden max-w-[12rem] text-[10px] leading-relaxed text-muted-light xl:block">
-          {topView ? (
-            <>
-              Click to select · drag selected to move · drag grips to resize<br />
-              Double-click a polygon edge to add a corner, a corner to remove it<br />
-              Right or middle drag to pan · scroll to zoom · Top again to fit
-            </>
-          ) : (
-            <>Click to select · drag selected to move<br />Right drag to pan · middle drag to orbit</>
-          )}
         </div>
       )}
       {topView && selectedFloor === 'all' && planFloor && floors.length > 1 && (

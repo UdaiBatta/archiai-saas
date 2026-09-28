@@ -171,6 +171,8 @@ interface CanvasState {
   updateRoom: (id: string, patch: Partial<Omit<Room, 'id'>>, options?: UpdateOptions) => void
   /** Choose how two adjacent rooms meet: solid wall, door, or open. */
   setConnection: (roomA: string, roomB: string, kind: ConnectionKind) => void
+  /** Named 3D camera views, saved with the layout (outside undo history). */
+  setSavedViews: (views: unknown[]) => void
   resizeRoom: (
     id: string,
     size: ComponentSize,
@@ -309,6 +311,14 @@ function snapshotOf(
     selectedFloor: state.selectedFloor,
     floorHeight: state.floorHeight,
   }
+}
+
+/** Undo/redo restore the layout but keep the current saved camera views. */
+function withSavedViewsOf(current: Record<string, unknown>, restored: Record<string, unknown>) {
+  const metadata = JSON.parse(JSON.stringify(restored)) as Record<string, unknown>
+  if (current.savedViews === undefined) delete metadata.savedViews
+  else metadata.savedViews = current.savedViews
+  return metadata
 }
 
 function connectionsOf(metadata: Record<string, unknown>): Connection[] {
@@ -725,6 +735,11 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         ...(shouldLog ? markUnsaved() : {}),
       }
     }),
+  setSavedViews: (views) =>
+    set((state) => ({
+      layoutMetadata: { ...state.layoutMetadata, savedViews: views },
+      ...markUnsaved(),
+    })),
   setConnection: (roomA, roomB, kind) =>
     set((state) => {
       const labelOf = (id: string) => state.rooms.find((r) => r.id === id)?.label ?? id
@@ -991,7 +1006,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       return {
         rooms: cloneRooms(previous.rooms),
         floors: cloneFloors(previous.floors),
-        layoutMetadata: JSON.parse(JSON.stringify(previous.layoutMetadata)) as Record<string, unknown>,
+        layoutMetadata: withSavedViewsOf(state.layoutMetadata, previous.layoutMetadata),
         selectedId: previous.selectedId,
         selectedFloor: previous.selectedFloor,
         floorHeight: previous.floorHeight,
@@ -1008,7 +1023,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       return {
         rooms: cloneRooms(next.rooms),
         floors: cloneFloors(next.floors),
-        layoutMetadata: JSON.parse(JSON.stringify(next.layoutMetadata)) as Record<string, unknown>,
+        layoutMetadata: withSavedViewsOf(state.layoutMetadata, next.layoutMetadata),
         selectedId: next.selectedId,
         selectedFloor: next.selectedFloor,
         floorHeight: next.floorHeight,
