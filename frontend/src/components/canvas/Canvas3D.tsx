@@ -229,7 +229,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
           readOnly={readOnly}
           lenses={!modelStage}
           tools={{
-            site: <SitePanel topView={topView} onRequestTop={() => applyPreset('top')} />,
+            site: <SitePanel defaultOpen topView={topView} onRequestTop={() => applyPreset('top')} />,
             views: (!readOnly || hasSavedViews) && (
               <SavedViewsPanel
                 readOnly={readOnly}

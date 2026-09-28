@@ -72,9 +72,11 @@ function NumberField({ label, value, onCommit, min = 0, max, step = 0.5, placeho
 interface SitePanelProps {
   topView: boolean
   onRequestTop: () => void
+  /** Start expanded (e.g. inside the dock's popover). */
+  defaultOpen?: boolean
 }
 
-export function SitePanel({ topView, onRequestTop }: SitePanelProps) {
+export function SitePanel({ topView, onRequestTop, defaultOpen = false }: SitePanelProps) {
   const raw = useCanvasStore((s) => s.layoutMetadata.site)
   const orientation = useCanvasStore((s) => s.layoutMetadata.orientation)
   const requirements = useCanvasStore((s) => s.layoutMetadata.mvpRequirements)
@@ -130,7 +132,7 @@ export function SitePanel({ topView, onRequestTop }: SitePanelProps) {
   }
 
   return (
-    <details className="group rounded-xl border border-ink/10 bg-graphite-800/95 text-[11px] text-muted shadow-lg backdrop-blur">
+    <details open={defaultOpen} className="group rounded-xl border border-ink/10 bg-graphite-800/95 text-[11px] text-muted shadow-lg backdrop-blur">
       <summary className="cursor-pointer select-none px-3 py-2.5 font-semibold text-ink">
         Site{site ? ` · ${site.boundary.length} edges` : ''}
       </summary>
