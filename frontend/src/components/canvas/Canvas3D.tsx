@@ -19,6 +19,8 @@ import { SavedViewsPanel, ViewCamera, type ViewCameraApi } from './SavedViewsPan
 import { restorableFloor, type SavedView } from './savedViews'
 import { MassLayer } from '../../site/MassLayer'
 import { MassingPanel } from '../../site/MassingPanel'
+import { SiteLayer } from '../../site/SiteLayer'
+import { SitePanel } from '../../site/SitePanel'
 
 // Props are stable per room, so metadata or UI-state changes in this
 // component no longer re-render every room.
@@ -182,6 +184,9 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
           />
         )}
         {studio && <MassLayer orbitRef={orbitRef} readOnly={readOnly} topView={topView} />}
+        {studio && (
+          <SiteLayer orbitRef={orbitRef} readOnly={readOnly} topView={topView} planY={(planFloor?.elevation ?? 0) + floorHeight + 0.4} />
+        )}
         {ghostRooms.map((r) => (
           <RoomMesh key={r.id} room={r} orbitRef={orbitRef} readOnly viewMode={viewMode} modelStage={modelStage} ghost />
         ))}
@@ -214,6 +219,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
             )}
           </div>
         )}
+        {!readOnly && <SitePanel topView={topView} onRequestTop={() => applyPreset('top')} />}
         <SavedViewsPanel
           readOnly={readOnly}
           capture={() => ({

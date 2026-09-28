@@ -14,6 +14,7 @@ from app.api.designs.router import router as designs_router
 from app.api.mvp.router import router as mvp_router
 from app.api.projects.router import router as projects_router
 from app.api.shares.router import router as shares_router
+from app.api.site.router import router as site_router
 from app.api.workspaces.router import router as workspaces_router
 
 app = FastAPI(title="ArchiAI API", version="0.1.0")
@@ -131,6 +132,7 @@ app.include_router(designs_router)
 app.include_router(mvp_router)
 app.include_router(shares_router)
 app.include_router(billing_router)
+app.include_router(site_router)
 
 
 @app.get("/api/health")

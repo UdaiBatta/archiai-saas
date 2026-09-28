@@ -11,8 +11,12 @@ export type Region = MultiPolygon
 
 const EPS = 1e-9
 
+// Snap to a micrometre grid: polygon-clipping fails ("Unable to complete
+// output ring") on float noise where skewed setback strips cross.
+const q = (v: number) => Math.round(v * 1e6) / 1e6
+
 const ring = (points: SitePoint[]): [number, number][] => {
-  const coords = points.map((p) => [p.x, p.z] as [number, number])
+  const coords = points.map((p) => [q(p.x), q(p.z)] as [number, number])
   return [...coords, coords[0]]
 }
 
