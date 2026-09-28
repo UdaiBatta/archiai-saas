@@ -1,7 +1,6 @@
 import { Link, NavLink } from 'react-router-dom'
 
-import { Button } from '../ui/Button'
-import { Avatar } from '../ui/Avatar'
+import { AccountMenu } from '../ui/AccountMenu'
 
 interface SidebarProps {
   userName?: string
@@ -53,8 +52,6 @@ export function Sidebar({
       isActive ? 'bg-ink/10 text-ink' : 'text-muted hover:bg-ink/5 hover:text-ink'
     }`
 
-  const displayName = userName ?? userEmail ?? ''
-
   return (
     <aside className="flex w-44 flex-shrink-0 flex-col border-r border-ink/10 bg-graphite-950 text-ink lg:w-52">
       <div className="border-b border-ink/10 p-4">
@@ -77,13 +74,7 @@ export function Sidebar({
         </NavLink>
       </nav>
       <div className="border-t border-ink/10 p-4">
-        <div className="mb-3 flex items-center gap-2.5">
-          <Avatar name={displayName} size={8} />
-          <p className="min-w-0 truncate text-sm text-muted">{displayName}</p>
-        </div>
-        <Button variant="secondary" onClick={onLogout} className="w-full text-sm">
-          Logout
-        </Button>
+        <AccountMenu name={userName} email={userEmail} onSignOut={onLogout} side="top" align="start" showName />
       </div>
     </aside>
   )
