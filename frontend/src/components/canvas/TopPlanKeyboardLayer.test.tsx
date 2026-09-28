@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useCanvasStore, type Room } from '../../store/canvasStore'
 import { useCanvasKeyboardShortcuts } from './useCanvasKeyboardShortcuts'
 import { TopPlanKeyboardLayer } from './TopPlanKeyboardLayer'
+import { useMassUi } from '../../site/massStore'
 
 const room = (id: string, label: string, x: number, overrides: Partial<Room> = {}): Room => ({
   id,
@@ -34,6 +35,7 @@ beforeEach(() => {
     rooms: ROOMS,
   })
   useCanvasStore.setState({ selectedId: null })
+  useMassUi.setState({ selectedMassId: null })
 })
 
 describe('TopPlanKeyboardLayer', () => {
@@ -62,5 +64,32 @@ describe('TopPlanKeyboardLayer', () => {
 
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(useCanvasStore.getState().selectedId).toBeNull()
+  })
+
+  it('Tab reaches the masses after the rooms; Enter/Space select, Escape clears', async () => {
+    useCanvasStore.getState().setMasses([
+      { id: 'm1', name: 'Tower', footprint: [{ x: 0, z: 0 }, { x: 10, z: 0 }, { x: 10, z: 8 }, { x: 0, z: 8 }], floors: 5, floorHeightM: 3, baseM: 0 },
+      { id: 'm2', name: 'Podium', footprint: [{ x: 0, z: 10 }, { x: 5, z: 10 }, { x: 5, z: 14 }, { x: 0, z: 14 }], floors: 1, floorHeightM: 4, baseM: 0 },
+    ])
+    render(<Harness />)
+    const user = userEvent.setup()
+    expect(screen.getByRole('button', { name: 'Tower, mass, 5 floors, GFA 400.0 m²' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Podium, mass, 1 floor, GFA 20.0 m²' })).toBeInTheDocument()
+
+    await user.tab()
+    await user.keyboard('{Enter}')
+    expect(useCanvasStore.getState().selectedId).toBe('room-1')
+    await user.tab()
+    await user.tab()
+    await user.keyboard('{Enter}')
+    expect(useMassUi.getState().selectedMassId).toBe('m1')
+    expect(useCanvasStore.getState().selectedId).toBeNull()
+    expect(screen.getByTestId('plan-mass-m1')).toHaveAttribute('aria-pressed', 'true')
+    await user.tab()
+    await user.keyboard(' ')
+    expect(useMassUi.getState().selectedMassId).toBe('m2')
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(useMassUi.getState().selectedMassId).toBeNull()
   })
 })

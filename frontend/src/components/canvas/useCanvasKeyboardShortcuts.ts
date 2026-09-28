@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useCanvasStore } from '../../store/canvasStore'
 import { getCanvasShortcut } from './keyboardShortcuts'
+import { useMassUi } from '../../site/massStore'
 
 interface CanvasKeyboardShortcutOptions {
   disabled?: boolean
@@ -49,6 +50,7 @@ export function useCanvasKeyboardShortcuts({
         store.clearMeasure()
         store.resetInteraction()
         store.deselectAll()
+        useMassUi.getState().select(null)
       }
     }
 
