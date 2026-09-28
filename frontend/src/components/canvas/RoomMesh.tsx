@@ -16,7 +16,7 @@ import { ResizeHandles } from './ResizeHandles'
 import { roomVisualTreatment } from './roomVisualTreatment'
 import { EDITOR_PALETTE, displayRoomColor } from './editorPalette'
 import { wallModelPieces } from './modelGeometry'
-import { MODEL_COLORS, floorTint } from './modelView'
+import { MODEL_COLORS, floorTint, mixHex } from './modelView'
 
 interface OrbitHandle {
   enabled: boolean
@@ -31,6 +31,8 @@ interface RoomMeshProps {
   modelStage?: boolean
   /** Context from another floor: translucent, not interactive. */
   ghost?: boolean
+  /** Top plan view: labels, dimensions and handles come from TopPlanOverlay. */
+  plan?: boolean
 }
 
 interface PendingMove {
@@ -60,6 +62,7 @@ export function RoomMesh({
   invalid = false,
   modelStage = false,
   ghost = false,
+  plan = false,
 }: RoomMeshProps) {
   const meshRef = useRef<THREE.Mesh>(null)
   const pendingMoveRef = useRef<PendingMove | null>(null)
@@ -99,7 +102,23 @@ export function RoomMesh({
     ? MODEL_COLORS.wallSelected
     : isGlass
       ? MODEL_COLORS.glass
-      : floorTint(displayRoomColor(room))
+      : invalid
+        ? mixHex(floorTint(displayRoomColor(room)), MODEL_COLORS.invalid, 0.35)
+        : floorTint(displayRoomColor(room))
+  // A polygon room's floor follows its outline, not its bounding box.
+  const polygonSlab = useMemo(() => {
+    const vertices = room.polygonVertices
+    if (!modelSurface || !vertices || vertices.length < 3) return null
+    const shape = new THREE.Shape(
+      vertices.map((v) => new THREE.Vector2(v.x - room.position.x, v.z - room.position.z)),
+    )
+    const geometry = new THREE.ExtrudeGeometry(shape, { depth: renderHeight, bevelEnabled: false })
+    // Shape y -> world z, extrusion -> y centred on the slab.
+    geometry.rotateX(Math.PI / 2)
+    geometry.translate(0, renderHeight / 2, 0)
+    return geometry
+  }, [modelSurface, room.polygonVertices, room.position.x, room.position.z, renderHeight])
+  useEffect(() => () => polygonSlab?.dispose(), [polygonSlab])
   const see = ghost ? 0.12 : isGlass ? 0.35 : 1
   const edgeColor = isSpace ? MODEL_COLORS.floorEdge : MODEL_COLORS.edge
   const visual = roomVisualTreatment(
@@ -268,7 +287,11 @@ export function RoomMesh({
             }
       }
     >
-      <boxGeometry args={[room.size.w, renderHeight, room.size.d]} />
+      {polygonSlab ? (
+        <primitive object={polygonSlab} attach="geometry" />
+      ) : (
+        <boxGeometry args={[room.size.w, renderHeight, room.size.d]} />
+      )}
       <meshStandardMaterial
         visible={!wallPieces && !modelFurniture}
         color={solid3d ? modelColor : displayRoomColor(room)}
@@ -346,7 +369,7 @@ export function RoomMesh({
 
   if (ghost) return mesh
 
-  const shouldShowLabel = modelStage ? isSelected : !isThinComponent || isSelected
+  const shouldShowLabel = !plan && (modelStage ? isSelected : !isThinComponent || isSelected)
   const label = shouldShowLabel ? (
     <Html
       position={[room.position.x, room.position.y + room.size.h / 2 + 0.35, room.position.z]}
@@ -378,14 +401,14 @@ export function RoomMesh({
   ) : null
 
   const dimensions =
-    !modelStage && isDimensionable && (isSelected || (showDimensions && isPlanView)) ? (
+    !plan && !modelStage && isDimensionable && (isSelected || (showDimensions && isPlanView)) ? (
       <DimensionAnnotations room={room} emphasized={isSelected} />
     ) : null
 
   return (
     <>
       {mesh}
-      {!modelStage && isSelected && (isPlanView || room.objectType === 'room') && (
+      {!plan && !modelStage && isSelected && (isPlanView || room.objectType === 'room') && (
         <ResizeHandles
           room={room}
           orbitRef={orbitRef}

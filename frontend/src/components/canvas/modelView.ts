@@ -146,6 +146,8 @@ export const MODEL_COLORS = {
   gridCell: '#cfcdc6',
   gridSection: '#b5b2aa',
   sky: '#eceef0',
+  /** Hard-violation rooms: outline, label and floor tint. */
+  invalid: '#c4553f',
 } as const
 
 /** A room floor keeps its colour identity as a pale, desaturated tint. */
