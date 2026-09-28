@@ -28,13 +28,18 @@ interface SceneProps {
   preset?: CameraPreset
   /** Architectural site presentation: white model, site ground, AO-ready lighting. */
   site?: boolean
+  /** Level to show instead of the store's selection (Top view shows one level). */
+  level?: number | 'all'
+  /** Bumped to re-frame the camera on demand (re-clicking a preset). */
+  frameNonce?: number
 }
 
-export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage = false, sunHour = 10, preset = 'perspective', site = false }: SceneProps) {
+export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage = false, sunHour = 10, preset = 'perspective', site = false, level, frameNonce = 0 }: SceneProps) {
   const camera = useThree((s) => s.camera)
   const viewportSize = useThree((s) => s.size)
   const floors = useCanvasStore((s) => s.floors)
-  const selectedFloor = useCanvasStore((s) => s.selectedFloor)
+  const storedFloor = useCanvasStore((s) => s.selectedFloor)
+  const selectedFloor = level ?? storedFloor
   const measurePoints = useCanvasStore((s) => s.measurePoints)
   const layoutMetadata = useCanvasStore((s) => s.layoutMetadata)
   const orientation = parseOrientation(layoutMetadata)
@@ -57,7 +62,7 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
   const buildingTop = Math.max(0, ...floors.map((floor) => floor.elevation)) + floorHeight
   // Frame the active level on entry; editing a room must not reset the camera.
   const footprint = visibleFloors[0]?.footprint
-  const framingKey = `${selectedFloor}:${viewMode}:${modelStage}:${preset}:${footprint?.w ?? 0}:${footprint?.d ?? 0}`
+  const framingKey = `${frameNonce}:${selectedFloor}:${viewMode}:${modelStage}:${preset}:${footprint?.w ?? 0}:${footprint?.d ?? 0}`
   useEffect(() => {
     if (!footprint) return
     const bounds = { ...footprint, h: buildingTop }
@@ -206,7 +211,8 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
           const facing = orientation.facingDirection ?? orientation.entrySide
           const midX = footprint.x + footprint.w / 2
           const midZ = footprint.z + footprint.d / 2
-          const pad = 1.6
+          // Top view keeps the band next to the footprint for dimension strings.
+          const pad = topView ? 3.2 : 1.6
           const positions: Record<ScreenEdge, [number, number, number]> = {
             top: [midX, 0.05, footprint.z - pad],
             bottom: [midX, 0.05, footprint.z + footprint.d + pad],
@@ -217,6 +223,7 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
             <>
               {(Object.keys(positions) as ScreenEdge[]).map((edge) => {
                 const isFacing = cardinals[edge] === facing
+                const isRoad = cardinals[edge] === orientation.roadSide
                 return (
                   <Html
                     key={edge}
@@ -234,6 +241,7 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
                     >
                       {cardinals[edge]}
                       {isFacing ? ' · FRONT' : ''}
+                      {isRoad ? ' · ROAD' : ''}
                     </span>
                   </Html>
                 )

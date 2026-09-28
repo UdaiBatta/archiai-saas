@@ -4,6 +4,7 @@ import { EffectComposer, N8AO, ToneMapping } from '@react-three/postprocessing'
 import { ToneMappingMode } from 'postprocessing'
 import { Scene } from './Scene'
 import { RoomMesh } from './RoomMesh'
+import { TopPlanOverlay } from './TopPlanOverlay'
 import { useCanvasStore } from '../../store/canvasStore'
 import { canClearSelectionFromEmptyCanvas } from '../../store/interactionModel'
 import { useCanvasKeyboardShortcuts } from './useCanvasKeyboardShortcuts'
@@ -30,21 +31,45 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
   const rooms = useCanvasStore((s) => s.rooms)
   const selectedFloor = useCanvasStore((s) => s.selectedFloor)
   const storedViewMode = useCanvasStore((s) => s.viewMode)
-  const viewMode = briefBackground ? '3d' : storedViewMode
+  const setViewMode = useCanvasStore((s) => s.setViewMode)
+  // The plan tab *is* the 3D Top view: floor_plan in the store <=> Top here.
+  const planLens = !briefBackground && storedViewMode === 'floor_plan'
+  const viewMode = briefBackground || planLens ? '3d' : storedViewMode
   const layoutMetadata = useCanvasStore((s) => s.layoutMetadata)
   const clipboardMessage = useCanvasStore((s) => s.clipboardMessage)
   const clearClipboardMessage = useCanvasStore((s) => s.clearClipboardMessage)
   // 10:00 by default: morning light, so an east-facing front reads as lit.
   const [sunHour, setSunHour] = useState(10)
-  const [preset, setPreset] = useState<CameraPreset>('perspective')
+  const [orbitPreset, setOrbitPreset] = useState<CameraPreset>('perspective')
+  const preset: CameraPreset = planLens ? 'top' : orbitPreset
+  const [frameNonce, setFrameNonce] = useState(0)
+  const floors = useCanvasStore((s) => s.floors)
+  const floorHeight = useCanvasStore((s) => s.floorHeight)
   const [ghostFloors, setGhostFloors] = useState(false)
   const multiFloor = useCanvasStore((s) => s.floors.length > 1)
   // Architectural site presentation for the real 3D view (not the hidden
   // capture canvas behind the plan lenses, nor the empty-brief backdrop).
   const studio = viewMode === '3d' && !briefBackground
+  const topView = studio && preset === 'top'
+  // Top shows one level; "all" means the lowest, as the 2D plan did.
+  const sortedFloors = [...floors].sort((a, b) => a.level - b.level)
+  const planLevel = topView && selectedFloor === 'all' ? sortedFloors[0]?.level ?? 0 : selectedFloor
+  const planFloor = sortedFloors.find((floor) => floor.level === planLevel)
+  const building = layoutMetadata.mvpFootprint as { x: number; y: number; w: number; h: number } | undefined
+  const planBounds = building?.w && building.h
+    ? { x: building.x, z: building.y, w: building.w, d: building.h }
+    : planFloor?.footprint
+  const choosePreset = (value: CameraPreset) => {
+    if (value === preset) setFrameNonce((n) => n + 1)
+    else if (value === 'top' && !modelStage) setViewMode('floor_plan')
+    else {
+      setOrbitPreset(value)
+      if (planLens) setViewMode('3d')
+    }
+  }
   const roomDisplay = (room: (typeof rooms)[number]) =>
     shouldRenderCanvasObject(room, viewMode)
-      ? floorDisplay(room.floorLevel ?? 0, selectedFloor, studio && ghostFloors)
+      ? floorDisplay(room.floorLevel ?? 0, planLevel, studio && ghostFloors)
       : 'hidden'
   const visibleRooms = rooms.filter((room) => roomDisplay(room) === 'active')
   const ghostRooms = studio ? rooms.filter((room) => roomDisplay(room) === 'ghost') : []
@@ -102,7 +127,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
               }
         }
       >
-        <Scene orbitRef={orbitRef} readOnly={readOnly} viewMode={viewMode} modelStage={modelStage} sunHour={sunHour} preset={preset} site={studio} />
+        <Scene orbitRef={orbitRef} readOnly={readOnly} viewMode={viewMode} modelStage={modelStage} sunHour={sunHour} preset={preset} site={studio} level={planLevel} frameNonce={frameNonce} />
         {visibleRooms.map((r) => (
           <RoomMesh
             key={r.id}
@@ -112,8 +137,19 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
             viewMode={viewMode}
             invalid={invalidRoomIds.has(r.id)}
             modelStage={modelStage}
+            plan={topView}
           />
         ))}
+        {topView && (
+          <TopPlanOverlay
+            orbitRef={orbitRef}
+            readOnly={readOnly}
+            rooms={visibleRooms}
+            invalidRoomIds={invalidRoomIds}
+            bounds={planBounds}
+            y={(planFloor?.elevation ?? 0) + floorHeight + 0.4}
+          />
+        )}
         {ghostRooms.map((r) => (
           <RoomMesh key={r.id} room={r} orbitRef={orbitRef} readOnly viewMode={viewMode} modelStage={modelStage} ghost />
         ))}
@@ -135,7 +171,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
                 type="button"
                 aria-label={`${option.value === 'top' ? 'Top plan' : option.value === 'axo' ? 'Axonometric' : 'Perspective'} view`}
                 aria-pressed={preset === option.value}
-                onClick={() => setPreset(option.value)}
+                onClick={() => choosePreset(option.value)}
                 className={segmentClass(preset === option.value)}
               >
                 {option.label}
@@ -170,7 +206,20 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
       )}
       {viewMode === '3d' && !readOnly && (
         <div className="pointer-events-none absolute bottom-[19rem] left-4 hidden max-w-[12rem] text-[10px] leading-relaxed text-muted-light xl:block">
-          Click to select · drag selected to move<br />Right drag to pan · middle drag to orbit
+          {topView ? (
+            <>
+              Click to select · drag selected to move · drag grips to resize<br />
+              Double-click a polygon edge to add a corner, a corner to remove it<br />
+              Right or middle drag to pan · scroll to zoom · Top again to fit
+            </>
+          ) : (
+            <>Click to select · drag selected to move<br />Right drag to pan · middle drag to orbit</>
+          )}
+        </div>
+      )}
+      {topView && selectedFloor === 'all' && planFloor && floors.length > 1 && (
+        <div role="status" className="pointer-events-none absolute left-1/2 top-28 z-20 -translate-x-1/2 rounded-full border border-warn/30 bg-graphite-800/95 px-3 py-1.5 text-[11px] font-medium text-warn shadow-sm">
+          Top view shows {planFloor.name}. Choose a level to edit another floor.
         </div>
       )}
       {clipboardMessage && (
