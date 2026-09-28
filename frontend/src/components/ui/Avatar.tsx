@@ -10,13 +10,19 @@ function hashString(value: string): number {
   return hash
 }
 
+/** "Ada Lovelace" -> "AL", "ada@x.io" -> "A", "" -> "?". */
+export function initials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean)
+  const letters = words.length > 1 ? words[0][0] + words[words.length - 1][0] : (words[0]?.[0] ?? '?')
+  return letters.toUpperCase()
+}
+
 interface AvatarProps {
   name: string
   size?: number
 }
 
 export function Avatar({ name, size = 8 }: AvatarProps) {
-  const initial = name.trim().charAt(0).toUpperCase() || '?'
   const color = AVATAR_COLORS[hashString(name) % AVATAR_COLORS.length]
   return (
     <span
@@ -24,7 +30,7 @@ export function Avatar({ name, size = 8 }: AvatarProps) {
       className="flex flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
       style={{ backgroundColor: color, height: `${size * 0.25}rem`, width: `${size * 0.25}rem` }}
     >
-      {initial}
+      {initials(name)}
     </span>
   )
 }
