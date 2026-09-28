@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import ProjectPage from './index'
@@ -210,24 +210,24 @@ describe('ProjectPage canvas views', () => {
   it('keeps the brief out of the way once a plan exists, and reopens it from Edit', async () => {
     renderProjectPage()
     const user = userEvent.setup()
-    await screen.findByRole('tab', { name: '2D Plan' })
+    await screen.findByRole('button', { name: 'Rooms & details' })
     expect(screen.queryByLabelText('Layout prompt')).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('menuitem', { name: 'Edit' }))
     await user.click(await screen.findByRole('menuitem', { name: 'Edit brief…' }))
     // Starts from the brief this plan was made from.
     expect(screen.getByLabelText('Layout prompt')).toHaveValue('starter')
-    expect(screen.queryByRole('tab', { name: '2D Plan' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Rooms & details' })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Back to plan' }))
     expect(screen.queryByLabelText('Layout prompt')).not.toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: '2D Plan' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Rooms & details' })).toBeInTheDocument()
   })
 
   it('enters the model stage and returns without losing geometry or undo history', async () => {
     renderProjectPage()
     const user = userEvent.setup()
-    await screen.findByRole('tab', { name: '2D Plan' })
+    await screen.findByRole('button', { name: 'Rooms & details' })
     act(() => useCanvasStore.getState().updateRoom(INITIAL_ROOMS[0].id, { label: 'Revised living room' }))
     const before = useCanvasStore.getState().serializeLayout()
     const history = useCanvasStore.getState().past
@@ -248,49 +248,51 @@ describe('ProjectPage canvas views', () => {
   it('reviews actual session edits rather than only server activity', async () => {
     renderProjectPage()
     const user = userEvent.setup()
-    await screen.findByRole('tab', { name: '2D Plan' })
+    await screen.findByRole('button', { name: 'Rooms & details' })
     act(() => useCanvasStore.getState().updateRoom(INITIAL_ROOMS[0].id, { label: 'Lounge' }))
     await user.click(screen.getByRole('button', { name: /Review & refine/ }))
     expect(screen.getByRole('list', { name: 'Session changes' })).toHaveTextContent('Lounge')
     expect(projectService.activity).not.toHaveBeenCalled()
   })
 
-  it('opens the 2D Plan tab as the 3D Top view, not a separate SVG editor', async () => {
+  it('opens the 2D Plan view as the 3D Top view, not a separate SVG editor', async () => {
     renderProjectPage()
     const user = userEvent.setup()
+    await screen.findByRole('button', { name: 'Rooms & details' })
 
-    await user.click(await screen.findByRole('tab', { name: '2D Plan' }))
+    await user.click(screen.getByRole('menuitem', { name: 'View' }))
+    await user.click(await screen.findByRole('menuitemradio', { name: '2D Plan' }))
 
     expect(screen.queryByRole('application', { name: 'Editable floor plan' })).not.toBeInTheDocument()
     expect(useCanvasStore.getState().viewMode).toBe('floor_plan')
-    expect(screen.getByRole('tab', { name: '3D Edit' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'More views' }))
-    expect(screen.getByRole('tab', { name: 'Zoning' })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Room Graph' })).toBeInTheDocument()
   })
 
   it('renders the zoning and room graph lenses from the same layout state', async () => {
     renderProjectPage()
     const user = userEvent.setup()
+    await screen.findByRole('button', { name: 'Rooms & details' })
 
-    await user.click(await screen.findByRole('button', { name: 'More views' }))
-    await user.click(screen.getByRole('tab', { name: 'Zoning' }))
-    expect(useCanvasStore.getState().viewMode).toBe('zoning')
+    act(() => useCanvasStore.getState().setViewMode('zoning'))
     expect(screen.getByRole('application', { name: 'Zoning view' })).toBeInTheDocument()
     expect(screen.getByTestId('zone-legend')).toBeInTheDocument()
 
-    await user.click(screen.getByRole('tab', { name: 'Room Graph' }))
+    const dock = screen.getByRole('navigation', { name: 'Editor dock' })
+    expect(within(dock).getByRole('button', { name: 'Zoning' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(within(dock).getByRole('button', { name: 'Room Graph' }))
     expect(useCanvasStore.getState().viewMode).toBe('graph')
     expect(
       screen.getByRole('application', { name: 'Room access graph' }),
     ).toBeInTheDocument()
+
+    await user.click(within(dock).getByRole('button', { name: 'Top plan' }))
+    expect(useCanvasStore.getState().viewMode).toBe('floor_plan')
   })
 
   it('preserves the selected object when switching between editor views', async () => {
     renderProjectPage()
     const user = userEvent.setup()
 
-    await screen.findByRole('tab', { name: '2D Plan' })
+    await screen.findByRole('button', { name: 'Rooms & details' })
     const roomId = 'seed-room'
     useCanvasStore.setState({
       rooms: [
@@ -310,11 +312,11 @@ describe('ProjectPage canvas views', () => {
     })
     useCanvasStore.getState().selectRoom(roomId)
 
-    await user.click(screen.getByRole('button', { name: 'More views' }))
-    await user.click(screen.getByRole('tab', { name: 'Zoning' }))
+    act(() => useCanvasStore.getState().setViewMode('zoning'))
     expect(useCanvasStore.getState().selectedId).toBe(roomId)
 
-    await user.click(screen.getByRole('tab', { name: '3D Edit' }))
+    await user.click(screen.getByRole('button', { name: 'Perspective' }))
+    expect(useCanvasStore.getState().viewMode).toBe('3d')
     expect(useCanvasStore.getState().selectedId).toBe(roomId)
     expect(useCanvasStore.getState().rooms.length).toBeGreaterThan(0)
   })
@@ -381,7 +383,7 @@ describe('ProjectPage generation flow', () => {
 
     await screen.findByLabelText('Layout prompt')
     expect(screen.queryByRole('tab', { name: 'Refine' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('tab', { name: '2D Plan' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Rooms & details' })).not.toBeInTheDocument()
   })
 
   it('reads a brief from /projects/new back for review on arrival', async () => {

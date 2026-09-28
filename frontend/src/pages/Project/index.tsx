@@ -8,7 +8,7 @@ import { ZoningView } from '../../components/canvas/ZoningView'
 import { RoomGraphView } from '../../components/canvas/RoomGraphView'
 import { RightPanel } from '../../components/canvas/RightPanel'
 import { EditorTopBar } from '../../components/canvas/EditorTopBar'
-import { ViewModeSwitcher } from '../../components/canvas/ViewModeSwitcher'
+import { EditorDock } from '../../components/canvas/EditorDock'
 import { BottomStatusBar } from '../../components/canvas/BottomStatusBar'
 import { ToolRail } from '../../components/canvas/ToolRail'
 import { MeasurePanel } from '../../components/canvas/MeasurePanel'
@@ -267,6 +267,8 @@ export default function ProjectPage() {
   const selectedId = useCanvasStore((s) => s.selectedId)
   const activityCount = useCanvasStore((s) => s.activityLog.length)
   const viewMode = useCanvasStore((s) => s.viewMode)
+  // Persp/Axo picked in the lens dock: the 3D view opens with that camera.
+  const [lensExitPreset, setLensExitPreset] = useState<'perspective' | 'axo'>('perspective')
   const loadLayout = useCanvasStore((s) => s.loadLayout)
   const clearLayout = useCanvasStore((s) => s.clearLayout)
   const serializeLayout = useCanvasStore((s) => s.serializeLayout)
@@ -749,7 +751,7 @@ export default function ProjectPage() {
             {roomCount === 0 ? <><Canvas3D className="h-full" readOnly briefBackground /><div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_45%,rgba(25,27,32,0.75)_0%,rgba(25,27,32,0.1)_70%)]" /></> :
             viewMode === '3d' || viewMode === 'floor_plan' ? (
               // The plan tab is the 3D Top view (Canvas3D maps floor_plan to Top).
-              <Canvas3D className="h-full" readOnly={generating} modelStage={modelStage} />
+              <Canvas3D className="h-full" readOnly={generating} modelStage={modelStage} initialPreset={lensExitPreset} />
             ) : (
               <>
                 {/* Hidden WebGL canvas keeps the thumbnail/PNG/PDF capture
@@ -759,6 +761,15 @@ export default function ProjectPage() {
                 </div>
                 {viewMode === 'zoning' && <ZoningView className="h-full" />}
                 {viewMode === 'graph' && <RoomGraphView className="h-full" />}
+                <EditorDock
+                  className="bottom-[7.25rem]"
+                  preset={null}
+                  readOnly={generating}
+                  onPreset={(preset) => {
+                    if (preset !== 'top') setLensExitPreset(preset)
+                    useCanvasStore.getState().setViewMode(preset === 'top' ? 'floor_plan' : '3d')
+                  }}
+                />
               </>
             )}
 
@@ -845,8 +856,8 @@ export default function ProjectPage() {
 
             {roomCount > 0 && !editingBrief && <>
               <div className="absolute inset-x-3 top-16 z-30 flex flex-wrap items-center justify-between gap-2">
-                {modelStage ? <div className="flex items-center gap-3"><button type="button" onClick={leaveModelStage} disabled={generating} className="rounded-lg border border-ink/15 bg-graphite-800/95 px-3 py-2 text-xs text-ink">← Back to layout</button><span className="text-xs font-semibold text-ink">3D model</span></div> : <ViewModeSwitcher disabled={generating} />}
-                <div className="flex items-center gap-2">
+                {modelStage ? <div className="flex items-center gap-3"><button type="button" onClick={leaveModelStage} disabled={generating} className="rounded-lg border border-ink/15 bg-graphite-800/95 px-3 py-2 text-xs text-ink">← Back to layout</button><span className="text-xs font-semibold text-ink">3D model</span></div> : null}
+                <div className="ml-auto flex items-center gap-2">
                   <button type="button" aria-expanded={panelOpen} onClick={() => setPanelOpen(!panelOpen)} className="rounded-lg border border-ink/15 bg-graphite-800 px-3 py-2 text-xs text-ink lg:hidden">Rooms & details</button>
                 </div>
               </div>
