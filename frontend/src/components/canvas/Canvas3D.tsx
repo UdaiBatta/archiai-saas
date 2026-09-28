@@ -17,6 +17,8 @@ import { SUNRISE, SUNSET, formatHour, sunAt } from './sunModel'
 import { CAMERA_PRESETS, MODEL_COLORS, floorDisplay, type CameraPreset } from './modelView'
 import { SavedViewsPanel, ViewCamera, type ViewCameraApi } from './SavedViewsPanel'
 import { restorableFloor, type SavedView } from './savedViews'
+import { SiteLayer } from '../../site/SiteLayer'
+import { SitePanel } from '../../site/SitePanel'
 
 // Props are stable per room, so metadata or UI-state changes in this
 // component no longer re-render every room.
@@ -179,6 +181,9 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
             y={(planFloor?.elevation ?? 0) + floorHeight + 0.4}
           />
         )}
+        {studio && (
+          <SiteLayer orbitRef={orbitRef} readOnly={readOnly} topView={topView} planY={(planFloor?.elevation ?? 0) + floorHeight + 0.4} />
+        )}
         {ghostRooms.map((r) => (
           <RoomMesh key={r.id} room={r} orbitRef={orbitRef} readOnly viewMode={viewMode} modelStage={modelStage} ghost />
         ))}
@@ -210,6 +215,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
             )}
           </div>
         )}
+        {!readOnly && <SitePanel topView={topView} onRequestTop={() => applyPreset('top')} />}
         <SavedViewsPanel
           readOnly={readOnly}
           capture={() => ({
