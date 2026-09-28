@@ -33,6 +33,22 @@ describe('buildableEnvelope', () => {
     expect(buildableEnvelope(site(rect(0, 0, 10, 10), [6, 6, 6, 6]))).toEqual([])
   })
 
+  it('does not throw on skewed polygons (polygon-clipping float robustness)', () => {
+    const skewed = [{ x: 2.262758595655229, z: 0.3472664495210456 }, { x: 19.58771874824688, z: 0.8422653111458848 }, { x: 21.072715332754733, z: 14.702233436641418 }, { x: 3.2527563186604667, z: 15.6922311598911 }]
+    expect(regionArea(buildableEnvelope(site(skewed, [6, 1.5, 3, 1.5])))).toBeCloseTo(81.945, 2)
+    let seed = 7
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647
+    for (let k = 0; k < 400; k++) {
+      const n = 3 + Math.floor(rnd() * 5)
+      const pts = Array.from({ length: n }, (_, i) => {
+        const a = (i / n) * Math.PI * 2 + rnd() * 0.5
+        const r = 8 + rnd() * 12
+        return { x: 5 + Math.cos(a) * r, z: 3 + Math.sin(a) * r }
+      })
+      expect(() => buildableEnvelope(site(pts, pts.map(() => Math.round(rnd() * 12) / 2)))).not.toThrow()
+    }
+  })
+
   it('is the whole site with no setbacks', () => {
     expect(regionArea(buildableEnvelope(site(rect(0, 0, 10, 10), [0, 0, 0, 0])))).toBeCloseTo(100)
   })
