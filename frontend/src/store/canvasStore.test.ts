@@ -696,6 +696,25 @@ describe('undo/redo', () => {
     expect(useCanvasStore.getState().serializeLayout().metadata?.savedViews).toEqual([{ id: 'v1' }])
   })
 
+  it('saves the site and masses with the layout, and undoes them', () => {
+    const site = {
+      boundary: [{ x: 0, z: 0 }, { x: 20, z: 0 }, { x: 20, z: 30 }],
+      rules: { setbacks: [3, 1.5, 1.5], maxHeightM: 12, maxCoverage: 0.5, maxFar: 1.8 },
+    }
+    const mass = { id: 'm1', name: 'Block A', footprint: site.boundary, floors: 3, floorHeightM: 3.2, baseM: 0 }
+    useCanvasStore.getState().setSite(site)
+    useCanvasStore.getState().setMasses([mass])
+    expect(useCanvasStore.getState().serializeLayout().metadata?.site).toEqual(site)
+    useCanvasStore.getState().undo()
+    expect(useCanvasStore.getState().layoutMetadata.masses).toBeUndefined()
+    expect(useCanvasStore.getState().layoutMetadata.site).toEqual(site)
+    useCanvasStore.getState().undo()
+    expect(useCanvasStore.getState().layoutMetadata.site).toBeUndefined()
+    useCanvasStore.getState().redo()
+    useCanvasStore.getState().redo()
+    expect(useCanvasStore.getState().layoutMetadata.masses).toEqual([mass])
+  })
+
   it('reverts a move', () => {
     useCanvasStore.getState().updateRoom('room-1', { position: { x: 3, y: 1.5, z: 4 } })
     useCanvasStore.getState().undo()
