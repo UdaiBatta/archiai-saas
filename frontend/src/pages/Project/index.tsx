@@ -30,6 +30,7 @@ import {
   type GenerationOverrides,
 } from '../../services/mvpGenerationPolicy'
 import { useCanvasStore, type CanvasViewMode } from '../../store/canvasStore'
+import { loadPreferences } from '../../utils/preferences'
 import { layoutThumbnailDataUrl } from '../../components/canvas/LayoutThumbnail'
 import { VersionHistoryDrawer } from '../../components/canvas/VersionHistoryDrawer'
 import { ActivityDrawer } from '../../components/canvas/ActivityDrawer'
@@ -219,6 +220,11 @@ export default function ProjectPage() {
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
   const { user } = useAuth()
+
+  // Settings > Preferences: the grid-snapping default, applied per project opened.
+  useEffect(() => {
+    useCanvasStore.getState().setSnapToGrid(loadPreferences(user?.id).snapToGrid)
+  }, [id, user?.id])
 
   const [project, setProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)

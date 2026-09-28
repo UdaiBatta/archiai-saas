@@ -7,19 +7,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.connection import get_db
 from app.schemas.auth import (
     AuthResponse,
+    ChangePasswordRequest,
     LoginRequest,
     LogoutRequest,
     RefreshRequest,
     RefreshResponse,
     RegisterRequest,
+    UpdateProfileRequest,
     UserOut,
 )
 from app.services.auth_service import (
+    change_password,
     get_current_user,
     login_user,
     refresh_access_token,
     register_user,
     revoke_refresh_token,
+    update_profile,
 )
 from app.utils.rate_limit import rate_limit
 
@@ -75,3 +79,31 @@ async def me(
     if not credentials:
         raise HTTPException(status_code=401, detail="Not authenticated")
     return await get_current_user(db, credentials.credentials)
+
+
+def _token(credentials: Optional[HTTPAuthorizationCredentials]) -> str:
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return credentials.credentials
+
+
+@router.patch("/me", response_model=UserOut)
+async def update_me(
+    data: UpdateProfileRequest,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
+    db: AsyncSession = Depends(get_db),
+):
+    return await update_profile(db, _token(credentials), data)
+
+
+@router.post(
+    "/password",
+    status_code=204,
+    dependencies=[Depends(rate_limit("auth_password", limit=5, window_seconds=60, by_ip=True))],
+)
+async def update_password(
+    data: ChangePasswordRequest,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
+    db: AsyncSession = Depends(get_db),
+):
+    await change_password(db, _token(credentials), data)
