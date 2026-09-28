@@ -120,9 +120,10 @@ export const floorsWithin = (mass: Mass, maxHeightM: number) =>
   Math.max(1, Math.floor((maxHeightM - mass.baseM) / mass.floorHeightM + 1e-9))
 
 /**
- * Take floors off the tallest masses, one at a time, until the total GFA
- * fits. Deterministic: tallest top first, then most floors, then id. Stops
- * when every mass is down to one floor.
+ * Take floors off one at a time until the total GFA fits, stopping as soon
+ * as it does. Each step picks the tallest mass (top height), and among
+ * those the largest footprint (the biggest GFA cut per floor), then id.
+ * Stops when every mass is down to one floor.
  */
 export function reduceFloorsForGfa(masses: Mass[], maxGfa: number): Mass[] {
   const next = masses.map((m) => ({ ...m }))
@@ -130,7 +131,7 @@ export function reduceFloorsForGfa(masses: Mass[], maxGfa: number): Mass[] {
   while (gfa > maxGfa * (1 + 1e-9)) {
     const candidates = next.filter((m) => m.floors > 1)
     if (!candidates.length) break
-    candidates.sort((a, b) => massTop(b) - massTop(a) || b.floors - a.floors || a.id.localeCompare(b.id))
+    candidates.sort((a, b) => massTop(b) - massTop(a) || polygonArea(b.footprint) - polygonArea(a.footprint) || a.id.localeCompare(b.id))
     const target = candidates[0]
     target.floors -= 1
     gfa -= polygonArea(target.footprint)

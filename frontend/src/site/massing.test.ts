@@ -106,6 +106,24 @@ describe('zoningIssues', () => {
     expect(siteMetrics(site(), fixed).far).toBeLessThanOrEqual(0.5)
   })
 
+  it('FAR fix is the smallest reduction that fits (no overshoot)', () => {
+    // Equal-height masses of very different sizes: cutting the big one first
+    // lands just under the limit instead of flattening everything.
+    const masses = [
+      mass('m1', rect(10, 10, 5, 10), 4),
+      mass('m2', rect(10, 25, 4, 4), 4),
+      mass('m3', rect(20, 10, 12, 30), 4),
+    ]
+    const limit = 0.7 // 1400 m2 of GFA against 1704 m2 drawn
+    const fixed = zoningIssues(site({ maxFar: limit }), masses)[0].fix!.masses
+    const far = siteMetrics(site(), fixed).far!
+    expect(far).toBeLessThanOrEqual(limit)
+    // Within one floor's worth of GFA of the limit: the last floor removed was needed.
+    const largestFloor = Math.max(...masses.map((m) => polygonArea(m.footprint)))
+    expect((limit - far) * 2000).toBeLessThan(largestFloor)
+    expect(fixed.map((m) => m.floors)).toEqual([4, 4, 3])
+  })
+
   it('reduceFloorsForGfa is deterministic and never drops below one floor', () => {
     const masses = [mass('b', rect(0, 0, 10, 10), 3), mass('a', rect(0, 0, 10, 10), 3)]
     // Tie on height and floors -> lowest id ('a') loses a floor first.
