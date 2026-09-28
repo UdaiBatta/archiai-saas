@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { EffectComposer, N8AO, ToneMapping } from '@react-three/postprocessing'
 import { ToneMappingMode } from 'postprocessing'
 import { Scene } from './Scene'
-import { RoomMesh } from './RoomMesh'
+import { RoomMesh as RoomMeshBase } from './RoomMesh'
+import { PauseWhileMoving, PerfReadout, SHOW_PERF } from './RenderBudget'
 import { useCanvasStore } from '../../store/canvasStore'
 import { canClearSelectionFromEmptyCanvas } from '../../store/interactionModel'
 import { useCanvasKeyboardShortcuts } from './useCanvasKeyboardShortcuts'
@@ -14,6 +15,10 @@ import { SUNRISE, SUNSET, formatHour, sunAt } from './sunModel'
 import { CAMERA_PRESETS, MODEL_COLORS, floorDisplay, type CameraPreset } from './modelView'
 import { SavedViewsPanel, ViewCamera, type ViewCameraApi } from './SavedViewsPanel'
 import { restorableFloor, type SavedView } from './savedViews'
+
+// Props are stable per room, so metadata or UI-state changes in this
+// component no longer re-render every room.
+const RoomMesh = memo(RoomMeshBase)
 
 const segmentClass = (active: boolean) =>
   `flex-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors ${
@@ -33,7 +38,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
   const selectedFloor = useCanvasStore((s) => s.selectedFloor)
   const storedViewMode = useCanvasStore((s) => s.viewMode)
   const viewMode = briefBackground ? '3d' : storedViewMode
-  const layoutMetadata = useCanvasStore((s) => s.layoutMetadata)
+  const mvpQuality = useCanvasStore((s) => s.layoutMetadata.mvpQuality)
   const clipboardMessage = useCanvasStore((s) => s.clipboardMessage)
   const clearClipboardMessage = useCanvasStore((s) => s.clearClipboardMessage)
   // 10:00 by default: morning light, so an east-facing front reads as lit.
@@ -42,6 +47,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
   const [ghostFloors, setGhostFloors] = useState(false)
   const multiFloor = useCanvasStore((s) => s.floors.length > 1)
   const viewCameraRef = useRef<ViewCameraApi>(null)
+  const aoRef = useRef<{ enabled: boolean }>(null)
   const restoreView = (view: SavedView) => {
     const state = useCanvasStore.getState()
     setPreset(view.preset)
@@ -61,8 +67,8 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
   const visibleRooms = rooms.filter((room) => roomDisplay(room) === 'active')
   const ghostRooms = studio ? rooms.filter((room) => roomDisplay(room) === 'ghost') : []
   const invalidRoomIds = useMemo(
-    () => hardViolationRoomIds(parseMvpQuality(layoutMetadata)),
-    [layoutMetadata],
+    () => hardViolationRoomIds(parseMvpQuality({ mvpQuality })),
+    [mvpQuality],
   )
   const camera =
     viewMode === '3d'
@@ -92,7 +98,9 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
         shadows={viewMode === '3d' ? 'percentage' : false}
         dpr={[1, 2]}
         camera={camera}
-        gl={{ preserveDrawingBuffer: true, antialias: true }}
+        // The studio composer multisamples itself; canvas MSAA there only
+        // costs fill rate (~25-40% of the frame) for a full-screen blit.
+        gl={{ preserveDrawingBuffer: true, antialias: !studio }}
         onPointerMissed={
           readOnly
             ? undefined
@@ -132,10 +140,12 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
         ))}
         {studio && (
           <EffectComposer multisampling={4}>
-            <N8AO aoRadius={1.2} distanceFalloff={0.6} intensity={2.4} quality="medium" halfRes color="#1f1d1a" />
+            <N8AO ref={aoRef as never} aoRadius={1.2} distanceFalloff={0.6} intensity={2.4} quality="medium" halfRes color="#1f1d1a" />
             <ToneMapping mode={ToneMappingMode.NEUTRAL} />
           </EffectComposer>
         )}
+        {studio && <PauseWhileMoving pass={aoRef} />}
+        {SHOW_PERF && <PerfReadout />}
       </Canvas>
       {studio && (
         <div className="absolute bottom-12 left-4 z-20 flex w-56 flex-col gap-2">
