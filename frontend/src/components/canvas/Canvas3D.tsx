@@ -12,6 +12,8 @@ import { EDITOR_PALETTE } from './editorPalette'
 import { hardViolationRoomIds, parseMvpQuality } from './qualityModel'
 import { SUNRISE, SUNSET, formatHour, sunAt } from './sunModel'
 import { CAMERA_PRESETS, MODEL_COLORS, floorDisplay, type CameraPreset } from './modelView'
+import { SavedViewsPanel, ViewCamera, type ViewCameraApi } from './SavedViewsPanel'
+import { restorableFloor, type SavedView } from './savedViews'
 
 const segmentClass = (active: boolean) =>
   `flex-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors ${
@@ -39,6 +41,16 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
   const [preset, setPreset] = useState<CameraPreset>('perspective')
   const [ghostFloors, setGhostFloors] = useState(false)
   const multiFloor = useCanvasStore((s) => s.floors.length > 1)
+  const viewCameraRef = useRef<ViewCameraApi>(null)
+  const restoreView = (view: SavedView) => {
+    const state = useCanvasStore.getState()
+    setPreset(view.preset)
+    setSunHour(view.sunHour)
+    setGhostFloors(view.ghostFloors)
+    const floor = restorableFloor(view, state.floors.map((level) => level.level))
+    state.setSelectedFloor(floor)
+    viewCameraRef.current?.restore(view, floor)
+  }
   // Architectural site presentation for the real 3D view (not the hidden
   // capture canvas behind the plan lenses, nor the empty-brief backdrop).
   const studio = viewMode === '3d' && !briefBackground
@@ -103,6 +115,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
         }
       >
         <Scene orbitRef={orbitRef} readOnly={readOnly} viewMode={viewMode} modelStage={modelStage} sunHour={sunHour} preset={preset} site={studio} />
+        {studio && <ViewCamera apiRef={viewCameraRef} preset={preset} />}
         {visibleRooms.map((r) => (
           <RoomMesh
             key={r.id}
@@ -126,6 +139,22 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
       </Canvas>
       {studio && (
         <div className="absolute bottom-12 left-4 z-20 flex w-56 flex-col gap-2">
+        {!readOnly && (
+          <div className="pointer-events-none hidden text-[10px] leading-relaxed text-muted-light xl:block">
+            Click to select · drag selected to move<br />Right drag to pan · middle drag to orbit
+          </div>
+        )}
+        <SavedViewsPanel
+          readOnly={readOnly}
+          capture={() => ({
+            ...viewCameraRef.current!.capture(),
+            preset,
+            sunHour,
+            selectedFloor,
+            ghostFloors,
+          })}
+          onRestore={restoreView}
+        />
         <div className="flex flex-col gap-1.5 rounded-xl border border-ink/10 bg-graphite-800/95 px-3 py-2.5 text-[11px] text-muted shadow-lg backdrop-blur">
           <span className="font-semibold text-ink">View</span>
           <div role="group" aria-label="Camera view" className="flex gap-0.5 rounded-lg bg-graphite-900/60 p-0.5">
@@ -166,11 +195,6 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
             className="accent-accent"
           />
         </label>
-        </div>
-      )}
-      {viewMode === '3d' && !readOnly && (
-        <div className="pointer-events-none absolute bottom-[19rem] left-4 hidden max-w-[12rem] text-[10px] leading-relaxed text-muted-light xl:block">
-          Click to select · drag selected to move<br />Right drag to pan · middle drag to orbit
         </div>
       )}
       {clipboardMessage && (
