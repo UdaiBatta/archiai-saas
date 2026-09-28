@@ -29,7 +29,7 @@ const config: Config = {
         // Semantic tokens (dark theme): ink = primary text, muted = secondary,
         // muted-light = tertiary/disabled, surface = app background.
         ink: '#F5F5F6',
-        muted: { DEFAULT: '#A8A8AC', light: '#7C7C80' },
+        muted: { DEFAULT: '#A8A8AC', light: '#7C7C80', foreground: '#A8A8AC' },
         // App background: the landing page's near-black, so every page
         // (sign-in, projects, editor) sits on the same ground as the site.
         surface: '#0B0A0A',
@@ -50,6 +50,12 @@ const config: Config = {
         ok: '#8FAE94',
         warn: '#C9A96E',
         danger: '#C97B70',
+        // shadcn/ui token names, aliased onto the palette above so copied
+        // shadcn components render in our colours. `accent` is NOT aliased:
+        // it is the brand ember, so menu items style focus explicitly.
+        popover: { DEFAULT: '#2B2B2C', foreground: '#F5F5F6' }, // graphite-800 / ink
+        card: { DEFAULT: '#2B2B2C', foreground: '#F5F5F6' },
+        destructive: { DEFAULT: '#C97B70', foreground: '#F5F5F6' }, // danger
       },
       fontFamily: {
         sans: ['Archivo', ...defaultTheme.fontFamily.sans],
