@@ -8,7 +8,7 @@ must stay fast), and the reject tier of the scorer (Phase 6).
 Violation codes (stable API): overlap, out_of_bounds, below_min_size,
 unreachable, missing_requested_room, through_room_access, unmet_must_connection,
 staircase_alignment, outdoor_room_inland, entry_inland, walk_through_room,
-garage_access.
+garage_access, no_daylight.
 
 Reachability walks the access graph derived from doors: each door's midpoint
 connects every room whose boundary touches that point (interior doors connect
@@ -514,6 +514,26 @@ def touches_outside(room: PlanRoom, plan: LayoutPlan) -> bool:
 _NEEDS_OUTSIDE = frozenset({"balcony", "terrace", "porch", "veranda"})
 
 
+# In a home, rooms people sleep, live or cook in need a window: an outside
+# wall. Dining rooms and studies are often inland in real homes, so they
+# stay a soft daylight preference (soft_rules.natural_light_rule).
+_NEEDS_WINDOW = frozenset({"bedroom", "master_bedroom", "kids_room", "living_room", "open_plan_living", "kitchen"})
+
+
+def _daylight_violations(plan: LayoutPlan, requirements: RequirementsSpec | None) -> list[Violation]:
+    if requirements is None or requirements.building_type.value not in RESIDENTIAL_BUILDINGS:
+        return []
+    return [
+        Violation(
+            code="no_daylight",
+            room_ids=[room.id],
+            message=f"{room.label} has no outside wall for a window",
+        )
+        for room in plan.rooms
+        if (resolve_alias(room.type) or room.type) in _NEEDS_WINDOW and not touches_outside(room, plan)
+    ]
+
+
 def _inland_violations(plan: LayoutPlan) -> list[Violation]:
     violations: list[Violation] = []
     for room in plan.rooms:
@@ -617,6 +637,9 @@ def validate(
 
     # (i) balconies and the entry reach the outside of the house.
     violations.extend(_inland_violations(plan))
+
+    # (j) in a home, bedrooms, living rooms and kitchens get a window.
+    violations.extend(_daylight_violations(plan, requirements))
 
     return violations
 

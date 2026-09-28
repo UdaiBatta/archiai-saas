@@ -236,6 +236,7 @@ export default function Landing() {
                   <li className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-ember-soft/30" />Service</li>
                   <li className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-ink/15" />Private</li>
                   <li className="flex items-center gap-1.5"><span className="h-0.5 w-3 bg-ember" />Door</li>
+                  <li className="flex items-center gap-1.5"><span className="h-1 w-3 border-y border-ink/70 bg-night" />Window</li>
                   <li className="flex items-center gap-1.5"><span className="w-3 border-t border-dashed border-ember-soft" />Open</li>
                 </ul>
               </div>

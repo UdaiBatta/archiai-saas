@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { Scene } from './Scene'
 import { RoomMesh } from './RoomMesh'
@@ -8,6 +8,7 @@ import { useCanvasKeyboardShortcuts } from './useCanvasKeyboardShortcuts'
 import { shouldRenderCanvasObject } from './canvasObjectVisibility'
 import { EDITOR_PALETTE } from './editorPalette'
 import { hardViolationRoomIds, parseMvpQuality } from './qualityModel'
+import { SUNRISE, SUNSET, formatHour, sunAt } from './sunModel'
 
 interface Canvas3DProps {
   className?: string
@@ -25,6 +26,8 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
   const layoutMetadata = useCanvasStore((s) => s.layoutMetadata)
   const clipboardMessage = useCanvasStore((s) => s.clipboardMessage)
   const clearClipboardMessage = useCanvasStore((s) => s.clearClipboardMessage)
+  // 10:00 by default: morning light, so an east-facing front reads as lit.
+  const [sunHour, setSunHour] = useState(10)
   const visibleRooms =
     selectedFloor === 'all'
       ? rooms.filter((room) => shouldRenderCanvasObject(room, viewMode))
@@ -85,7 +88,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
               }
         }
       >
-        <Scene orbitRef={orbitRef} readOnly={readOnly} viewMode={viewMode} modelStage={modelStage} />
+        <Scene orbitRef={orbitRef} readOnly={readOnly} viewMode={viewMode} modelStage={modelStage} sunHour={sunHour} />
         {visibleRooms.map((r) => (
           <RoomMesh
             key={r.id}
@@ -98,6 +101,22 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
           />
         ))}
       </Canvas>
+      {viewMode === '3d' && !briefBackground && (
+        <label className="absolute bottom-12 left-4 z-20 flex w-56 flex-col gap-1.5 rounded-xl border border-ink/10 bg-graphite-800/95 px-3 py-2.5 text-[11px] text-muted shadow-lg backdrop-blur">
+          <span className="font-semibold text-ink">Sun · {formatHour(sunHour)}</span>
+          <span className="text-muted-light">{sunAt(sunHour).label}</span>
+          <input
+            type="range"
+            aria-label="Time of day"
+            min={SUNRISE}
+            max={SUNSET}
+            step={0.5}
+            value={sunHour}
+            onChange={(event) => setSunHour(Number(event.target.value))}
+            className="accent-accent"
+          />
+        </label>
+      )}
       {viewMode === '3d' && !readOnly && (
         <div className="pointer-events-none absolute bottom-64 left-4 hidden max-w-[12rem] text-[10px] leading-relaxed text-muted-light xl:block">
           Click to select · drag selected to move<br />Right drag to pan · middle drag to orbit

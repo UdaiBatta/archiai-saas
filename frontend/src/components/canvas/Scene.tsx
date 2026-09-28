@@ -1,10 +1,11 @@
-import { useEffect, type RefObject } from 'react'
+import { useEffect, useRef, type RefObject } from 'react'
 import { useThree } from '@react-three/fiber'
 import { OrbitControls, Grid, Html, Line } from '@react-three/drei'
 import * as THREE from 'three'
 import { CanvasViewMode, useCanvasStore } from '../../store/canvasStore'
 import { canClearSelectionFromEmptyCanvas } from '../../store/interactionModel'
 import { edgeCardinals, parseOrientation, type ScreenEdge } from './orientationModel'
+import { sunAt } from './sunModel'
 
 interface OrbitHandle {
   enabled: boolean
@@ -17,9 +18,11 @@ interface SceneProps {
   readOnly?: boolean
   viewMode?: CanvasViewMode
   modelStage?: boolean
+  /** Time of day for the 3D sun (06:00-18:00). */
+  sunHour?: number
 }
 
-export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage = false }: SceneProps) {
+export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage = false, sunHour = 10 }: SceneProps) {
   const camera = useThree((s) => s.camera)
   const viewportSize = useThree((s) => s.size)
   const floors = useCanvasStore((s) => s.floors)
@@ -52,6 +55,20 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
     orbitRef.current?.update?.()
   }, [framingKey, camera, viewportSize.width, viewportSize.height])
 
+  // The 3D sun: aimed at the house centre from where the sun is at
+  // `sunHour`, with a shadow box that covers the whole house.
+  const sunRef = useRef<THREE.DirectionalLight>(null)
+  const sun = sunAt(sunHour)
+  const centerX = footprint ? footprint.x + footprint.w / 2 : 0
+  const centerZ = footprint ? footprint.z + footprint.d / 2 : 0
+  const reach = Math.max(footprint?.w ?? 10, footprint?.d ?? 10, 8)
+  useEffect(() => {
+    const light = sunRef.current
+    if (!light) return
+    light.target.position.set(centerX, 0, centerZ)
+    light.target.updateMatrixWorld()
+  }, [centerX, centerZ])
+
   // Distinct floor slab colours so stacked floors are visually separable
   const floorSlabColor = (level: number) => {
     if (modelStage) return '#e8e5dc'
@@ -62,17 +79,29 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
 
   return (
     <>
-      <ambientLight intensity={isPlanView ? 0.9 : 0.5} />
+      <ambientLight intensity={isPlanView ? 0.9 : 0.35} />
       {!isPlanView && (
-        <hemisphereLight args={['#BDBDC0', '#26282D', 0.5]} />
+        <hemisphereLight args={['#BDBDC0', '#26282D', 0.45]} />
       )}
       <directionalLight
-        position={[10, 20, 10]}
-        intensity={isPlanView ? 0.55 : 1.25}
+        ref={sunRef}
+        position={
+          isPlanView
+            ? [10, 20, 10]
+            : [centerX + sun.direction[0] * reach * 2, sun.direction[1] * reach * 2, centerZ + sun.direction[2] * reach * 2]
+        }
+        color={isPlanView ? '#ffffff' : sun.color}
+        intensity={isPlanView ? 0.55 : sun.intensity}
         castShadow={!isPlanView}
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
         shadow-bias={-0.0002}
+        shadow-camera-left={-reach}
+        shadow-camera-right={reach}
+        shadow-camera-top={reach}
+        shadow-camera-bottom={-reach}
+        shadow-camera-near={0.5}
+        shadow-camera-far={reach * 5}
       />
 
       {visibleFloors.map((floor) => {

@@ -17,6 +17,7 @@ from app.services.quality.soft_rules import (
     natural_light_rule,
     privacy_rule,
     wet_stack_rule,
+    proportion_rule,
 )
 from app.services.quality.vastu import evaluate_vastu
 
@@ -33,6 +34,7 @@ def _generic(plan: LayoutPlan, requirements: RequirementsSpec) -> list[SoftRuleR
     results = [
         adjacency_rule(plan, requirements),
         natural_light_rule(plan, requirements),
+        proportion_rule(plan, requirements),
     ]
     if requirements.floors > 1:
         results.extend([
@@ -72,6 +74,7 @@ REGISTRY: dict[str, RulePack] = {
         weights={
             "adjacency": 0.35,
             "natural_light": 0.20,
+            "proportion": 0.15,
             "wet_stack": 0.10,
             "floor_area_balance": 0.10,
         },

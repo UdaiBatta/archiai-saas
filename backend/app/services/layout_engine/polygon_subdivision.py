@@ -18,6 +18,8 @@ from shapely.geometry import Polygon, box
 
 from app.schemas.requirements import Facing
 from app.services.layout_engine.subdivision import (
+    _ENTRY_TYPES,
+    _OUTSIDE_WALL_TYPES,
     RoomNeed,
     SubdivisionError,
     clamped_cut,
@@ -35,21 +37,37 @@ def _clip(polygon: Polygon, minx: float, miny: float, maxx: float, maxy: float) 
     return inter
 
 
+def _on_outline(piece: Polygon, outline: Polygon | None) -> bool:
+    return outline is not None and piece.boundary.intersection(outline.boundary).length > 1e-6
+
+
+def _cut_off_penalty(group: list[RoomNeed], piece: Polygon, parent_on_outline: bool, outline: Polygon | None) -> int:
+    """Same rule as the rectangular cutter: a piece cut off from the plot's
+    outline costs its entry (100) and each room that needs a window (10)."""
+    if outline is None or not parent_on_outline or _on_outline(piece, outline):
+        return 0
+    return sum(100 if n.type in _ENTRY_TYPES else 10 if n.type in _OUTSIDE_WALL_TYPES else 0 for n in group)
+
+
 def subdivide_polygon(
-    needs: list[RoomNeed], polygon: Polygon, facing: Facing
+    needs: list[RoomNeed], polygon: Polygon, facing: Facing, outline: Polygon | None = None,
 ) -> list[tuple[RoomNeed, Polygon]]:
+    """With `outline` (the plot boundary), each cut also weighs which rooms
+    keep an outside wall; ties keep the plain longer-side-first order."""
     if not needs:
         return []
     if len(needs) == 1:
         return [(needs[0], polygon)]
 
     i = split_index(needs)
-    group_a, group_b = needs[:i], needs[i:]
-
     minx, miny, maxx, maxy = polygon.bounds
     w, d = maxx - minx, maxy - miny
     axes = ("x", "y") if w >= d else ("y", "x")
-    for axis in axes:
+    parent_on_outline = _on_outline(polygon, outline)
+    best = None
+    # Old order first (each axis unswapped), then the swapped alternatives.
+    for rank, (axis, swapped) in enumerate([(a, False) for a in axes] + [(a, True) for a in axes]):
+        group_a, group_b = (needs[i:], needs[:i]) if swapped else (needs[:i], needs[i:])
         span, other = (w, d) if axis == "x" else (d, w)
         t = clamped_cut(span, other, group_a, group_b)
         if t is None:
@@ -75,8 +93,20 @@ def subdivide_polygon(
             # this cut line would fragment one side into disjoint pieces —
             # Phase 8's PlanRoom has one vertex ring, no multi-piece rooms.
             continue
-        return subdivide_polygon(group_a, poly_a, facing) + subdivide_polygon(group_b, poly_b, facing)
+        penalty = (
+            _cut_off_penalty(group_a, poly_a, parent_on_outline, outline)
+            + _cut_off_penalty(group_b, poly_b, parent_on_outline, outline)
+        )
+        if best is None or (penalty, rank) < best[0]:
+            best = ((penalty, rank), swapped, group_a, poly_a, group_b, poly_b)
+        if penalty == 0:
+            break
 
-    raise SubdivisionError(
-        f"cannot cut polygon (bbox {w:.1f}x{d:.1f}m) for {len(group_a)}+{len(group_b)} rooms"
-    )
+    if best is None:
+        raise SubdivisionError(
+            f"cannot cut polygon (bbox {w:.1f}x{d:.1f}m) for {i}+{len(needs) - i} rooms"
+        )
+    _, swapped, group_a, poly_a, group_b, poly_b = best
+    parts_a = subdivide_polygon(group_a, poly_a, facing, outline)
+    parts_b = subdivide_polygon(group_b, poly_b, facing, outline)
+    return parts_b + parts_a if swapped else parts_a + parts_b

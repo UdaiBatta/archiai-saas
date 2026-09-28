@@ -136,6 +136,48 @@ function doorObject(layout: LayoutPlan, index: number): Room | null {
   }
 }
 
+// Windows sit at a 0.9 m sill and are 1.2 m tall (1.5 m to the head), the
+// usual residential opening; bathroom ventilators use the same band.
+const WINDOW_SILL_M = 0.9
+const WINDOW_HEIGHT_M = 1.2
+
+function windowObject(layout: LayoutPlan, index: number): Room | null {
+  const opening = layout.windows?.[index]
+  const wall = opening && layout.walls.find((candidate) => candidate.id === opening.wall_ref)
+  if (!opening || !wall) return null
+  const floor = opening.floor ?? wall.floor ?? 0
+  const dx = wall.x2 - wall.x1
+  const dy = wall.y2 - wall.y1
+  const length = Math.hypot(dx, dy)
+  const at = Math.min(opening.offset + opening.width / 2, length)
+  const horizontal = Math.abs(dx) >= Math.abs(dy)
+  const markerThickness = Math.max(wall.thickness * 1.5, 0.16)
+  return {
+    id: opening.id,
+    label: `Window ${index + 1}`,
+    roomType: 'window',
+    objectType: 'window',
+    floorId: `floor_${floor}`,
+    floorLevel: floor,
+    hostWallId: wall.id,
+    position: {
+      x: round3(wall.x1 + (length ? dx / length : 0) * at),
+      y: floor * WALL_HEIGHT_M + WINDOW_SILL_M + WINDOW_HEIGHT_M / 2,
+      z: round3(wall.y1 + (length ? dy / length : 0) * at),
+    },
+    size: {
+      w: round3(horizontal ? opening.width : markerThickness),
+      h: WINDOW_HEIGHT_M,
+      d: round3(horizontal ? markerThickness : opening.width),
+    },
+    rotation: { x: 0, y: 0, z: 0 },
+    color: '#7C93A6',
+    // Placed by the engine: replaced on each server re-check, unlike a
+    // window the user added by hand.
+    derived: 'engine',
+  }
+}
+
 export function layoutPlanDerivedObjects(layout: LayoutPlan): Room[] {
   const wallObjects = layout.walls.flatMap((wall, index) =>
     wall.kind === 'open' ? [] : [wallObject(layout, index)],
@@ -143,11 +185,14 @@ export function layoutPlanDerivedObjects(layout: LayoutPlan): Room[] {
   const doorObjects = layout.doors
     .map((_, index) => doorObject(layout, index))
     .filter((door): door is Room => door !== null)
-  return [...wallObjects, ...doorObjects]
+  const windowObjects = (layout.windows ?? [])
+    .map((_, index) => windowObject(layout, index))
+    .filter((opening): opening is Room => opening !== null)
+  return [...wallObjects, ...doorObjects, ...windowObjects]
 }
 
 /**
- * Canonical MVP walls and hosted doors are regenerated from room rectangles.
+ * Canonical MVP walls, hosted doors and windows are regenerated from room rectangles.
  * Preserve every editable room and non-canonical component while replacing
  * only those derived objects with the server's scored geometry.
  */
@@ -156,7 +201,10 @@ export function replaceDerivedCanvasObjects(
   layout: LayoutPlan,
 ): Room[] {
   const preserved = objects.filter(
-    (object) => object.objectType !== 'wall' && object.objectType !== 'door',
+    (object) =>
+      object.objectType !== 'wall'
+      && object.objectType !== 'door'
+      && !(object.objectType === 'window' && object.derived === 'engine'),
   )
   return [...preserved, ...layoutPlanDerivedObjects(layout)]
 }

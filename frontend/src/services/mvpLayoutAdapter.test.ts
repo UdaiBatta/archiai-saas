@@ -110,6 +110,25 @@ describe('canonical MVP layout adapter', () => {
     })
   })
 
+  it('turns engine windows into hosted window objects at sill height', () => {
+    const withWindow: LayoutPlan = {
+      ...layout,
+      walls: [...layout.walls, { id: 'wall-east', x1: 9, y1: 0, x2: 9, y2: 12, thickness: 0.115, floor: 0 }],
+      windows: [{ id: 'win1', wall_ref: 'wall-east', offset: 5.25, width: 1.5, floor: 0 }],
+    }
+    const result = layoutPlanToCanvas(withWindow)
+    expect(result.rooms.find((object) => object.id === 'win1')).toMatchObject({
+      objectType: 'window',
+      hostWallId: 'wall-east',
+      // centred at 6 m along the wall; 0.9 m sill + half of a 1.2 m opening
+      position: { x: 9, y: 1.5, z: 6 },
+      size: { h: 1.2, d: 1.5 },
+    })
+    // A server re-check replaces derived windows like walls and doors.
+    const replaced = replaceDerivedCanvasObjects(result.rooms, { ...withWindow, windows: [] })
+    expect(replaced.some((object) => object.objectType === 'window')).toBe(false)
+  })
+
   it('lists each adjacent pair once, a door winning over a solid segment', () => {
     const plan: LayoutPlan = {
       ...layout,

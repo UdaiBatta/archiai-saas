@@ -4,12 +4,11 @@ At most three things are "now". Finished items are deleted, not archived.
 
 ## Now
 
-1. **Remaining stretched rooms (22% of home-fixture rooms, down from 32%).** Left:
-   the pooja room in a bedroom wing (4.6 × 1.2 m), a lone common bathroom with no
-   attached one to stack against, upstairs wings in multi-storey homes (villa
-   bedrooms ~3 × 11 m), and rooms along long office corridors. Next: a
-   proportion rule in the score so the search prefers squarer rooms, and
-   letting small private rooms (pooja, study) join the living zone.
+1. **Remaining stretched rooms (13.5% of rooms in the home quality suite, down
+   from 22.7%; passages excluded).** Mostly bathrooms stacked back to back in
+   one slot (about 1.5 x 4.3 m each) and long utility/service strips. Next:
+   split the shared wet slot along its depth, and give service strips a
+   depth cap. Measure with `scripts/home_quality.py`.
 2. **Fit robustness.** The 3BHK and 4BHK fixtures now fit all four facings
    since the building-footprint change. Still to do: try the other archetypes
    and the rotated band order before refusing tight plots.
@@ -19,6 +18,9 @@ At most three things are "now". Finished items are deleted, not archived.
 
 ## Next
 
+- Multi-storey homes: lay the upper floor so its bathrooms sit over the ground
+  floor's wet rooms. Putting the foyer on the street side (as the brief's
+  facing says) cost three templates their stacking (score 100/97/95 -> 91).
 - Polygon plots try the original room order and up to 63 single swaps; broader
   order search is still deferred, so some valid arrangements may be missed.
 - A Playwright test of the core loop: brief → generate → drag a room → save → reload.

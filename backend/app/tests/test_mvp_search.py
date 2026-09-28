@@ -133,13 +133,15 @@ def test_search_finds_a_meaningfully_better_layout_than_single_shot():
 
     Stacking the attached and the common bathroom back to back, keeping the
     balcony with the living room, and sizing the house to its rooms (not the
-    plot) lifted the single shot from 72 to 90; the search reaches 100.
+    plot) lifted the single shot from 72 to 90 (91 with the squarer-room
+    cutting); the search reaches 100 (99 now that the score also counts
+    room proportions).
     """
     spec = _load("3bhk_adjacencies")
     single_shot_score = score(generate_plan(spec), spec).score
     best_score = score(best_candidate(spec, n=64, seed=0), spec).score
-    assert single_shot_score == 90
-    assert best_score == 100
+    assert single_shot_score == 91
+    assert best_score == 99
     assert best_score - single_shot_score >= 8
 
 
