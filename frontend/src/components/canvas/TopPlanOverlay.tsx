@@ -40,6 +40,8 @@ interface TopPlanOverlayProps {
   /** Objects on the plan level (already filtered for visibility). */
   rooms: Room[]
   invalidRoomIds: Set<string>
+  /** Room focused through the keyboard layer: drawn with a focus ring. */
+  focusedRoomId?: string | null
   /** Outline to dimension overall (the building slab), if any. */
   bounds?: PlanBounds
   /** Height the annotations float at: above everything on this level. */
@@ -96,7 +98,7 @@ function localToWorld(room: Room, x: number, z: number, y: number): [number, num
  * strings, plan symbols, violation outlines and the selected room's resize /
  * vertex handles - the editing surface the SVG plan used to provide.
  */
-export function TopPlanOverlay({ orbitRef, readOnly, rooms, invalidRoomIds, bounds, y }: TopPlanOverlayProps) {
+export function TopPlanOverlay({ orbitRef, readOnly, rooms, invalidRoomIds, focusedRoomId = null, bounds, y }: TopPlanOverlayProps) {
   const pxPerMetre = usePixelsPerMetre()
   const gl = useThree((s) => s.gl)
   const selectedId = useCanvasStore((s) => s.selectedId)
@@ -254,6 +256,14 @@ export function TopPlanOverlay({ orbitRef, readOnly, rooms, invalidRoomIds, boun
         const { w, d } = room.size
         return (
           <group key={room.id}>
+            {room.id === focusedRoomId && (
+              <Line
+                name={`focus-ring-${room.id}`}
+                points={[...outline, outline[0]].map((p) => at(p, y + 0.05))}
+                color={EDITOR_PALETTE.selection}
+                lineWidth={4}
+              />
+            )}
             {invalid && (
               <Line
                 points={[...outline, outline[0]].map((p) => at(p, y))}

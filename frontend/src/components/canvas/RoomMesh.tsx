@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { Edges, Html } from '@react-three/drei'
-import type { ThreeEvent } from '@react-three/fiber'
+import { useThree, type ThreeEvent } from '@react-three/fiber'
 import type { RefObject } from 'react'
 import * as THREE from 'three'
 import { CanvasHistorySnapshot, CanvasViewMode, Room, useCanvasStore } from '../../store/canvasStore'
@@ -17,6 +17,8 @@ import { roomVisualTreatment } from './roomVisualTreatment'
 import { EDITOR_PALETTE, displayRoomColor } from './editorPalette'
 import { wallModelPieces } from './modelGeometry'
 import { MODEL_COLORS, floorTint, mixHex } from './modelView'
+import { roomLabelLayout, roomPlanArea, roomWorldBounds } from './topViewModel'
+import { formatArea, formatDims } from '../../utils/format'
 
 interface OrbitHandle {
   enabled: boolean
@@ -75,6 +77,8 @@ export function RoomMesh({
   plan = false,
 }: RoomMeshProps) {
   const meshRef = useRef<THREE.Mesh>(null)
+  const canvasElement = useThree((s) => s.gl.domElement)
+  const camera = useThree((s) => s.camera)
   const pendingMoveRef = useRef<PendingMove | null>(null)
   const selectedId = useCanvasStore((s) => s.selectedId)
   const selectRoom = useCanvasStore((s) => s.selectRoom)
@@ -287,13 +291,29 @@ export function RoomMesh({
       onPointerMove={readOnly ? undefined : handlePointerMove}
       onPointerUp={readOnly ? undefined : finishPointerDrag}
       onPointerCancel={readOnly ? undefined : finishPointerDrag}
-      onPointerOut={
-        readOnly
-          ? undefined
-          : (event) => {
-              if (pendingMoveRef.current?.pointerId === event.pointerId) event.stopPropagation()
+      onPointerOver={
+        plan
+          ? (event) => {
+              // Native tooltip for rooms too small to carry a Top-view label.
+              event.stopPropagation()
+              const world = roomWorldBounds(room)
+              const { showName } = roomLabelLayout({
+                label: room.label,
+                w: world.w,
+                d: world.d,
+                pxPerMetre: camera.zoom,
+                isSpace,
+              })
+              canvasElement.title = showName
+                ? ''
+                : `${room.label} — ${formatDims(world.w, world.d)} · ${formatArea(roomPlanArea(room))}`
             }
+          : undefined
       }
+      onPointerOut={(event) => {
+        if (plan) canvasElement.title = ''
+        if (!readOnly && pendingMoveRef.current?.pointerId === event.pointerId) event.stopPropagation()
+      }}
     >
       {polygonSlab ? (
         <primitive object={polygonSlab} attach="geometry" />

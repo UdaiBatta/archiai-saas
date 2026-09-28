@@ -5,6 +5,7 @@ import { ToneMappingMode } from 'postprocessing'
 import { Scene } from './Scene'
 import { RoomMesh } from './RoomMesh'
 import { TopPlanOverlay } from './TopPlanOverlay'
+import { TopPlanKeyboardLayer } from './TopPlanKeyboardLayer'
 import { useCanvasStore } from '../../store/canvasStore'
 import { canClearSelectionFromEmptyCanvas } from '../../store/interactionModel'
 import { useCanvasKeyboardShortcuts } from './useCanvasKeyboardShortcuts'
@@ -43,6 +44,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
   const [orbitPreset, setOrbitPreset] = useState<CameraPreset>('perspective')
   const preset: CameraPreset = planLens ? 'top' : orbitPreset
   const [frameNonce, setFrameNonce] = useState(0)
+  const [focusedRoomId, setFocusedRoomId] = useState<string | null>(null)
   const floors = useCanvasStore((s) => s.floors)
   const floorHeight = useCanvasStore((s) => s.floorHeight)
   const [ghostFloors, setGhostFloors] = useState(false)
@@ -146,6 +148,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
             readOnly={readOnly}
             rooms={visibleRooms}
             invalidRoomIds={invalidRoomIds}
+            focusedRoomId={focusedRoomId}
             bounds={planBounds}
             y={(planFloor?.elevation ?? 0) + floorHeight + 0.4}
           />
@@ -153,13 +156,17 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
         {ghostRooms.map((r) => (
           <RoomMesh key={r.id} room={r} orbitRef={orbitRef} readOnly viewMode={viewMode} modelStage={modelStage} ghost />
         ))}
-        {studio && (
+        {/* Top reads as a drawing: no ambient occlusion (and no sun shadows, see Scene). */}
+        {studio && !topView && (
           <EffectComposer multisampling={4}>
             <N8AO aoRadius={1.2} distanceFalloff={0.6} intensity={2.4} quality="medium" halfRes color="#1f1d1a" />
             <ToneMapping mode={ToneMappingMode.NEUTRAL} />
           </EffectComposer>
         )}
       </Canvas>
+      {topView && !readOnly && (
+        <TopPlanKeyboardLayer rooms={visibleRooms} invalidRoomIds={invalidRoomIds} onFocusRoom={setFocusedRoomId} />
+      )}
       {studio && (
         <div className="absolute bottom-12 left-4 z-20 flex w-56 flex-col gap-2">
         <div className="flex flex-col gap-1.5 rounded-xl border border-ink/10 bg-graphite-800/95 px-3 py-2.5 text-[11px] text-muted shadow-lg backdrop-blur">
