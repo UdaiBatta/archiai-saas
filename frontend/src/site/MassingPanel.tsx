@@ -38,8 +38,8 @@ const fmt: Record<string, (v: number) => string> = {
 
 const btn =
   'rounded-md border border-ink/15 px-2 py-1 text-[11px] font-medium text-ink transition-colors hover:border-accent/60 disabled:opacity-40'
-const input =
-  'w-full rounded-md border border-ink/15 bg-graphite-900/60 px-1.5 py-1 text-right font-mono text-[11px] tabular-nums text-ink'
+const field = 'w-full rounded-md border border-ink/15 bg-graphite-900/60 px-1.5 py-1 text-[11px] text-ink'
+const input = `${field} text-right font-mono tabular-nums`
 
 /**
  * Massing panel: tools to create masses, live site metrics against the
@@ -140,7 +140,7 @@ export function MassingPanel({ readOnly, topView, plot }: { readOnly: boolean; t
               <input
                 key={`${selected.id}:${selected.name}`}
                 aria-label="Mass name"
-                className={`${input} text-left font-sans font-semibold`}
+                className={`${field} font-semibold`}
                 defaultValue={selected.name}
                 disabled={readOnly}
                 onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
