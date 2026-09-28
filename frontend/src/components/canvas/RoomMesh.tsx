@@ -66,6 +66,19 @@ function movedTo(room: Room, position: Room['position']): Partial<Room> {
     : { position }
 }
 
+/** Edge lines of a w x h x d box, rebuilt only when the size changes and
+ * freed when it does (the source box is freed at once). */
+function useBoxEdges(w: number, h: number, d: number) {
+  const edges = useMemo(() => {
+    const box = new THREE.BoxGeometry(w, h, d)
+    const geometry = new THREE.EdgesGeometry(box)
+    box.dispose()
+    return geometry
+  }, [w, h, d])
+  useEffect(() => () => edges.dispose(), [edges])
+  return edges
+}
+
 export function RoomMesh({
   room,
   orbitRef,
@@ -106,6 +119,8 @@ export function RoomMesh({
   const isSpace = definition.category === 'space'
   const modelSurface = solid3d && (isSpace || (room.objectType === 'door' && typeof room.hostWallId === 'string'))
   const renderHeight = modelSurface ? 0.045 : room.size.h
+  const boxEdges = useBoxEdges(room.size.w, room.size.h, room.size.d)
+  const selectionEdges = useBoxEdges(room.size.w + 0.08, Math.max(renderHeight + 0.08, 0.12), room.size.d + 0.08)
   const renderY = modelSurface ? room.position.y - room.size.h / 2 + renderHeight / 2 : room.position.y
   const modelFurniture = modelStage && room.objectType === 'furniture'
   // White model: matte surfaces, floors keep a pale tint of their room colour,
@@ -363,7 +378,7 @@ export function RoomMesh({
       )}
       {!solid3d && (isSelected || definition.category === 'space' || room.objectType === 'stair') && (
         <lineSegments>
-          <edgesGeometry args={[new THREE.BoxGeometry(room.size.w, room.size.h, room.size.d)]} />
+          <primitive object={boxEdges} attach="geometry" />
           <lineBasicMaterial
             color={visual.edgeColor}
             transparent
@@ -374,15 +389,7 @@ export function RoomMesh({
       )}
       {isSelected && (
         <lineSegments>
-          <edgesGeometry
-            args={[
-              new THREE.BoxGeometry(
-                room.size.w + 0.08,
-                Math.max(renderHeight + 0.08, 0.12),
-                room.size.d + 0.08,
-              ),
-            ]}
-          />
+          <primitive object={selectionEdges} attach="geometry" />
           <lineBasicMaterial
             color={solid3d ? EDITOR_PALETTE.selection : '#ffffff'}
             transparent
