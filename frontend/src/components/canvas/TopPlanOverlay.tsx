@@ -323,7 +323,7 @@ export function TopPlanOverlay({ orbitRef, readOnly, rooms, invalidRoomIds, boun
                 </div>
               </Html>
             )}
-            {definition.canResize && (isSelected || showDimensions) && (
+            {definition.canResize && (isSelected || (showDimensions && definition.category === 'space')) && (
               <Dimensions
                 strings={dimensionStrings(world, Math.max(0.35, 16 * metre))}
                 y={y}
@@ -374,6 +374,7 @@ export function TopPlanOverlay({ orbitRef, readOnly, rooms, invalidRoomIds, boun
               size={handleSize * 0.7}
               round
               faint
+              onPointerDown={(event) => event.stopPropagation()}
               onDoubleClick={editPolygon(editable, insertPolygonVertex(editable, index))}
               onPointerOver={() => { gl.domElement.style.cursor = 'copy' }}
               onPointerOut={() => { gl.domElement.style.cursor = '' }}

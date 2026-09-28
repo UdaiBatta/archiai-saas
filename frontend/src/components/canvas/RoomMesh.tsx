@@ -51,7 +51,17 @@ function cloneRoomForInteraction(room: Room): Room {
     position: { ...room.position },
     size: { ...room.size },
     rotation: { ...room.rotation },
+    polygonVertices: room.polygonVertices?.map((vertex) => ({ ...vertex })),
   }
+}
+
+/** Position (and a polygon room's outline, which is absolute) of `room` moved to `position`. */
+function movedTo(room: Room, position: Room['position']): Partial<Room> {
+  const dx = position.x - room.position.x
+  const dz = position.z - room.position.z
+  return room.polygonVertices
+    ? { position, polygonVertices: room.polygonVertices.map((v) => ({ x: v.x + dx, z: v.z + dz })) }
+    : { position }
 }
 
 export function RoomMesh({
@@ -141,7 +151,7 @@ export function RoomMesh({
     const cancelInteraction = () => {
       const pending = pendingMoveRef.current
       if (pending?.moving) {
-        updateRoom(room.id, { position: pending.startRoom.position }, { log: false })
+        updateRoom(room.id, movedTo(pending.startRoom, pending.startRoom.position), { log: false })
       }
       resetMoveState()
     }
@@ -217,13 +227,11 @@ export function RoomMesh({
 
     updateRoom(
       room.id,
-      {
-        position: {
-          x: hit.x - pending.offset.x,
-          y: pending.startRoom.position.y,
-          z: hit.z - pending.offset.z,
-        },
-      },
+      movedTo(pending.startRoom, {
+        x: hit.x - pending.offset.x,
+        y: pending.startRoom.position.y,
+        z: hit.z - pending.offset.z,
+      }),
       { log: false },
     )
   }
@@ -242,11 +250,11 @@ export function RoomMesh({
         Math.abs(current.position.x - pending.startRoom.position.x) > 0.001 ||
         Math.abs(current.position.z - pending.startRoom.position.z) > 0.001
       if (moved && cancelled) {
-        updateRoom(room.id, { position: pending.startRoom.position }, { log: false })
+        updateRoom(room.id, movedTo(pending.startRoom, pending.startRoom.position), { log: false })
       } else if (moved) {
         updateRoom(
           room.id,
-          { position: current.position },
+          movedTo(pending.startRoom, current.position),
           {
             action: 'object.moved',
             previousValue: pending.startRoom,

@@ -211,8 +211,7 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
           const facing = orientation.facingDirection ?? orientation.entrySide
           const midX = footprint.x + footprint.w / 2
           const midZ = footprint.z + footprint.d / 2
-          // Top view keeps the band next to the footprint for dimension strings.
-          const pad = topView ? 3.2 : 1.6
+          const pad = 1.6
           const positions: Record<ScreenEdge, [number, number, number]> = {
             top: [midX, 0.05, footprint.z - pad],
             bottom: [midX, 0.05, footprint.z + footprint.d + pad],
