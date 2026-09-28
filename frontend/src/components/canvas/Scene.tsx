@@ -36,8 +36,10 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
   const floors = useCanvasStore((s) => s.floors)
   const selectedFloor = useCanvasStore((s) => s.selectedFloor)
   const measurePoints = useCanvasStore((s) => s.measurePoints)
-  const layoutMetadata = useCanvasStore((s) => s.layoutMetadata)
-  const orientation = parseOrientation(layoutMetadata)
+  // Narrow selectors: other metadata (quality, saved views) must not re-render the scene.
+  const orientationMeta = useCanvasStore((s) => s.layoutMetadata.orientation)
+  const mvpFootprint = useCanvasStore((s) => s.layoutMetadata.mvpFootprint)
+  const orientation = useMemo(() => parseOrientation({ orientation: orientationMeta }), [orientationMeta])
   const visibleFloors =
     selectedFloor === 'all'
       ? floors
@@ -93,7 +95,7 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
 
   // The building's own outline on the plot (the engine sizes it inside the
   // plot); slabs use it so upper floors are not plot-sized in the model.
-  const building = layoutMetadata.mvpFootprint as { x: number; y: number; w: number; h: number } | undefined
+  const building = mvpFootprint as { x: number; y: number; w: number; h: number } | undefined
   const orientationNorth = orientation ? THREE.MathUtils.degToRad(northAngleDeg(orientation)) : 0
 
   // Distinct floor slab colours so stacked floors are visually separable
