@@ -4,8 +4,10 @@ import { motion, useReducedMotion, type Variants } from 'framer-motion'
 export interface HoverGradientNavItem {
   id: string
   icon: ReactNode
-  /** Visible label on wide screens; always the tooltip and accessible name. */
+  /** Tooltip and accessible name (the bar shows icons only). */
   label: string
+  /** Shown in the tooltip after the label, e.g. 'Ctrl+Z'. */
+  shortcut?: string
   /** CSS background for the hover glow, e.g. a radial-gradient(). */
   gradient: string
   /** Tailwind classes for the icon on hover, e.g. 'group-hover:text-accent-bright'. */
@@ -51,7 +53,7 @@ export const ACTIVE_GLOW =
   'radial-gradient(circle, rgba(255,59,31,0.24) 0%, rgba(255,59,31,0.08) 55%, rgba(255,59,31,0) 100%)'
 
 const faceClass =
-  'flex items-center justify-center gap-2 rounded-xl px-2.5 py-2 text-[11px] font-semibold'
+  'flex items-center justify-center rounded-xl p-2'
 
 function Face({ item }: { item: HoverGradientNavItem }) {
   return (
@@ -61,7 +63,6 @@ function Face({ item }: { item: HoverGradientNavItem }) {
       >
         {item.icon}
       </span>
-      <span className="hidden whitespace-nowrap xl:inline">{item.label}</span>
     </>
   )
 }
@@ -73,7 +74,7 @@ function NavButton({ item, reduced }: { item: HoverGradientNavItem; reduced: boo
       type="button"
       data-dock-item={item.id}
       aria-label={item.label}
-      title={item.label}
+      title={item.shortcut ? `${item.label} (${item.shortcut})` : item.label}
       aria-pressed={item.expanded === undefined ? item.ariaPressed ?? item.active ?? false : undefined}
       aria-haspopup={item.expanded === undefined ? undefined : 'dialog'}
       aria-expanded={item.expanded}
