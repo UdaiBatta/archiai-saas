@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { Html } from '@react-three/drei'
+import { Edges, Html } from '@react-three/drei'
 import type { ThreeEvent } from '@react-three/fiber'
 import type { RefObject } from 'react'
 import * as THREE from 'three'
@@ -14,8 +14,9 @@ import {
 import { DimensionAnnotations } from './DimensionAnnotations'
 import { ResizeHandles } from './ResizeHandles'
 import { roomVisualTreatment } from './roomVisualTreatment'
-import { displayRoomColor } from './editorPalette'
+import { EDITOR_PALETTE, displayRoomColor } from './editorPalette'
 import { wallModelPieces } from './modelGeometry'
+import { MODEL_COLORS, floorTint } from './modelView'
 
 interface OrbitHandle {
   enabled: boolean
@@ -28,6 +29,8 @@ interface RoomMeshProps {
   viewMode?: CanvasViewMode
   invalid?: boolean
   modelStage?: boolean
+  /** Context from another floor: translucent, not interactive. */
+  ghost?: boolean
 }
 
 interface PendingMove {
@@ -56,6 +59,7 @@ export function RoomMesh({
   viewMode = '3d',
   invalid = false,
   modelStage = false,
+  ghost = false,
 }: RoomMeshProps) {
   const meshRef = useRef<THREE.Mesh>(null)
   const pendingMoveRef = useRef<PendingMove | null>(null)
@@ -87,6 +91,17 @@ export function RoomMesh({
   const renderHeight = modelSurface ? 0.045 : room.size.h
   const renderY = modelSurface ? room.position.y - room.size.h / 2 + renderHeight / 2 : room.position.y
   const modelFurniture = modelStage && room.objectType === 'furniture'
+  // White model: matte surfaces, floors keep a pale tint of their room colour,
+  // windows read as glass.
+  const isGlass = solid3d && room.objectType === 'window'
+  const noRaycast = () => null
+  const modelColor = isSelected
+    ? MODEL_COLORS.wallSelected
+    : isGlass
+      ? MODEL_COLORS.glass
+      : floorTint(displayRoomColor(room))
+  const see = ghost ? 0.12 : isGlass ? 0.35 : 1
+  const edgeColor = isSpace ? MODEL_COLORS.floorEdge : MODEL_COLORS.edge
   const visual = roomVisualTreatment(
     definition,
     room.objectType,
@@ -232,10 +247,10 @@ export function RoomMesh({
   const mesh = (
     <mesh
       ref={meshRef}
-      castShadow={!isPlanView}
+      castShadow={!isPlanView && see === 1}
       receiveShadow
       position={[room.position.x, renderY, room.position.z]}
-      raycast={wallPieces ? () => null : undefined}
+      raycast={wallPieces || ghost ? noRaycast : undefined}
       rotation={[
         THREE.MathUtils.degToRad(room.rotation.x),
         THREE.MathUtils.degToRad(room.rotation.y),
@@ -256,19 +271,29 @@ export function RoomMesh({
       <boxGeometry args={[room.size.w, renderHeight, room.size.d]} />
       <meshStandardMaterial
         visible={!wallPieces && !modelFurniture}
-        color={modelStage && isSpace ? (isSelected ? '#F3D5CB' : '#eeeae1') : displayRoomColor(room)}
+        color={solid3d ? modelColor : displayRoomColor(room)}
         emissive={visual.emissive}
         emissiveIntensity={visual.emissiveIntensity}
-        transparent={!solid3d && visual.opacity < 1}
-        opacity={solid3d ? 1 : visual.opacity}
-        depthWrite={solid3d || visual.depthWrite}
-        roughness={visual.roughness}
-        metalness={visual.metalness}
+        transparent={solid3d ? see < 1 : visual.opacity < 1}
+        opacity={solid3d ? see : visual.opacity}
+        depthWrite={solid3d ? see === 1 : visual.depthWrite}
+        roughness={solid3d ? (isGlass ? 0.05 : 0.92) : visual.roughness}
+        metalness={solid3d ? (isGlass ? 0.1 : 0) : visual.metalness}
       />
+      {solid3d && !wallPieces && !modelFurniture && (
+        <Edges color={edgeColor} transparent={ghost} opacity={ghost ? 0.3 : 1} />
+      )}
       {wallPieces?.map((piece, index) => (
-        <mesh key={index} position={piece.position} castShadow receiveShadow>
+        <mesh key={index} position={piece.position} castShadow={!ghost} receiveShadow raycast={ghost ? noRaycast : undefined}>
           <boxGeometry args={piece.size} />
-          <meshStandardMaterial color={isSelected ? '#F0C4B6' : '#e2e1d7'} roughness={0.9} />
+          <meshStandardMaterial
+            color={isSelected ? MODEL_COLORS.wallSelected : MODEL_COLORS.wall}
+            roughness={0.95}
+            transparent={ghost}
+            opacity={see}
+            depthWrite={!ghost}
+          />
+          <Edges color={MODEL_COLORS.edge} transparent={ghost} opacity={ghost ? 0.3 : 1} />
         </mesh>
       ))}
       {modelFurniture && (
@@ -308,7 +333,7 @@ export function RoomMesh({
             ]}
           />
           <lineBasicMaterial
-            color="#ffffff"
+            color={solid3d ? EDITOR_PALETTE.selection : '#ffffff'}
             transparent
             opacity={0.9}
             linewidth={2}
@@ -318,6 +343,8 @@ export function RoomMesh({
       )}
     </mesh>
   )
+
+  if (ghost) return mesh
 
   const shouldShowLabel = modelStage ? isSelected : !isThinComponent || isSelected
   const label = shouldShowLabel ? (

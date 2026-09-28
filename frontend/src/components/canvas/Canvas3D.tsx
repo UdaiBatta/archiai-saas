@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
+import { EffectComposer, N8AO, ToneMapping } from '@react-three/postprocessing'
+import { ToneMappingMode } from 'postprocessing'
 import { Scene } from './Scene'
 import { RoomMesh } from './RoomMesh'
 import { useCanvasStore } from '../../store/canvasStore'
@@ -9,6 +11,12 @@ import { shouldRenderCanvasObject } from './canvasObjectVisibility'
 import { EDITOR_PALETTE } from './editorPalette'
 import { hardViolationRoomIds, parseMvpQuality } from './qualityModel'
 import { SUNRISE, SUNSET, formatHour, sunAt } from './sunModel'
+import { CAMERA_PRESETS, MODEL_COLORS, floorDisplay, type CameraPreset } from './modelView'
+
+const segmentClass = (active: boolean) =>
+  `flex-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors ${
+    active ? 'bg-accent text-graphite-950' : 'text-muted hover:bg-ink/10 hover:text-ink'
+  }`
 
 interface Canvas3DProps {
   className?: string
@@ -28,14 +36,18 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
   const clearClipboardMessage = useCanvasStore((s) => s.clearClipboardMessage)
   // 10:00 by default: morning light, so an east-facing front reads as lit.
   const [sunHour, setSunHour] = useState(10)
-  const visibleRooms =
-    selectedFloor === 'all'
-      ? rooms.filter((room) => shouldRenderCanvasObject(room, viewMode))
-      : rooms.filter(
-          (room) =>
-            (room.floorLevel ?? 0) === selectedFloor &&
-            shouldRenderCanvasObject(room, viewMode),
-        )
+  const [preset, setPreset] = useState<CameraPreset>('perspective')
+  const [ghostFloors, setGhostFloors] = useState(false)
+  const multiFloor = useCanvasStore((s) => s.floors.length > 1)
+  // Architectural site presentation for the real 3D view (not the hidden
+  // capture canvas behind the plan lenses, nor the empty-brief backdrop).
+  const studio = viewMode === '3d' && !briefBackground
+  const roomDisplay = (room: (typeof rooms)[number]) =>
+    shouldRenderCanvasObject(room, viewMode)
+      ? floorDisplay(room.floorLevel ?? 0, selectedFloor, studio && ghostFloors)
+      : 'hidden'
+  const visibleRooms = rooms.filter((room) => roomDisplay(room) === 'active')
+  const ghostRooms = studio ? rooms.filter((room) => roomDisplay(room) === 'ghost') : []
   const invalidRoomIds = useMemo(
     () => hardViolationRoomIds(parseMvpQuality(layoutMetadata)),
     [layoutMetadata],
@@ -44,7 +56,9 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
     viewMode === '3d'
       ? { position: [10, 12, 10] as [number, number, number], fov: 50 }
       : { position: [0, 28, 0.01] as [number, number, number], fov: 42 }
-  const background = `radial-gradient(circle at 50% 10%, ${EDITOR_PALETTE.workspaceHighlight} 0%, ${EDITOR_PALETTE.workspaceStart} 48%, ${EDITOR_PALETTE.workspaceEnd} 100%)`
+  const background = studio
+    ? `linear-gradient(180deg, #dde3ea 0%, ${MODEL_COLORS.sky} 55%, ${MODEL_COLORS.sky} 100%)`
+    : `radial-gradient(circle at 50% 10%, ${EDITOR_PALETTE.workspaceHighlight} 0%, ${EDITOR_PALETTE.workspaceStart} 48%, ${EDITOR_PALETTE.workspaceEnd} 100%)`
 
   useCanvasKeyboardShortcuts({ disabled: readOnly })
 
@@ -63,7 +77,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
       <Canvas
         key={`${viewMode}:${modelStage}`}
         frameloop="demand"
-        shadows={viewMode === '3d'}
+        shadows={viewMode === '3d' ? 'percentage' : false}
         dpr={[1, 2]}
         camera={camera}
         gl={{ preserveDrawingBuffer: true, antialias: true }}
@@ -88,7 +102,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
               }
         }
       >
-        <Scene orbitRef={orbitRef} readOnly={readOnly} viewMode={viewMode} modelStage={modelStage} sunHour={sunHour} />
+        <Scene orbitRef={orbitRef} readOnly={readOnly} viewMode={viewMode} modelStage={modelStage} sunHour={sunHour} preset={preset} site={studio} />
         {visibleRooms.map((r) => (
           <RoomMesh
             key={r.id}
@@ -100,9 +114,45 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
             modelStage={modelStage}
           />
         ))}
+        {ghostRooms.map((r) => (
+          <RoomMesh key={r.id} room={r} orbitRef={orbitRef} readOnly viewMode={viewMode} modelStage={modelStage} ghost />
+        ))}
+        {studio && (
+          <EffectComposer multisampling={4}>
+            <N8AO aoRadius={1.2} distanceFalloff={0.6} intensity={2.4} quality="medium" halfRes color="#1f1d1a" />
+            <ToneMapping mode={ToneMappingMode.NEUTRAL} />
+          </EffectComposer>
+        )}
       </Canvas>
-      {viewMode === '3d' && !briefBackground && (
-        <label className="absolute bottom-12 left-4 z-20 flex w-56 flex-col gap-1.5 rounded-xl border border-ink/10 bg-graphite-800/95 px-3 py-2.5 text-[11px] text-muted shadow-lg backdrop-blur">
+      {studio && (
+        <div className="absolute bottom-12 left-4 z-20 flex w-56 flex-col gap-2">
+        <div className="flex flex-col gap-1.5 rounded-xl border border-ink/10 bg-graphite-800/95 px-3 py-2.5 text-[11px] text-muted shadow-lg backdrop-blur">
+          <span className="font-semibold text-ink">View</span>
+          <div role="group" aria-label="Camera view" className="flex gap-0.5 rounded-lg bg-graphite-900/60 p-0.5">
+            {CAMERA_PRESETS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                aria-label={`${option.value === 'top' ? 'Top plan' : option.value === 'axo' ? 'Axonometric' : 'Perspective'} view`}
+                aria-pressed={preset === option.value}
+                onClick={() => setPreset(option.value)}
+                className={segmentClass(preset === option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          {multiFloor && selectedFloor !== 'all' && (
+            <div role="group" aria-label="Other floors" className="flex items-center gap-2">
+              <span className="text-muted-light">Other floors</span>
+              <div className="flex flex-1 gap-0.5 rounded-lg bg-graphite-900/60 p-0.5">
+                <button type="button" aria-label="Hide other floors" aria-pressed={!ghostFloors} onClick={() => setGhostFloors(false)} className={segmentClass(!ghostFloors)}>Hide</button>
+                <button type="button" aria-label="Ghost other floors" aria-pressed={ghostFloors} onClick={() => setGhostFloors(true)} className={segmentClass(ghostFloors)}>Ghost</button>
+              </div>
+            </div>
+          )}
+        </div>
+        <label className="flex flex-col gap-1.5 rounded-xl border border-ink/10 bg-graphite-800/95 px-3 py-2.5 text-[11px] text-muted shadow-lg backdrop-blur">
           <span className="font-semibold text-ink">Sun · {formatHour(sunHour)}</span>
           <span className="text-muted-light">{sunAt(sunHour).label}</span>
           <input
@@ -116,9 +166,10 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
             className="accent-accent"
           />
         </label>
+        </div>
       )}
       {viewMode === '3d' && !readOnly && (
-        <div className="pointer-events-none absolute bottom-64 left-4 hidden max-w-[12rem] text-[10px] leading-relaxed text-muted-light xl:block">
+        <div className="pointer-events-none absolute bottom-[19rem] left-4 hidden max-w-[12rem] text-[10px] leading-relaxed text-muted-light xl:block">
           Click to select · drag selected to move<br />Right drag to pan · middle drag to orbit
         </div>
       )}
