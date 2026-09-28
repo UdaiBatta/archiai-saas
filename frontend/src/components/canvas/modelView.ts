@@ -62,7 +62,7 @@ export function screenAxes(dir: Vec3): { right: Vec3; up: Vec3 } {
 }
 
 /** Orthographic zoom that fits the whole site box on screen with a margin. */
-export function fitOrthoZoom(bounds: SiteBounds, dir: Vec3, viewport: Viewport, margin = 0.82): number {
+export function fitOrthoZoom(bounds: SiteBounds, dir: Vec3, viewport: Viewport, margin = 0.62): number {
   const { right, up } = screenAxes(dir)
   let minR = Infinity, maxR = -Infinity, minU = Infinity, maxU = -Infinity
   for (const x of [bounds.x, bounds.x + bounds.w]) {
@@ -96,6 +96,9 @@ export function presetView(preset: CameraPreset, bounds: SiteBounds, viewport: V
     }
   }
   // Orthographic: distance only has to clear the model; zoom does the framing.
+  // Axo aims at the middle of the box, not its floor: the zoom fit assumes the
+  // box is centred on screen, and a model rising off its target clips at the top.
+  if (preset === 'axo') target[1] = elevation + bounds.h / 2
   const distance = Math.max(bounds.w, bounds.d, bounds.h, 10) * 3
   return {
     position: [

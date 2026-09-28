@@ -130,7 +130,7 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
       <ambientLight intensity={isPlanView ? 0.9 : studio ? 0.08 : 0.35} />
       {!isPlanView && (
         studio
-          ? <hemisphereLight args={['#ffffff', '#c8c6c0', 2.2]} />
+          ? <hemisphereLight args={['#ffffff', '#c8c6c0', 1.35]} />
           : <hemisphereLight args={['#BDBDC0', '#26282D', 0.45]} />
       )}
       <directionalLight
@@ -141,7 +141,7 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
             : [centerX + sun.direction[0] * shadow.distance, sun.direction[1] * shadow.distance, centerZ + sun.direction[2] * shadow.distance]
         }
         color={isPlanView ? '#ffffff' : sun.color}
-        intensity={isPlanView ? 0.55 : studio ? sun.intensity * 1.4 : sun.intensity}
+        intensity={isPlanView ? 0.55 : studio ? sun.intensity * 1.9 : sun.intensity}
         castShadow={!isPlanView && !topView}
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
