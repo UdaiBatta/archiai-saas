@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useDeferredValue } from 'react'
 import { useCanvasStore } from '../../store/canvasStore'
 import { COMPONENT_REGISTRY } from '../../store/componentRegistry'
 import { InspectorProperties } from './Inspector'
@@ -20,7 +20,8 @@ interface WorkspacePanelProps {
 
 export function WorkspacePanel({ modelStage, reviewChanges, onReviewChanges, onCreateModel, open, onClose, busy }: WorkspacePanelProps) {
   const [search, setSearch] = useState('')
-  const rooms = useCanvasStore((s) => s.rooms)
+  // Low priority: the list must not hold up the canvas while a room is dragged.
+  const rooms = useDeferredValue(useCanvasStore((s) => s.rooms))
   const selectedId = useCanvasStore((s) => s.selectedId)
   const selectedFloor = useCanvasStore((s) => s.selectedFloor)
   const selectRoom = useCanvasStore((s) => s.selectRoom)

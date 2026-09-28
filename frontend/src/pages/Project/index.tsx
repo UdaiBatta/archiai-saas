@@ -207,8 +207,14 @@ function clarificationFromError(
   return null
 }
 
-export default function ProjectPage() {
+/** Scores manual edits in the background. Its own component: the hook reads
+ * every room, and at page level it re-rendered the whole editor on each drag step. */
+function QualityValidation() {
   useMvpQualityValidation()
+  return null
+}
+
+export default function ProjectPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const location = useLocation()
@@ -741,6 +747,7 @@ export default function ProjectPage() {
 
   return (
     <div className="flex h-screen bg-surface">
+      <QualityValidation />
       {/* Main — editor pages use the compact tool rail only (no dashboard sidebar) */}
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Canvas + Inspector row */}
