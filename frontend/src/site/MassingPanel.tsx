@@ -190,17 +190,22 @@ function NumberField({ label, value, min, max, step, disabled, onChange }: {
   return (
     <label className="flex flex-col gap-0.5">
       <span className="text-muted-light">{label}</span>
+      {/* Uncontrolled: typing and arrow ticks are free; blur or Enter commits one undo step. */}
       <input
+        key={value}
         type="number"
         className={input}
-        value={Number(value.toFixed(2))}
+        defaultValue={Number(value.toFixed(2))}
         min={min}
         max={max}
         step={step}
         disabled={disabled}
-        onChange={(e) => {
+        onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+        onBlur={(e) => {
           const v = e.target.valueAsNumber
-          if (Number.isFinite(v)) onChange(Math.min(max, Math.max(min, v)))
+          const next = Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : value
+          if (next !== value) onChange(next)
+          else e.target.value = String(Number(value.toFixed(2)))
         }}
       />
     </label>
