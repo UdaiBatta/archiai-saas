@@ -14,9 +14,10 @@ import { shouldRenderCanvasObject } from './canvasObjectVisibility'
 import { EDITOR_PALETTE } from './editorPalette'
 import { hardViolationRoomIds, parseMvpQuality } from './qualityModel'
 import { SUNRISE, SUNSET, formatHour, sunAt } from './sunModel'
-import { CAMERA_PRESETS, MODEL_COLORS, floorDisplay, type CameraPreset } from './modelView'
+import { MODEL_COLORS, floorDisplay, type CameraPreset } from './modelView'
+import { DOCK_CARD, EditorDock } from './EditorDock'
 import { SavedViewsPanel, ViewCamera, type ViewCameraApi } from './SavedViewsPanel'
-import { restorableFloor, type SavedView } from './savedViews'
+import { parseSavedViews, restorableFloor, type SavedView } from './savedViews'
 import { MassLayer } from '../../site/MassLayer'
 import { MassingPanel } from '../../site/MassingPanel'
 import { SiteLayer } from '../../site/SiteLayer'
@@ -36,9 +37,13 @@ interface Canvas3DProps {
   readOnly?: boolean
   modelStage?: boolean
   briefBackground?: boolean
+  /** Camera to open the 3D view with (e.g. Axo chosen from a lens). */
+  initialPreset?: Exclude<CameraPreset, 'top'>
+  /** False while something (e.g. the brief editor) covers the canvas. */
+  dock?: boolean
 }
 
-export function Canvas3D({ className, readOnly = false, modelStage = false, briefBackground = false }: Canvas3DProps) {
+export function Canvas3D({ className, readOnly = false, modelStage = false, briefBackground = false, initialPreset = 'perspective', dock = true }: Canvas3DProps) {
   const orbitRef = useRef<{ enabled: boolean }>(null)
   const rooms = useCanvasStore((s) => s.rooms)
   const selectedFloor = useCanvasStore((s) => s.selectedFloor)
@@ -53,7 +58,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
   const clearClipboardMessage = useCanvasStore((s) => s.clearClipboardMessage)
   // 10:00 by default: morning light, so an east-facing front reads as lit.
   const [sunHour, setSunHour] = useState(10)
-  const [orbitPreset, setOrbitPreset] = useState<CameraPreset>('perspective')
+  const [orbitPreset, setOrbitPreset] = useState<CameraPreset>(initialPreset)
   const preset: CameraPreset = planLens ? 'top' : orbitPreset
   const [frameNonce, setFrameNonce] = useState(0)
   const [focusedRoomId, setFocusedRoomId] = useState<string | null>(null)
@@ -61,6 +66,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
   const floorHeight = useCanvasStore((s) => s.floorHeight)
   const [ghostFloors, setGhostFloors] = useState(false)
   const multiFloor = useCanvasStore((s) => s.floors.length > 1)
+  const hasSavedViews = useCanvasStore((s) => parseSavedViews({ savedViews: s.layoutMetadata.savedViews }).length > 0)
   const viewCameraRef = useRef<ViewCameraApi>(null)
   const aoRef = useRef<{ enabled: boolean }>(null)
   const restoreView = (view: SavedView) => {
@@ -204,74 +210,72 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
       {topView && !readOnly && (
         <TopPlanKeyboardLayer rooms={visibleRooms} invalidRoomIds={invalidRoomIds} onFocusRoom={setFocusedRoomId} />
       )}
-      {studio && (
-        <div className="absolute bottom-12 left-4 z-20 flex w-56 flex-col gap-2">
-        {!readOnly && (
-          <div className="pointer-events-none hidden text-[10px] leading-relaxed text-muted-light xl:block">
-            {topView ? (
-              <>
-                Click to select · drag selected to move · drag grips to resize<br />
-                Double-click a polygon edge to add a corner, a corner to remove it<br />
-                Right or middle drag to pan · scroll to zoom · Top again to fit
-              </>
-            ) : (
-              <>Click to select · drag selected to move<br />Right drag to pan · middle drag to orbit</>
-            )}
-          </div>
-        )}
-        {!readOnly && <SitePanel topView={topView} onRequestTop={() => applyPreset('top')} />}
-        <SavedViewsPanel
-          readOnly={readOnly}
-          capture={() => ({
-            ...viewCameraRef.current!.capture(),
-            preset,
-            sunHour,
-            selectedFloor,
-            ghostFloors,
-          })}
-          onRestore={restoreView}
-        />
-        <div className="flex flex-col gap-1.5 rounded-xl border border-ink/10 bg-graphite-800/95 px-3 py-2.5 text-[11px] text-muted shadow-lg backdrop-blur">
-          <span className="font-semibold text-ink">View</span>
-          <div role="group" aria-label="Camera view" className="flex gap-0.5 rounded-lg bg-graphite-900/60 p-0.5">
-            {CAMERA_PRESETS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                aria-label={`${option.value === 'top' ? 'Top plan' : option.value === 'axo' ? 'Axonometric' : 'Perspective'} view`}
-                aria-pressed={preset === option.value}
-                onClick={() => choosePreset(option.value)}
-                className={segmentClass(preset === option.value)}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-          {multiFloor && selectedFloor !== 'all' && (
-            <div role="group" aria-label="Other floors" className="flex items-center gap-2">
-              <span className="text-muted-light">Other floors</span>
-              <div className="flex flex-1 gap-0.5 rounded-lg bg-graphite-900/60 p-0.5">
-                <button type="button" aria-label="Hide other floors" aria-pressed={!ghostFloors} onClick={() => setGhostFloors(false)} className={segmentClass(!ghostFloors)}>Hide</button>
-                <button type="button" aria-label="Ghost other floors" aria-pressed={ghostFloors} onClick={() => setGhostFloors(true)} className={segmentClass(ghostFloors)}>Ghost</button>
-              </div>
-            </div>
+      {studio && !readOnly && (
+        <div className="pointer-events-none absolute bottom-[6.5rem] left-4 z-10 hidden text-[10px] leading-relaxed text-muted-light xl:block">
+          {topView ? (
+            <>
+              Click to select · drag selected to move · drag grips to resize<br />
+              Double-click a polygon edge to add a corner, a corner to remove it<br />
+              Right or middle drag to pan · scroll to zoom · Top again to fit
+            </>
+          ) : (
+            <>Click to select · drag selected to move<br />Right drag to pan · middle drag to orbit</>
           )}
         </div>
-        <label className="flex flex-col gap-1.5 rounded-xl border border-ink/10 bg-graphite-800/95 px-3 py-2.5 text-[11px] text-muted shadow-lg backdrop-blur">
-          <span className="font-semibold text-ink">Sun · {formatHour(sunHour)}</span>
-          <span className="text-muted-light">{sunAt(sunHour).label}</span>
-          <input
-            type="range"
-            aria-label="Time of day"
-            min={SUNRISE}
-            max={SUNSET}
-            step={0.5}
-            value={sunHour}
-            onChange={(event) => setSunHour(Number(event.target.value))}
-            className="accent-accent"
-          />
-        </label>
-        </div>
+      )}
+      {studio && dock && (
+        <EditorDock
+          className="bottom-12"
+          preset={preset}
+          onPreset={choosePreset}
+          readOnly={readOnly}
+          modelStage={modelStage}
+          tools={{
+            site: <SitePanel defaultOpen topView={topView} onRequestTop={() => applyPreset('top')} />,
+            views: (!readOnly || hasSavedViews) && (
+              <SavedViewsPanel
+                readOnly={readOnly}
+                capture={() => ({
+                  ...viewCameraRef.current!.capture(),
+                  preset,
+                  sunHour,
+                  selectedFloor,
+                  ghostFloors,
+                })}
+                onRestore={restoreView}
+              />
+            ),
+            sun: (
+              <label className={DOCK_CARD}>
+                <span className="font-semibold text-ink">Sun · {formatHour(sunHour)}</span>
+                <span className="text-muted-light">{sunAt(sunHour).label}</span>
+                <input
+                  type="range"
+                  aria-label="Time of day"
+                  min={SUNRISE}
+                  max={SUNSET}
+                  step={0.5}
+                  value={sunHour}
+                  onChange={(event) => setSunHour(Number(event.target.value))}
+                  className="accent-accent"
+                />
+              </label>
+            ),
+            floors: multiFloor && (
+              <div role="group" aria-label="Other floors" className={DOCK_CARD}>
+                <span className="font-semibold text-ink">Other floors</span>
+                {selectedFloor === 'all' ? (
+                  <span className="text-muted-light">Choose a level to hide or ghost the others.</span>
+                ) : (
+                  <div className="flex gap-0.5 rounded-lg bg-graphite-900/60 p-0.5">
+                    <button type="button" aria-label="Hide other floors" aria-pressed={!ghostFloors} onClick={() => setGhostFloors(false)} className={segmentClass(!ghostFloors)}>Hide</button>
+                    <button type="button" aria-label="Ghost other floors" aria-pressed={ghostFloors} onClick={() => setGhostFloors(true)} className={segmentClass(ghostFloors)}>Ghost</button>
+                  </div>
+                )}
+              </div>
+            ),
+          }}
+        />
       )}
       {studio && <MassingPanel readOnly={readOnly} topView={topView} plot={planBounds ?? null} />}
       {topView && selectedFloor === 'all' && planFloor && floors.length > 1 && (

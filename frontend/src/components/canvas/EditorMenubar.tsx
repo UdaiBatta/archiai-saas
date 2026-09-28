@@ -3,10 +3,16 @@ import { useEffect, useState } from 'react'
 import { getApiErrorMessage } from '../../services/apiError'
 import { canvasObjectsToLayoutPlan } from '../../services/mvpLayoutAdapter'
 import projectService, { type FileExportFormat, type Project } from '../../services/project.service'
-import { useCanvasStore } from '../../store/canvasStore'
+import { useCanvasStore, type CanvasViewMode } from '../../store/canvasStore'
 import type { Connection, Facing, PlanZoneSpan } from '../../types/contracts'
 import { Menubar, MenubarItem, MenubarMenu, MenubarRadioGroup, MenubarSeparator, MenubarSubmenu } from '../ui/Menubar'
-import { VIEW_MODE_OPTIONS } from './ViewModeSwitcher'
+
+export const VIEW_MODE_OPTIONS: { value: CanvasViewMode; label: string }[] = [
+  { value: 'floor_plan', label: '2D Plan' },
+  { value: '3d', label: '3D Edit' },
+  { value: 'zoning', label: 'Zoning' },
+  { value: 'graph', label: 'Room Graph' },
+]
 
 export interface EditorMenubarProps {
   projectId: string
