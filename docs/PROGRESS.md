@@ -29,7 +29,9 @@ _Last updated: 2026-09-28_
 - [x] View cube
 - [x] Perspective / Axo / Top (orthographic, north up) views framing the site
 - [x] Hide or ghost other floors on multi-storey plans
-- [ ] Setback lines on the ground (needs setback data, comes with P2)
+- [x] Setback lines on the ground (with P2's site rules)
+- [x] No ghost trails in Top view after visiting Persp/Axo
+- [x] Camera frames the whole site and its masses
 - [x] Saved views: named cameras saved with the project (restore, rename, delete)
 - [x] Dimensions and room labels in Top view
 - [x] Editing in Top view: move, 8 resize grips, polygon corners, doors and windows, undo
@@ -41,13 +43,18 @@ _Last updated: 2026-09-28_
 - [ ] Rooms re-render only when they change (today one drag re-renders every room)
 - [ ] On-screen zoom buttons in Top view
 
-## P2: Site & massing
+## P2: Site & massing — PR #47 (in progress)
 
-- [ ] Draw or import the site polygon (DXF, GeoJSON); map tile underlay
-- [ ] Per-edge setbacks, height limit, coverage and FAR as site rules
-- [ ] Push/pull masses, floor count, floor-to-floor height
-- [ ] Live metrics panel: GFA, FAR, coverage, height, floors
-- [ ] Zoning warnings in 3D with a reason and a suggested fix
+- [x] Site from the plot, drawn in Top view, or imported (GeoJSON, DXF); drag its corners
+- [ ] Map tile underlay
+- [ ] Add or remove corners on an existing site or mass
+- [ ] DXF arcs and curves (today replaced by their chords)
+- [x] Per-edge setbacks, height limit, coverage and FAR as site rules
+- [x] Masses: add, fill the envelope, draw; push/pull floors; move and reshape in Top view
+- [x] Live metrics panel: GFA, FAR, coverage, height, floors against the limits
+- [x] Zoning warnings in 3D with a reason and a one-click fix (trim, height, FAR, overlap)
+- [ ] Automatic fix for over-coverage
+- [ ] Timed test: parcel to a compliant mass in under 5 minutes
 
 ## P3: Housing + interior inside the mass
 
