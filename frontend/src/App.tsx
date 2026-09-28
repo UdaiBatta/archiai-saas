@@ -7,6 +7,7 @@ import Landing from './pages/Landing'
 import Login from './pages/Login'
 import PricingPage from './pages/Pricing'
 import Register from './pages/Register'
+import SettingsPage from './pages/Settings'
 import SharedProjectPage from './pages/SharedProject'
 import WorkspacePage from './pages/Workspace'
 import WorkspacesPage from './pages/Workspaces'
@@ -41,6 +42,7 @@ export default function App() {
           <Route path="/projects/:id" element={<ProjectPage />} />
           <Route path="/workspaces" element={<WorkspacesPage />} />
           <Route path="/workspaces/:id" element={<WorkspacePage />} />
+          <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

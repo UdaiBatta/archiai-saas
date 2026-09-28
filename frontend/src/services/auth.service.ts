@@ -21,6 +21,12 @@ export const authService = {
       .then(() => undefined)
   },
 
+  updateMe: (data: { name: string }): Promise<UserOut> =>
+    api.patch<UserOut>('/api/auth/me', data).then((r) => r.data),
+
+  changePassword: (data: { current_password: string; new_password: string }): Promise<void> =>
+    api.post('/api/auth/password', data).then(() => undefined),
+
   getMe: (): Promise<UserOut> => {
     return api.get<UserOut>('/api/auth/me').then((r) => r.data)
   },

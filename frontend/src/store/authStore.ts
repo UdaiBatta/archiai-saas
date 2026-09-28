@@ -9,6 +9,7 @@ interface AuthState {
   isAuthenticated: boolean
   login: (token: string, refreshToken: string, user: UserOut) => void
   setSessionTokens: (token: string, refreshToken: string) => void
+  setUser: (user: UserOut) => void
   logout: () => void
 }
 
@@ -31,6 +32,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, token)
     localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, refreshToken)
     set({ token, refreshToken, isAuthenticated: true })
+  },
+  setUser: (user) => {
+    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user))
+    set({ user })
   },
   logout: () => {
     localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY)
