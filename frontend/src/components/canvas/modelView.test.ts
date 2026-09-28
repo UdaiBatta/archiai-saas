@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { fitOrthoZoom, floorDisplay, floorTint, mixHex, presetView, screenAxes, shadowFrustum } from './modelView'
+import { fitOrthoZoom, floorDisplay, floorTint, mixHex, presetView, sceneExtent, screenAxes, shadowFrustum } from './modelView'
 
 const site = { x: 0, z: 0, w: 20, d: 10, h: 6 }
 const viewport = { width: 1000, height: 800 }
@@ -63,5 +63,15 @@ describe('materials and floors', () => {
     expect(floorDisplay(1, 1, false)).toBe('active')
     expect(floorDisplay(2, 1, false)).toBe('hidden')
     expect(floorDisplay(2, 1, true)).toBe('ghost')
+  })
+})
+
+describe('sceneExtent', () => {
+  it('grows to the site boundary and the tallest mass', () => {
+    const plot = { x: 0, z: 0, w: 10, d: 10 }
+    expect(sceneExtent(plot, 3, null, [])).toEqual({ x: 0, z: 0, w: 10, d: 10, h: 3 })
+    const site = { boundary: [{ x: -5, z: -2 }, { x: 30, z: -2 }, { x: 30, z: 40 }] }
+    const tower = { footprint: [{ x: 0, z: 0 }, { x: 5, z: 0 }, { x: 5, z: 50 }], baseM: 0, floors: 10, floorHeightM: 3.2 }
+    expect(sceneExtent(plot, 3, site, [tower])).toEqual({ x: -5, z: -2, w: 35, d: 52, h: 32 })
   })
 })

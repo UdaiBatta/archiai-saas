@@ -85,10 +85,10 @@ export function presetView(preset: CameraPreset, bounds: SiteBounds, viewport: V
   const target: Vec3 = [bounds.x + bounds.w / 2, elevation, bounds.z + bounds.d / 2]
   const dir = PRESET_DIRECTION[preset]
   if (preset === 'perspective') {
-    // Same framing the editor always had: back off with the site size, more
+    // Back off with the site size (or a tall mass), more
     // on portrait viewports so the model is not clipped at the sides.
     const portraitScale = Math.max(1, (0.95 * viewport.height) / Math.max(viewport.width, 1))
-    const distance = Math.max(bounds.w, bounds.d, 8) * 1.15 * portraitScale
+    const distance = Math.max(bounds.w, bounds.d, bounds.h * 1.4, 8) * 1.15 * portraitScale
     return {
       position: [target[0] + 0.8 * distance, target[1] + distance, target[2] + 0.8 * distance],
       target,
@@ -157,4 +157,25 @@ export const floorTint = (roomColor: string) => mixHex(roomColor, MODEL_COLORS.f
 export function floorDisplay(level: number, selected: number | 'all', ghostOthers: boolean): 'active' | 'ghost' | 'hidden' {
   if (selected === 'all' || level === selected) return 'active'
   return ghostOthers ? 'ghost' : 'hidden'
+}
+
+/** The box the camera and sun must cover: the plot, the site boundary and
+ * every mass (with its top), whichever reach furthest. */
+export function sceneExtent(
+  plot: { x: number; z: number; w: number; d: number },
+  buildingTop: number,
+  site: { boundary: { x: number; z: number }[] } | null,
+  masses: { footprint: { x: number; z: number }[]; baseM: number; floors: number; floorHeightM: number }[],
+): SiteBounds {
+  const xs = [plot.x, plot.x + plot.w]
+  const zs = [plot.z, plot.z + plot.d]
+  let h = buildingTop
+  for (const p of site?.boundary ?? []) { xs.push(p.x); zs.push(p.z) }
+  for (const mass of masses) {
+    for (const p of mass.footprint) { xs.push(p.x); zs.push(p.z) }
+    h = Math.max(h, mass.baseM + mass.floors * mass.floorHeightM)
+  }
+  const x = Math.min(...xs)
+  const z = Math.min(...zs)
+  return { x, z, w: Math.max(...xs) - x, d: Math.max(...zs) - z, h }
 }
