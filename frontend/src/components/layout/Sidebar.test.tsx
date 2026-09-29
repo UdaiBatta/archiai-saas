@@ -16,6 +16,7 @@ describe('Sidebar', () => {
       '/',
       '/projects',
       '/workspaces',
+      '/settings',
     ])
   })
 })

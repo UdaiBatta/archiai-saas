@@ -1,3 +1,4 @@
+import { Settings } from 'lucide-react'
 import { Link, NavLink } from 'react-router-dom'
 
 import { AccountMenu } from '../ui/AccountMenu'
@@ -71,6 +72,10 @@ export function Sidebar({
         <NavLink to="/workspaces" className={navClassName}>
           <NavIcon name="workspaces" />
           <span className="flex-1">Workspaces</span>
+        </NavLink>
+        <NavLink to="/settings" className={navClassName}>
+          <Settings size={15} strokeWidth={1.8} aria-hidden="true" />
+          <span className="flex-1">Settings</span>
         </NavLink>
       </nav>
       <div className="border-t border-ink/10 p-4">

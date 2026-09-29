@@ -46,7 +46,7 @@ export function AccountMenu({ name, email, onSignOut, align = 'end', side = 'bot
         <Avatar name={displayName} size={8} />
         {showName && <span className="min-w-0 truncate text-sm text-muted">{displayName}</span>}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align={align} side={side} className="w-64 rounded-2xl">
+      <DropdownMenuContent align={align} side={side} className="w-72 rounded-2xl">
         <DropdownMenuLabel className="flex items-center gap-3 px-3 py-2.5 font-normal">
           <div className="relative">
             <Avatar name={displayName} size={10} />
@@ -54,8 +54,12 @@ export function AccountMenu({ name, email, onSignOut, align = 'end', side = 'bot
             <span className="absolute bottom-0 right-0 size-2.5 rounded-full bg-ok ring-2 ring-card" />
           </div>
           <div className="flex min-w-0 flex-col">
-            <span className="truncate text-sm font-medium text-popover-foreground">{name || 'Your account'}</span>
-            {email && <span className="truncate text-sm text-muted-foreground">{email}</span>}
+            <span title={name || undefined} className="truncate text-sm font-medium text-popover-foreground">{name || 'Your account'}</span>
+            {email && (
+              <span title={email} className="line-clamp-2 break-all text-sm text-muted-foreground">
+                {email}
+              </span>
+            )}
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
