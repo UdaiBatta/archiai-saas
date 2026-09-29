@@ -88,10 +88,12 @@ describe('ProjectCard', () => {
     expect(latest).toHaveBeenCalledWith('p1')
   })
 
-  it('shows the empty state and fetches nothing for a draft', async () => {
-    const latest = vi.spyOn(designService, 'getLatestProjectDesign')
+  it('shows the empty state and Draft when the project has no plan yet', async () => {
+    // No plan answers 404; the card must not rely on thumbnail_url, which only
+    // the editor's save sets.
+    vi.spyOn(designService, 'getLatestProjectDesign').mockRejectedValue(new Error('404'))
     render(<ProjectCard project={project} onClick={vi.fn()} />)
     await waitFor(() => expect(screen.getByText('No layout yet')).toBeInTheDocument())
-    expect(latest).not.toHaveBeenCalled()
+    expect(screen.getByText('Draft')).toBeInTheDocument()
   })
 })

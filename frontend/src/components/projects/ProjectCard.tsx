@@ -15,18 +15,19 @@ interface ProjectCardProps {
 
 export function ProjectCard({ project, onClick, onDuplicate }: ProjectCardProps) {
   const [duplicating, setDuplicating] = useState(false)
-  // Derived from real data only (whether a layout has ever been saved) — not
-  // a fabricated workflow status, since the app doesn't track project stages.
-  const hasSavedLayout = Boolean(project.thumbnail_url)
   // The preview is drawn from the plan itself, not the stored `thumbnail_url`
   // image (older ones are canvas screenshots with every floor stacked).
   // ponytail: one layout fetch per card; add a lightweight plan-outline field
   // to the project list API if dashboards grow large.
+  // Ask for the plan itself: `thumbnail_url` is only set by the editor's save,
+  // so plans made any other way (e.g. the generate API) would read as empty.
+  // A project without one answers 404, which shows the empty state.
   const [rooms, setRooms] = useState<Room[] | null>(null)
-  const [loadingPlan, setLoadingPlan] = useState(hasSavedLayout)
+  const [loadingPlan, setLoadingPlan] = useState(true)
+  // Derived from real data only (a plan exists), not a fabricated stage.
+  const hasSavedLayout = Boolean(rooms?.length)
 
   useEffect(() => {
-    if (!hasSavedLayout) return
     let live = true
     setLoadingPlan(true)
     getLatestProjectDesign(project.id)
@@ -36,7 +37,7 @@ export function ProjectCard({ project, onClick, onDuplicate }: ProjectCardProps)
     return () => {
       live = false
     }
-  }, [project.id, project.updated_at, hasSavedLayout])
+  }, [project.id, project.updated_at])
 
   const handleDuplicate = async () => {
     if (!onDuplicate || duplicating) return
