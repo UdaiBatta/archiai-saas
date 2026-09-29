@@ -83,7 +83,9 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
     if (!extent) return
     const bounds = extent
     const elevation = visibleFloors[0]?.elevation ?? 0
-    const view = presetView(isPlanView ? 'perspective' : preset, bounds, viewportSize, elevation)
+    // Studio chrome: 48 px top bar; dock + status bar take ~112 px at the bottom.
+    const insets = studio ? { top: 56, bottom: 120 } : { top: 0, bottom: 0 }
+    const view = presetView(isPlanView ? 'perspective' : preset, bounds, viewportSize, elevation, insets)
     if (isPlanView) {
       // Plan lenses: the old straight-down perspective framing.
       const distance = view.position[1] - elevation

@@ -75,3 +75,16 @@ describe('sceneExtent', () => {
     expect(sceneExtent(plot, 3, site, [tower])).toEqual({ x: -5, z: -2, w: 35, d: 52, h: 32 })
   })
 })
+
+describe('presetView insets', () => {
+  it('fits into the clear area and lifts the model above the dock', () => {
+    const site = { x: 0, z: 0, w: 20, d: 10, h: 3 }
+    const full = { width: 1000, height: 800 }
+    const plain = presetView('top', site, full)
+    const inset = presetView('top', site, full, 0, { top: 50, bottom: 150 })
+    expect(inset.zoom).toBeLessThanOrEqual(plain.zoom)
+    // Top view: screen up is -z, so lifting the model moves the aim to +z.
+    expect(inset.target[2]).toBeGreaterThan(plain.target[2])
+    expect(inset.target[0]).toBeCloseTo(plain.target[0])
+  })
+})
