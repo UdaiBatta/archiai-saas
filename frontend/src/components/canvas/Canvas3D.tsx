@@ -114,6 +114,17 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
       ? floorDisplay(room.floorLevel ?? 0, planLevel, studio && ghostFloors)
       : 'hidden'
   const visibleRooms = rooms.filter((room) => roomDisplay(room) === 'active')
+  // Frame the building, not the whole plot: a house on a large plot should
+  // fill the view (the plot, site and masses still widen it when present).
+  const focus = useMemo(() => {
+    const spaces = visibleRooms.filter((room) => room.objectType === 'room')
+    if (!spaces.length) return null
+    const xs = spaces.flatMap((room) => [room.position.x - room.size.w / 2, room.position.x + room.size.w / 2])
+    const zs = spaces.flatMap((room) => [room.position.z - room.size.d / 2, room.position.z + room.size.d / 2])
+    const x = Math.min(...xs)
+    const z = Math.min(...zs)
+    return { x, z, w: Math.max(...xs) - x, d: Math.max(...zs) - z }
+  }, [visibleRooms])
   const ghostRooms = studio ? rooms.filter((room) => roomDisplay(room) === 'ghost') : []
   const invalidRoomIds = useMemo(
     () => hardViolationRoomIds(parseMvpQuality({ mvpQuality })),
@@ -171,7 +182,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
               }
         }
       >
-        <Scene orbitRef={orbitRef} readOnly={readOnly} viewMode={viewMode} modelStage={modelStage} sunHour={sunHour} preset={preset} site={studio} level={planLevel} frameNonce={frameNonce} />
+        <Scene orbitRef={orbitRef} readOnly={readOnly} viewMode={viewMode} modelStage={modelStage} sunHour={sunHour} preset={preset} site={studio} level={planLevel} frameNonce={frameNonce} focus={focus} />
         {studio && <ViewCamera apiRef={viewCameraRef} preset={preset} />}
         {visibleRooms.map((r) => (
           <RoomMesh

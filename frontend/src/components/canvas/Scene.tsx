@@ -33,9 +33,11 @@ interface SceneProps {
   level?: number | 'all'
   /** Bumped to re-frame the camera on demand (re-clicking a preset). */
   frameNonce?: number
+  /** What the camera frames: the building's rooms (plot when absent). */
+  focus?: { x: number; z: number; w: number; d: number } | null
 }
 
-export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage = false, sunHour = 10, preset = 'perspective', site = false, level, frameNonce = 0 }: SceneProps) {
+export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage = false, sunHour = 10, preset = 'perspective', site = false, level, frameNonce = 0, focus = null }: SceneProps) {
   const camera = useThree((s) => s.camera)
   const viewportSize = useThree((s) => s.size)
   const floors = useCanvasStore((s) => s.floors)
@@ -72,8 +74,8 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
   // Everything on the site: plot, site boundary, masses. Plan lenses keep
   // framing the floor itself.
   const extent = useMemo(
-    () => footprint && (studio ? sceneExtent(footprint, buildingTop, siteModel, masses) : { ...footprint, h: buildingTop }),
-    [footprint, studio, buildingTop, siteModel, masses],
+    () => footprint && (studio ? sceneExtent(focus ?? footprint, buildingTop, siteModel, masses) : { ...footprint, h: buildingTop }),
+    [footprint, focus, studio, buildingTop, siteModel, masses],
   )
   // Reframe when the site changes, not on every mass edit (that would jump
   // the camera mid push/pull).
