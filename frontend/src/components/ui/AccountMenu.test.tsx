@@ -31,7 +31,7 @@ describe('AccountMenu', () => {
     await userEvent.click(trigger)
     expect(await screen.findByRole('menu')).toBeInTheDocument()
     expect(screen.getByText('Ada Lovelace')).toBeInTheDocument()
-    expect(screen.getByText('ada@example.com')).toBeInTheDocument()
+    expect(screen.getByText('ada@example.com')).toHaveAttribute('title', 'ada@example.com')
     expect(screen.queryByText(/invoice/i)).not.toBeInTheDocument()
   })
 
