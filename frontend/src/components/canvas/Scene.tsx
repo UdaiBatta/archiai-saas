@@ -39,6 +39,7 @@ interface SceneProps {
 
 export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage = false, sunHour = 10, preset = 'perspective', site = false, level, frameNonce = 0, focus = null }: SceneProps) {
   const camera = useThree((s) => s.camera)
+  const invalidate = useThree((s) => s.invalidate)
   const viewportSize = useThree((s) => s.size)
   const floors = useCanvasStore((s) => s.floors)
   const storedFloor = useCanvasStore((s) => s.selectedFloor)
@@ -99,6 +100,9 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
     camera.lookAt(...view.target)
     orbitRef.current?.target?.set(...view.target)
     orbitRef.current?.update?.()
+    // frameloop="demand": moving the camera here draws nothing by itself, so
+    // the old view could stay on screen under the new view's labels.
+    invalidate()
   }, [framingKey, camera, viewportSize.width, viewportSize.height])
 
   // The 3D sun: aimed at the house centre from where the sun is at

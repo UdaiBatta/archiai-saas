@@ -1,5 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useThree } from '@react-three/fiber'
+import { AdaptiveDpr } from '@react-three/drei'
 import { EffectComposer, N8AO, ToneMapping } from '@react-three/postprocessing'
 import { ToneMappingMode } from 'postprocessing'
 import { Scene } from './Scene'
@@ -157,6 +158,8 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
         frameloop="demand"
         shadows={viewMode === '3d' ? 'percentage' : false}
         dpr={[1, 2]}
+        // Drop to half resolution while moving (see PauseWhileMoving).
+        performance={{ min: 0.5 }}
         camera={camera}
         // The studio composer multisamples itself; canvas MSAA there only
         // costs fill rate (~25-40% of the frame) for a full-screen blit.
@@ -223,6 +226,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
           </EffectComposer>
         )}
         {studio && <PauseWhileMoving pass={aoRef} />}
+        {studio && <AdaptiveDpr />}
         {SHOW_PERF && <PerfReadout />}
       </Canvas>
       {topView && !readOnly && (
