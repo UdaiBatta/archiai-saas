@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Check, Eye, EyeOff, Lock } from 'lucide-react'
 
@@ -282,33 +282,40 @@ function PlanSection() {
   )
 }
 
-/** Highlights the section currently in view (or the one in the URL hash). */
-function useActiveSection(): SectionId {
+/** Highlights the section scrolled to in `main` (or the one in the URL hash). */
+function useActiveSection(scroller: RefObject<HTMLElement>): SectionId {
   const { hash } = useLocation()
   const fromHash = SECTIONS.find((s) => `#${s.id}` === hash)?.id
   const [active, setActive] = useState<SectionId>(fromHash ?? 'profile')
 
+  // A nav click wins over the scroll-spy while its smooth scroll plays out,
+  // so a short last section still highlights when it can't reach the line.
+  const clickedAt = useRef(0)
   useEffect(() => {
-    if (fromHash) setActive(fromHash)
+    if (!fromHash) return
+    clickedAt.current = Date.now()
+    setActive(fromHash)
   }, [fromHash])
 
   useEffect(() => {
-    if (typeof IntersectionObserver === 'undefined') return
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const top = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0]
-        if (top) setActive(top.target.id as SectionId)
-      },
-      { rootMargin: '0px 0px -60% 0px' },
-    )
-    SECTIONS.forEach((s) => {
-      const el = document.getElementById(s.id)
-      if (el) observer.observe(el)
-    })
-    return () => observer.disconnect()
-  }, [])
+    const main = scroller.current
+    if (!main) return
+    const onScroll = () => {
+      if (Date.now() - clickedAt.current < 800) return
+      // The last section whose top has passed a line a third of the way down;
+      // at the very bottom the last section wins even if it can't reach that line.
+      const line = main.getBoundingClientRect().top + main.clientHeight * 0.35
+      let current: SectionId = SECTIONS[0].id
+      for (const s of SECTIONS) {
+        const el = document.getElementById(s.id)
+        if (el && el.getBoundingClientRect().top <= line) current = s.id
+      }
+      if (main.scrollTop + main.clientHeight >= main.scrollHeight - 2) current = SECTIONS[SECTIONS.length - 1].id
+      setActive(current)
+    }
+    main.addEventListener('scroll', onScroll, { passive: true })
+    return () => main.removeEventListener('scroll', onScroll)
+  }, [scroller])
 
   return active
 }
@@ -316,14 +323,15 @@ function useActiveSection(): SectionId {
 export default function SettingsPage() {
   useHashScroll()
   const { logOut, user } = useAuth()
-  const active = useActiveSection()
+  const mainRef = useRef<HTMLElement>(null)
+  const active = useActiveSection(mainRef)
 
   return (
     <div className="flex h-screen bg-surface">
       <Sidebar userName={user?.name} userEmail={user?.email} onLogout={logOut} />
-      <main className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-8">
+      <main ref={mainRef} className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-8">
         <header className="mb-8 border-b border-ink/10 pb-6">
-          <h1 className="text-3xl font-black uppercase leading-none tracking-tight text-ink" style={{ fontStretch: '125%' }}>Settings</h1>
+          <h1 className="text-2xl font-black sm:text-3xl uppercase leading-none tracking-tight text-ink" style={{ fontStretch: '125%' }}>Settings</h1>
           <p className="mt-2 text-sm text-muted">Manage your profile, password, preferences and plan.</p>
         </header>
         <div className="flex max-w-5xl gap-12">
