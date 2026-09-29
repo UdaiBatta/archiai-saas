@@ -14,7 +14,7 @@ import { shouldRenderCanvasObject } from './canvasObjectVisibility'
 import { EDITOR_PALETTE } from './editorPalette'
 import { hardViolationRoomIds, parseMvpQuality } from './qualityModel'
 import { SUNRISE, SUNSET, formatHour, sunAt } from './sunModel'
-import { MODEL_COLORS, floorDisplay, type CameraPreset } from './modelView'
+import { MODEL_COLORS, PERSPECTIVE_FOV, floorDisplay, type CameraPreset } from './modelView'
 import { DOCK_CARD, EditorDock } from './EditorDock'
 import { SavedViewsPanel, ViewCamera, type ViewCameraApi } from './SavedViewsPanel'
 import { parseSavedViews, restorableFloor, type SavedView } from './savedViews'
@@ -22,6 +22,8 @@ import { MassLayer } from '../../site/MassLayer'
 import { MassingPanel } from '../../site/MassingPanel'
 import { SiteLayer } from '../../site/SiteLayer'
 import { SitePanel } from '../../site/SitePanel'
+import { useSiteAndMasses } from '../../site/massStore'
+import { zoningIssues } from '../../site/massing'
 
 // Props are stable per room, so metadata or UI-state changes in this
 // component no longer re-render every room.
@@ -98,6 +100,11 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
       if (planLens) setViewMode('3d')
     }
   }
+  const siteAndMasses = useSiteAndMasses()
+  const zoningIssueCount = useMemo(
+    () => zoningIssues(siteAndMasses.site, siteAndMasses.masses).length,
+    [siteAndMasses.site, siteAndMasses.masses],
+  )
   const choosePreset = (value: CameraPreset) => {
     if (value === preset) setFrameNonce((n) => n + 1)
     else applyPreset(value)
@@ -114,7 +121,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
   )
   const camera =
     viewMode === '3d'
-      ? { position: [10, 12, 10] as [number, number, number], fov: 50 }
+      ? { position: [10, 12, 10] as [number, number, number], fov: PERSPECTIVE_FOV }
       : { position: [0, 28, 0.01] as [number, number, number], fov: 42 }
   const background = studio
     ? `linear-gradient(180deg, #dde3ea 0%, ${MODEL_COLORS.sky} 55%, ${MODEL_COLORS.sky} 100%)`
@@ -210,19 +217,6 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
       {topView && !readOnly && (
         <TopPlanKeyboardLayer rooms={visibleRooms} invalidRoomIds={invalidRoomIds} onFocusRoom={setFocusedRoomId} />
       )}
-      {studio && !readOnly && (
-        <div className="pointer-events-none absolute bottom-[6.5rem] left-4 z-10 hidden text-[10px] leading-relaxed text-muted-light xl:block">
-          {topView ? (
-            <>
-              Click to select · drag selected to move · drag grips to resize<br />
-              Double-click a polygon edge to add a corner, a corner to remove it<br />
-              Right or middle drag to pan · scroll to zoom · Top again to fit
-            </>
-          ) : (
-            <>Click to select · drag selected to move<br />Right drag to pan · middle drag to orbit</>
-          )}
-        </div>
-      )}
       {studio && dock && (
         <EditorDock
           className="bottom-12"
@@ -230,8 +224,10 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
           onPreset={choosePreset}
           readOnly={readOnly}
           modelStage={modelStage}
+          alerts={{ massing: zoningIssueCount }}
           tools={{
             site: <SitePanel defaultOpen topView={topView} onRequestTop={() => applyPreset('top')} />,
+            massing: <MassingPanel docked readOnly={readOnly} topView={topView} plot={planBounds ?? null} />,
             views: (!readOnly || hasSavedViews) && (
               <SavedViewsPanel
                 readOnly={readOnly}
@@ -277,7 +273,6 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
           }}
         />
       )}
-      {studio && <MassingPanel readOnly={readOnly} topView={topView} plot={planBounds ?? null} />}
       {topView && selectedFloor === 'all' && planFloor && floors.length > 1 && (
         <div role="status" className="pointer-events-none absolute left-1/2 top-28 z-20 -translate-x-1/2 rounded-full border border-warn/30 bg-graphite-800/95 px-3 py-1.5 text-[11px] font-medium text-warn shadow-sm">
           Top view shows {planFloor.name}. Choose a level to edit another floor.

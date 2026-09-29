@@ -412,7 +412,9 @@ export function RoomMesh({
 
   if (ghost) return mesh
 
-  const shouldShowLabel = !plan && (modelStage ? isSelected : !isThinComponent || isSelected)
+  // 3D reads as a model, not a diagram: only the selected object is labelled
+  // there (Top view labels every room through the plan overlay).
+  const shouldShowLabel = !plan && (modelStage || solid3d ? isSelected : !isThinComponent || isSelected)
   const label = shouldShowLabel ? (
     <Html
       position={[room.position.x, room.position.y + room.size.h / 2 + 0.35, room.position.z]}

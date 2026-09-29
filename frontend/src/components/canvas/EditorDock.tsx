@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { Axis3d, Box, Camera, Layers, LayoutGrid, Map as MapIcon, Network, SquareDashed, Sun } from 'lucide-react'
+import { Axis3d, Box, Building2, Camera, Layers, LayoutGrid, Map as MapIcon, Network, SquareDashed, Sun } from 'lucide-react'
 import { HoverGradientNavBar, type HoverGradientNavGroup, type HoverGradientNavItem } from '@/components/ui/hover-gradient-nav-bar'
 import { useCanvasStore } from '../../store/canvasStore'
 import { CAMERA_PRESETS, type CameraPreset } from './modelView'
 import { useEditTools, type EditTool } from './editTools'
 
-export type DockTool = 'site' | 'views' | 'sun' | 'floors'
+export type DockTool = 'site' | 'massing' | 'views' | 'sun' | 'floors'
 type DockPopover = DockTool | 'more'
 
 const glow = (rgb: string) =>
@@ -15,6 +15,20 @@ const VIEW_LOOK = { gradient: glow('255,59,31'), iconColor: 'group-hover:text-ac
 const LENS_LOOK = { gradient: glow('201,169,110'), iconColor: 'group-hover:text-warn' }
 const TOOL_LOOK = { gradient: glow('143,174,148'), iconColor: 'group-hover:text-ok' }
 const icon = 'h-[18px] w-[18px]'
+
+/** A tool with open issues: red dot on the icon, the count in its label. */
+const alerted = (tool: { label: string; icon: ReactNode }, count: number) =>
+  count > 0
+    ? {
+        label: `${tool.label} · ${count} ${count === 1 ? 'issue' : 'issues'}`,
+        icon: (
+          <span className="relative inline-flex">
+            {tool.icon}
+            <span aria-hidden className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-danger ring-2 ring-graphite-800" />
+          </span>
+        ),
+      }
+    : {}
 
 const PRESET_ITEMS: Record<CameraPreset, { label: string; icon: ReactNode }> = {
   perspective: { label: 'Perspective', icon: <Box className={icon} /> },
@@ -27,6 +41,7 @@ const LENSES = [
 ] as const
 const TOOLS: { id: DockTool; label: string; icon: ReactNode }[] = [
   { id: 'site', label: 'Site', icon: <MapIcon className={icon} /> },
+  { id: 'massing', label: 'Massing', icon: <Building2 className={icon} /> },
   { id: 'views', label: 'Views', icon: <Camera className={icon} /> },
   { id: 'sun', label: 'Sun', icon: <Sun className={icon} /> },
   { id: 'floors', label: 'Floors', icon: <Layers className={icon} /> },
@@ -42,6 +57,8 @@ interface EditorDockProps {
   onPreset: (preset: CameraPreset) => void
   /** Popover content per tool; tools without content get no dock item. */
   tools?: Partial<Record<DockTool, ReactNode>>
+  /** Open issues per tool (e.g. zoning warnings): a red dot on its icon. */
+  alerts?: Partial<Record<DockTool, number>>
   /** Only the view items and Views (restore) remain. */
   readOnly?: boolean
   /** 3D model stage: Furniture instead of Room, and no lenses. */
@@ -54,7 +71,7 @@ interface EditorDockProps {
  * views, plan lenses and the view tools (Site, Views, Sun, Floors); the
  * add-object menu and each view tool open in a popover above it.
  */
-export function EditorDock({ preset, onPreset, tools = {}, readOnly = false, modelStage = false, className = '' }: EditorDockProps) {
+export function EditorDock({ preset, onPreset, tools = {}, alerts, readOnly = false, modelStage = false, className = '' }: EditorDockProps) {
   const viewMode = useCanvasStore((s) => s.viewMode)
   const setViewMode = useCanvasStore((s) => s.setViewMode)
   const [open, setOpen] = useState<DockPopover | null>(null)
@@ -134,6 +151,7 @@ export function EditorDock({ preset, onPreset, tools = {}, readOnly = false, mod
       label: 'Tools',
       items: available.map((tool) => ({
         ...tool,
+        ...alerted(tool, alerts?.[tool.id] ?? 0),
         ...TOOL_LOOK,
         active: openTool === tool.id,
         expanded: openTool === tool.id,
@@ -154,7 +172,7 @@ export function EditorDock({ preset, onPreset, tools = {}, readOnly = false, mod
           role="dialog"
           aria-label={popoverLabel}
           tabIndex={-1}
-          className="absolute bottom-full left-1/2 mb-2 max-h-[60vh] w-64 max-w-[calc(100vw-1.5rem)] -translate-x-1/2 overflow-y-auto outline-none motion-safe:animate-fade-in"
+          className="absolute bottom-full left-1/2 mb-2 max-h-[60vh] w-max min-w-64 max-w-[calc(100vw-1.5rem)] -translate-x-1/2 overflow-y-auto outline-none motion-safe:animate-fade-in"
         >
           {popovers[openTool]}
         </div>
