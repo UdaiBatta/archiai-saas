@@ -219,7 +219,7 @@ export default function ProjectPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { user } = useAuth()
+  const { user, logOut } = useAuth()
 
   // Settings > Preferences: the grid-snapping default, applied per project opened.
   useEffect(() => {
@@ -801,6 +801,8 @@ export default function ProjectPage() {
               onSaveTitle={handleSave}
               onShare={() => setShareOpen(true)}
               avatarName={user?.name ?? user?.email ?? ''}
+              avatarEmail={user?.email}
+              onSignOut={logOut}
               designId={designId}
               hasLayout={roomCount > 0}
               layoutSaving={layoutSaving}

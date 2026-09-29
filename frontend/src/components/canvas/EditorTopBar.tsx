@@ -1,4 +1,4 @@
-import { Avatar } from '../ui/Avatar'
+import { AccountMenu } from '../ui/AccountMenu'
 import { LevelMenu } from './LevelMenu'
 import { EditorMenubar, type EditorMenubarProps } from './EditorMenubar'
 import { SavePopover } from './SavePopover'
@@ -20,6 +20,8 @@ interface EditorTopBarProps {
 
   onShare: () => void
   avatarName: string
+  avatarEmail?: string
+  onSignOut: () => void
 
   designId: string | null
   hasLayout: boolean
@@ -52,6 +54,8 @@ export function EditorTopBar({
   onSaveTitle,
   onShare,
   avatarName,
+  avatarEmail,
+  onSignOut,
   designId,
   hasLayout = true,
   layoutSaving,
@@ -67,7 +71,7 @@ export function EditorTopBar({
   deleteError,
 }: EditorTopBarProps) {
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-0 z-40 flex h-12 items-center justify-between gap-1 border-b border-ink/10 bg-[#191a1b]/92 px-2 backdrop-blur-md sm:gap-3 sm:px-4">
+    <div className="pointer-events-none absolute inset-x-0 top-0 z-40 flex h-12 items-center justify-between gap-1 border-b border-ink/10 bg-[#191a1b]/95 px-2 backdrop-blur-md sm:gap-3 sm:px-4">
       <div className="pointer-events-auto flex min-w-0 items-center gap-1 sm:gap-2.5">
         <button
           type="button"
@@ -184,7 +188,7 @@ export function EditorTopBar({
           onSave={onSaveLayout}
         />
 
-        <span className="hidden md:block"><Avatar name={avatarName} size={7.5} /></span>
+        <span className="hidden md:block"><AccountMenu name={avatarName} email={avatarEmail} onSignOut={onSignOut} /></span>
       </div>
 
       {/* Menu actions close their menu, so their failures show here. */}
