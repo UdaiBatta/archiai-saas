@@ -5,6 +5,8 @@ import { EffectComposer, N8AO, ToneMapping } from '@react-three/postprocessing'
 import { ToneMappingMode } from 'postprocessing'
 import { Scene } from './Scene'
 import { RoomMesh as RoomMeshBase } from './RoomMesh'
+import { MergedModel } from './MergedModel'
+import { isMergeable } from './mergedGeometry'
 import { TopPlanOverlay } from './TopPlanOverlay'
 import { TopPlanKeyboardLayer } from './TopPlanKeyboardLayer'
 import { PauseWhileMoving, PerfReadout, SHOW_PERF } from './RenderBudget'
@@ -115,6 +117,18 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
       ? floorDisplay(room.floorLevel ?? 0, planLevel, studio && ghostFloors)
       : 'hidden'
   const visibleRooms = rooms.filter((room) => roomDisplay(room) === 'active')
+  // Walls, floors and windows draw as one merged model (3 draw calls). The
+  // selection stays a RoomMesh so it can be dragged without rebuilding the
+  // model; a selected door/window keeps its host wall out too, since the
+  // wall's openings follow it.
+  const selectedId = useCanvasStore((s) => s.selectedId)
+  const solidModel = modelStage || viewMode === '3d'
+  const selectedObject = selectedId ? visibleRooms.find((room) => room.id === selectedId) : undefined
+  const keepApart = new Set([selectedId, selectedObject?.hostWallId].filter(Boolean) as string[])
+  const merged = (room: (typeof rooms)[number]) => solidModel && isMergeable(room) && !keepApart.has(room.id)
+  const mergedObjects = visibleRooms.filter(merged)
+  const individualRooms = visibleRooms.filter((room) => !merged(room))
+  const openings = visibleRooms.filter((room) => room.objectType === 'door' || room.objectType === 'window')
   // Frame the building, not the whole plot: a house on a large plot should
   // fill the view (the plot, site and masses still widen it when present).
   const focus = useMemo(() => {
@@ -187,7 +201,10 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
       >
         <Scene orbitRef={orbitRef} readOnly={readOnly} viewMode={viewMode} modelStage={modelStage} sunHour={sunHour} preset={preset} site={studio} level={planLevel} frameNonce={frameNonce} focus={focus} />
         {studio && <ViewCamera apiRef={viewCameraRef} preset={preset} />}
-        {visibleRooms.map((r) => (
+        {solidModel && (
+          <MergedModel objects={mergedObjects} openings={openings} invalidRoomIds={invalidRoomIds} readOnly={readOnly} plan={topView} />
+        )}
+        {individualRooms.map((r) => (
           <RoomMesh
             key={r.id}
             room={r}
