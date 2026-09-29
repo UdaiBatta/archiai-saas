@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -32,9 +32,24 @@ describe('Settings page', () => {
     renderSettings()
     expect(screen.getByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument()
     expect(screen.getByLabelText('Name')).toHaveValue('Ada Lovelace')
-    expect(screen.getByLabelText('Email')).toHaveValue('ada@example.com')
-    expect(await screen.findByText('free')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'See plans and pricing' })).toHaveAttribute('href', '/pricing')
+    const email = screen.getByLabelText('Email')
+    expect(email).toHaveValue('ada@example.com')
+    expect(email).toHaveAttribute('readonly')
+    expect(email).toHaveAccessibleDescription('Contact support to change your email.')
+    expect(await screen.findByText('Starter')).toBeInTheDocument()
+    expect(screen.getByText('PNG export')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'View plans' })).toHaveAttribute('href', '/pricing')
+    expect(screen.getByRole('navigation', { name: 'Settings sections' })).toBeInTheDocument()
+  })
+
+  it('keeps Save disabled until the name changes', async () => {
+    renderSettings()
+    const save = screen.getByRole('button', { name: 'Save changes' })
+    expect(save).toBeDisabled()
+    await userEvent.type(screen.getByLabelText('Name'), 'x')
+    expect(save).toBeEnabled()
+    await userEvent.type(screen.getByLabelText('Name'), '{Backspace}')
+    expect(save).toBeDisabled()
   })
 
   it('saves the name through the API and updates the signed-in user', async () => {
@@ -43,16 +58,17 @@ describe('Settings page', () => {
     const name = screen.getByLabelText('Name')
     await userEvent.clear(name)
     await userEvent.type(name, ' Ada King ')
-    await userEvent.click(screen.getByRole('button', { name: 'Save name' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }))
 
     expect(updateMe).toHaveBeenCalledWith({ name: 'Ada King' })
-    expect(await screen.findByText('Saved')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getAllByRole('status').some((el) => el.textContent === 'Saved')).toBe(true))
     expect(useAuthStore.getState().user?.name).toBe('Ada King')
   })
 
   it('changes the password with the current one', async () => {
     const changePassword = vi.spyOn(authService, 'changePassword').mockResolvedValue()
     renderSettings()
+    expect(screen.getByRole('button', { name: 'Change password' })).toBeDisabled()
     await userEvent.type(screen.getByLabelText('Current password'), 'password123')
     await userEvent.type(screen.getByLabelText('New password'), 'brandnew123')
     await userEvent.click(screen.getByRole('button', { name: 'Change password' }))
@@ -61,10 +77,23 @@ describe('Settings page', () => {
     expect(await screen.findByText('Password changed')).toBeInTheDocument()
   })
 
+  it('shows and hides a password', async () => {
+    renderSettings()
+    const field = screen.getByLabelText('Current password')
+    expect(field).toHaveAttribute('type', 'password')
+    await userEvent.click(screen.getByRole('button', { name: 'Show current password' }))
+    expect(field).toHaveAttribute('type', 'text')
+    await userEvent.click(screen.getByRole('button', { name: 'Hide current password' }))
+    expect(field).toHaveAttribute('type', 'password')
+  })
+
   it('stores preferences per user and applies reduce motion', async () => {
     renderSettings()
-    await userEvent.click(screen.getByRole('checkbox', { name: /Reduce motion/ }))
-    await userEvent.click(screen.getByRole('checkbox', { name: /Snap to grid/ }))
+    const reduce = screen.getByRole('switch', { name: 'Reduce motion' })
+    expect(reduce).toHaveAttribute('aria-checked', 'false')
+    await userEvent.click(reduce)
+    expect(reduce).toHaveAttribute('aria-checked', 'true')
+    await userEvent.click(screen.getByRole('switch', { name: 'Snap to grid' }))
 
     expect(loadPreferences('u1')).toEqual({ snapToGrid: true, reduceMotion: true })
     expect(loadPreferences('someone-else')).toEqual({ snapToGrid: false, reduceMotion: false })
