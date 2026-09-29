@@ -97,19 +97,24 @@ export function useMvpQualityValidation({
     }
 
     if (previousFingerprint.current === null) {
-      previousFingerprint.current = fingerprint
       // A freshly generated plan is already in sync. One saved without edge
       // data (older saves) is not: re-derive now, not on the first edit, or
       // the access graph reads it as a house with no doors.
-      if (hasEdges) return
+      if (hasEdges) {
+        previousFingerprint.current = fingerprint
+        return
+      }
     } else if (previousFingerprint.current === fingerprint) {
       return
     }
-    previousFingerprint.current = fingerprint
 
     const requestId = ++requestSequence.current
     let cancelled = false
     const timeoutId = window.setTimeout(() => {
+      // Mark this geometry as validated only once the request is sent: an
+      // unrelated re-render during the debounce cancels the timer, and the
+      // rerun must schedule it again rather than think it already ran.
+      previousFingerprint.current = fingerprint
       const plan = canvasObjectsToLayoutPlan(
         objects,
         footprint,

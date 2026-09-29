@@ -136,6 +136,24 @@ describe('useMvpQualityValidation', () => {
     expect(validateAndSyncMvpLayout).toHaveBeenCalledTimes(1)
   })
 
+  it('still re-derives when an unrelated update lands during the debounce', async () => {
+    // The backend's generate path saves plans without edge data; a re-render
+    // mid-debounce (floors, save status) used to cancel the only request.
+    useCanvasStore.setState((state) => {
+      const { mvpEdges: _dropped, ...metadata } = state.layoutMetadata
+      return { layoutMetadata: metadata }
+    })
+    renderHook(() => useMvpQualityValidation({ debounceMs: 100 }))
+
+    await advance(50)
+    act(() => {
+      useCanvasStore.setState((state) => ({ floors: state.floors.map((floor) => ({ ...floor })) }))
+    })
+    await advance(100)
+
+    expect(validateAndSyncMvpLayout).toHaveBeenCalledTimes(1)
+  })
+
   it('debounces room edits and publishes the latest full quality report', async () => {
     renderHook(() => useMvpQualityValidation({ debounceMs: 100 }))
 

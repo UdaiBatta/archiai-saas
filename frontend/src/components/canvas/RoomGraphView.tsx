@@ -97,7 +97,7 @@ export function RoomGraphView({ className }: RoomGraphViewProps) {
     <div className={`relative overflow-hidden bg-graphite-900 ${className ?? ''}`}>
       {/* Clear the top bar + view switcher (top-28) and the reasoning panel
           on the right, so no node or column header hides under the chrome. */}
-      <div className="h-full w-full overflow-auto pb-12 pt-28 sm:pr-80" data-testid="room-graph-canvas">
+      <div className="h-full w-full overflow-auto px-6 pb-32 pt-16 sm:pr-80" data-testid="room-graph-canvas">
         <svg
           role="application"
           aria-label="Room access graph"
@@ -223,7 +223,7 @@ export function RoomGraphView({ className }: RoomGraphViewProps) {
 
       <aside
         aria-label="Access reasoning"
-        className="absolute right-3 top-28 z-10 max-h-[55%] w-[min(19rem,calc(100%-1.5rem))] overflow-y-auto rounded-xl border border-ink/10 bg-graphite-800/95 p-3 text-xs shadow-xl backdrop-blur"
+        className="absolute right-3 top-16 z-10 max-h-[55%] w-[min(19rem,calc(100%-1.5rem))] overflow-y-auto rounded-xl border border-ink/10 bg-graphite-800/95 p-3 text-xs shadow-xl backdrop-blur"
       >
         <h2 className="mb-2 text-[11px] font-semibold text-ink">Access reasoning</h2>
         {route && route.length > 0 && (
