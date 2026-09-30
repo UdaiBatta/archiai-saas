@@ -16,7 +16,6 @@ import { useCanvasKeyboardShortcuts } from './useCanvasKeyboardShortcuts'
 import { shouldRenderCanvasObject } from './canvasObjectVisibility'
 import { EDITOR_PALETTE } from './editorPalette'
 import { hardViolationRoomIds, parseMvpQuality } from './qualityModel'
-import { SUNRISE, SUNSET, formatHour, sunAt } from './sunModel'
 import { MODEL_COLORS, PERSPECTIVE_FOV, floorDisplay, type CameraPreset } from './modelView'
 import { DOCK_CARD, EditorDock } from './EditorDock'
 import { SavedViewsPanel, ViewCamera, type ViewCameraApi } from './SavedViewsPanel'
@@ -27,6 +26,7 @@ import { SiteLayer } from '../../site/SiteLayer'
 import { SitePanel } from '../../site/SitePanel'
 import { useSiteAndMasses } from '../../site/massStore'
 import { zoningIssues } from '../../site/massing'
+import { SunPanel } from '../../analysis/SunPanel'
 
 // Props are stable per room, so metadata or UI-state changes in this
 // component no longer re-render every room.
@@ -295,19 +295,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
               />
             ),
             sun: (
-              <div className={DOCK_CARD}>
-                <span className="font-semibold text-ink">Sun · {formatHour(sunHour)}</span>
-                <span className="text-muted-light">{sunAt(sunHour).label}</span>
-                <input
-                  type="range"
-                  aria-label="Time of day"
-                  min={SUNRISE}
-                  max={SUNSET}
-                  step={0.5}
-                  value={sunHour}
-                  onChange={(event) => setSunHour(Number(event.target.value))}
-                  className="accent-accent"
-                />
+              <SunPanel hour={sunHour} onHour={setSunHour}>
                 <label className="mt-1 flex items-center justify-between gap-3 border-t border-ink/10 pt-2">
                   <span>
                     <span className="block text-ink">Ambient occlusion</span>
@@ -315,7 +303,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
                   </span>
                   <input type="checkbox" role="switch" aria-checked={aoWanted} checked={aoWanted} onChange={(event) => chooseAo(event.target.checked)} className="h-4 w-4 accent-accent" />
                 </label>
-              </div>
+              </SunPanel>
             ),
             floors: multiFloor && (
               <div role="group" aria-label="Other floors" className={DOCK_CARD}>
