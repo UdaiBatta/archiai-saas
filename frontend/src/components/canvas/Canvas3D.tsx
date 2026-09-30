@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { AdaptiveDpr } from '@react-three/drei'
+import { AdaptiveDpr, PerformanceMonitor } from '@react-three/drei'
 import { EffectComposer, N8AO, ToneMapping } from '@react-three/postprocessing'
 import { ToneMappingMode } from 'postprocessing'
 import { Scene } from './Scene'
@@ -31,6 +31,8 @@ import { zoningIssues } from '../../site/massing'
 // Props are stable per room, so metadata or UI-state changes in this
 // component no longer re-render every room.
 const RoomMesh = memo(RoomMeshBase)
+
+const AO_KEY = 'archiai:ambient-occlusion'
 
 const segmentClass = (active: boolean) =>
   `flex-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors ${
@@ -87,7 +89,17 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
   // capture canvas behind the plan lenses, nor the empty-brief backdrop).
   const studio = viewMode === '3d' && !briefBackground
   const topView = studio && preset === 'top'
-  const aoOn = studio && preset === 'perspective'
+  // Ambient occlusion is a presentation option, off by default: a full-screen
+  // pass at 4x multisampling was the heaviest thing left in Persp on laptop
+  // GPUs. Remembered per browser; dropped automatically if frames slow down.
+  const [aoWanted, setAoWanted] = useState(() => {
+    try { return window.localStorage.getItem(AO_KEY) === '1' } catch { return false }
+  })
+  const chooseAo = (on: boolean) => {
+    setAoWanted(on)
+    try { window.localStorage.setItem(AO_KEY, on ? '1' : '0') } catch { /* private mode */ }
+  }
+  const aoOn = studio && preset === 'perspective' && aoWanted
   // Top shows one level; "all" means the lowest, as the 2D plan did.
   const sortedFloors = [...floors].sort((a, b) => a.level - b.level)
   const planLevel = topView && selectedFloor === 'all' ? sortedFloors[0]?.level ?? 0 : selectedFloor
@@ -251,6 +263,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
         )}
         {studio && <PauseWhileMoving pass={aoRef} />}
         {studio && <AdaptiveDpr />}
+        {aoOn && <PerformanceMonitor onDecline={() => chooseAo(false)} />}
         {SHOW_PERF && <PerfReadout />}
       </Canvas>
       {topView && !readOnly && (
@@ -281,7 +294,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
               />
             ),
             sun: (
-              <label className={DOCK_CARD}>
+              <div className={DOCK_CARD}>
                 <span className="font-semibold text-ink">Sun · {formatHour(sunHour)}</span>
                 <span className="text-muted-light">{sunAt(sunHour).label}</span>
                 <input
@@ -294,7 +307,14 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
                   onChange={(event) => setSunHour(Number(event.target.value))}
                   className="accent-accent"
                 />
-              </label>
+                <label className="mt-1 flex items-center justify-between gap-3 border-t border-ink/10 pt-2">
+                  <span>
+                    <span className="block text-ink">Ambient occlusion</span>
+                    <span className="text-muted-light">Softer contact shading, Persp only. Slower.</span>
+                  </span>
+                  <input type="checkbox" role="switch" aria-checked={aoWanted} checked={aoWanted} onChange={(event) => chooseAo(event.target.checked)} className="h-4 w-4 accent-accent" />
+                </label>
+              </div>
             ),
             floors: multiFloor && (
               <div role="group" aria-label="Other floors" className={DOCK_CARD}>
