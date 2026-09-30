@@ -180,10 +180,10 @@ thead th.col-today, thead th.col-target { color: var(--accent); }
       <h1>ArchiAI: feature map &amp; build plan</h1>
     </div>
     <dl>
-      <dt>Updated</dt><dd id="updated">2026-09-30</dd>
+      <dt>Updated</dt><dd id="updated">2026-10-01</dd>
       <dt>Scope</dt><dd>Site, massing, housing, interior</dd>
       <dt>Status</dt><dd>P1 in progress</dd>
-      <dt>Progress</dt><dd id="overall">37 / 66 items</dd>
+      <dt>Progress</dt><dd id="overall">52 / 72 items</dd>
     </dl>
   </div>
   <p class="lede"><strong>ArchiAI is a browser-based, 3D-first design tool for the first weeks of a residential project</strong>: draw the site, shape the mass, and fill it with homes and rooms that already obey the rules an architect would check by hand (daylight, street entry, circulation, adjacency). It is for architects and small practices doing early-stage site and housing design who today stitch together a massing tool, a plan sketcher and a spreadsheet. The engine is deterministic and explainable; AI sits on top as an optional suggestion layer. Everything leaves as clean DXF and IFC, so the work continues in AutoCAD, Revit or ArchiCAD without redrawing.</p>
@@ -287,7 +287,7 @@ thead th.col-today, thead th.col-target { color: var(--accent); }
       <h3>Professional 3D workspace</h3>
       <div class="meta"><span class="tag now">In progress</span><span class="tag size">Size L</span><span class="tag">Free</span></div>
       <p>Goal: the 3D view is good enough to be the only view.</p>
-      <!--P1--><div class="meter" aria-hidden="true"><i style="width:91%"></i></div><span class="tag prog">21 / 23 done</span>
+      <!--P1--><div class="meter" aria-hidden="true"><i style="width:96%"></i></div><span class="tag prog">24 / 25 done</span>
       <ul class="check">
         <li class="ok">White model: matte walls, crisp edges, pale room-floor tints, glass windows</li>
         <li class="ok">Ambient occlusion and soft sun shadows fitted to the site</li>
@@ -311,7 +311,9 @@ thead th.col-today, thead th.col-target { color: var(--accent); }
         <li class="ok">Camera frames the building in the space the chrome leaves clear (PR #48)</li>
         <li class="ok">Rooms may overhang the plot (balconies); plot line still reported (PR #48)</li>
         <li class="ok">Account menu and settings page (profile, password, preferences, plan) (PR #48)</li>
-        <li>On-screen zoom buttons in Top view</li>
+        <li class="ok">On-screen zoom in / out / fit in Top and Axo (PR #48)</li>
+        <li class="ok">Ambient occlusion opt-in, off by default: Persp stays light (PR #48)</li>
+        <li class="ok">Merged meshes: ~60 draw calls per frame for a 17-room villa (PR #48)</li>
       </ul><!--/P1-->
       <div class="done"><b>Done when</b>every edit possible in the 2D editor works in ortho plan view, the 2D editor is removed, and the workspace holds 60 fps on a mid-range laptop for a 4-bedroom home.</div>
     </div>
@@ -323,7 +325,7 @@ thead th.col-today, thead th.col-target { color: var(--accent); }
       <h3>Site &amp; massing</h3>
       <div class="meta"><span class="tag size">Size L</span><span class="tag">Free: 1 site / Pro: unlimited</span></div>
       <p>Goal: go from a parcel to a zoning-compliant mass in minutes.</p>
-      <!--P2--><div class="meter" aria-hidden="true"><i style="width:50%"></i></div><span class="tag prog">5 / 10 done</span>
+      <!--P2--><div class="meter" aria-hidden="true"><i style="width:60%"></i></div><span class="tag prog">6 / 10 done</span>
       <ul class="check">
         <li class="ok">Site from the plot, drawn in Top view, or imported (GeoJSON, DXF); drag its corners</li>
         <li>Map tile underlay</li>
@@ -333,7 +335,7 @@ thead th.col-today, thead th.col-target { color: var(--accent); }
         <li class="ok">Masses: add, fill the envelope, draw; push/pull floors; move and reshape in Top view</li>
         <li class="ok">Live metrics panel: GFA, FAR, coverage, height, floors against the limits</li>
         <li class="ok">Zoning warnings in 3D with a reason and a one-click fix (trim, height, FAR, overlap)</li>
-        <li>Automatic fix for over-coverage</li>
+        <li class="ok">Automatic fix for over-coverage (shrink footprints to fit) (PR #48)</li>
         <li>Timed test: parcel to a compliant mass in under 5 minutes</li>
       </ul><!--/P2-->
       <div class="done"><b>Done when</b>a test user draws a site, sets four zoning rules and produces a compliant mass in under 5 minutes, and metrics update in under 100 ms per edit.</div>
@@ -346,12 +348,14 @@ thead th.col-today, thead th.col-target { color: var(--accent); }
       <h3>Housing + interior inside the mass</h3>
       <div class="meta"><span class="tag size">Size L</span><span class="tag">Pro</span></div>
       <p>Goal: the layout engine fills massing floors, not just single plots.</p>
-      <!--P3--><div class="meter" aria-hidden="true"><i style="width:0%"></i></div><span class="tag prog">0 / 4 done</span>
+      <!--P3--><div class="meter" aria-hidden="true"><i style="width:67%"></i></div><span class="tag prog">4 / 6 done</span>
       <ul class="check">
-        <li>Engine fills massing floor plates around a core</li>
-        <li>Unit mix targets with yield readout</li>
-        <li>Instant re-solve on mass edit, honouring locked rooms and units</li>
-        <li>Furniture layouts checked against clearances</li>
+        <li class="ok">Engine fills massing floor plates around a core (corridor, stair/lift core, stacked units)</li>
+        <li class="ok">Unit mix targets with yield readout (mix within 1 unit per type; NSA, GFA, efficiency)</li>
+        <li class="ok">Re-solve on mass edit (optional auto), honouring locked units</li>
+        <li>Locks for individual rooms inside a unit</li>
+        <li>Second wing / core for irregular footprints (today: largest rectangle)</li>
+        <li class="ok">Furniture layouts checked against clearances (zero violations on the golden plans)</li>
       </ul><!--/P3-->
       <div class="done"><b>Done when</b>a 6-storey mass fills with a target mix within &plusmn;5%, all units pass hard rules, the home-quality suite stays at 26/26 fit with mean &ge; 98, and re-solve completes in under 3 s.</div>
     </div>
@@ -363,12 +367,12 @@ thead th.col-today, thead th.col-target { color: var(--accent); }
       <h3>AI assistant panel (secondary)</h3>
       <div class="meta"><span class="tag size">Size M</span><span class="tag">Pro (metered)</span></div>
       <p>Goal: AI speeds up decisions; it never owns the geometry.</p>
-      <!--P4--><div class="meter" aria-hidden="true"><i style="width:0%"></i></div><span class="tag prog">0 / 4 done</span>
+      <!--P4--><div class="meter" aria-hidden="true"><i style="width:100%"></i></div><span class="tag prog">4 / 4 done</span>
       <ul class="check">
-        <li>Brief to three scored options</li>
-        <li>Explain a rule violation with the engine&#x27;s fix</li>
-        <li>Suggest alternatives for a selected room or unit</li>
-        <li>Every AI action is an ordinary, undoable edit</li>
+        <li class="ok">Brief to three distinct scored options, engine-only (Plan &gt; Options)</li>
+        <li class="ok">Explain a rule violation: why it matters and how to fix it</li>
+        <li class="ok">Assistant: plain-language instruction to a previewed, validated edit</li>
+        <li class="ok">Every AI action is an ordinary, undoable edit (nothing changes before Apply)</li>
       </ul><!--/P4-->
       <div class="done"><b>Done when</b>the product is fully usable with the panel closed, and in testing at least 60% of AI suggestions are accepted without manual correction.</div>
     </div>
@@ -380,10 +384,12 @@ thead th.col-today, thead th.col-target { color: var(--accent); }
       <h3>Analysis</h3>
       <div class="meta"><span class="tag size">Size M</span><span class="tag">Pro</span></div>
       <p>Goal: environmental checks that feed the rules.</p>
-      <!--P5--><div class="meter" aria-hidden="true"><i style="width:0%"></i></div><span class="tag prog">0 / 3 done</span>
+      <!--P5--><div class="meter" aria-hidden="true"><i style="width:60%"></i></div><span class="tag prog">3 / 5 done</span>
       <ul class="check">
-        <li>Sun-hours heatmap on facades and ground</li>
-        <li>Per-room daylight check tied to the daylight rule</li>
+        <li class="ok">Real solar position (NOAA) for the site&#x27;s latitude and a chosen date</li>
+        <li class="ok">Sun-hours heatmap on ground and façades (0.2 s for villa + 5-floor block)</li>
+        <li class="ok">Per-room direct-sun check at the windows of habitable rooms</li>
+        <li>Validate sun hours against an external tool (Ladybug) on three sites</li>
         <li>View analysis per window</li>
       </ul><!--/P5-->
       <div class="done"><b>Done when</b>sun hours match a reference tool (e.g. Ladybug) within 10% on three test sites, and results appear in under 10 s in the browser.</div>
