@@ -139,6 +139,8 @@ export function AsciiField({ className = '' }: { className?: string }) {
     }
 
     const draw = (time: number) => {
+      // A hidden or collapsed section has a 0 x 0 canvas; drawImage throws on it.
+      if (!canvas.width || !canvas.height) return
       const t = time / 1000
       ctx.globalCompositeOperation = 'source-over'
       ctx.globalAlpha = 1

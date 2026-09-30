@@ -9,6 +9,7 @@ interface TopPlanKeyboardLayerProps {
   rooms: Room[]
   invalidRoomIds: Set<string>
   onFocusRoom: (roomId: string | null) => void
+  onFocusMass: (massId: string | null) => void
 }
 
 /**
@@ -18,7 +19,7 @@ interface TopPlanKeyboardLayerProps {
  * focused room; Escape is the shared canvas shortcut and clears selection.
  * Massing blocks follow the rooms, named with their floors and GFA.
  */
-export function TopPlanKeyboardLayer({ rooms, invalidRoomIds, onFocusRoom }: TopPlanKeyboardLayerProps) {
+export function TopPlanKeyboardLayer({ rooms, invalidRoomIds, onFocusRoom, onFocusMass }: TopPlanKeyboardLayerProps) {
   const selectedId = useCanvasStore((s) => s.selectedId)
   const selectRoom = useCanvasStore((s) => s.selectRoom)
   const { masses } = useSiteAndMasses()
@@ -55,6 +56,8 @@ export function TopPlanKeyboardLayer({ rooms, invalidRoomIds, onFocusRoom }: Top
           data-testid={`plan-mass-${mass.id}`}
           aria-label={`${mass.name}, mass, ${mass.floors} floor${mass.floors === 1 ? '' : 's'}, GFA ${formatArea(massGfa(mass))}`}
           aria-pressed={selectedMassId === mass.id}
+          onFocus={() => onFocusMass(mass.id)}
+          onBlur={() => onFocusMass(null)}
           onClick={() => {
             useCanvasStore.getState().deselectAll()
             selectMass(mass.id)

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type RefObject } from 'react'
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { Html, Line } from '@react-three/drei'
 import * as THREE from 'three'
-import { type CanvasHistorySnapshot, type Room, useCanvasStore } from '../../store/canvasStore'
+import { type CanvasHistorySnapshot, type Room, useCanvasStore, workArea } from '../../store/canvasStore'
 import { COMPONENT_REGISTRY } from '../../store/componentRegistry'
 import { formatArea } from '../../utils/format'
 import {
@@ -172,7 +172,7 @@ export function TopPlanOverlay({ orbitRef, readOnly, rooms, invalidRoomIds, focu
       point: { x: hit.x, z: hit.z },
       snapToGrid: state.snapToGrid,
       gridSize: state.gridSize,
-      footprint: state.floors.find((floor) => floor.level === (active.startRoom.floorLevel ?? 0))?.footprint,
+      footprint: workArea(state.floors.find((floor) => floor.level === (active.startRoom.floorLevel ?? 0))?.footprint),
     }
     const next =
       active.kind.type === 'resize'

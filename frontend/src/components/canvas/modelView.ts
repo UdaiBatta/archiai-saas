@@ -6,6 +6,9 @@
  */
 export type CameraPreset = 'perspective' | 'axo' | 'top'
 
+/** Vertical field of view of the 3D view's perspective camera (Canvas3D). */
+export const PERSPECTIVE_FOV = 50
+
 export const CAMERA_PRESETS: { value: CameraPreset; label: string }[] = [
   { value: 'perspective', label: 'Persp' },
   { value: 'axo', label: 'Axo' },
@@ -62,7 +65,7 @@ export function screenAxes(dir: Vec3): { right: Vec3; up: Vec3 } {
 }
 
 /** Orthographic zoom that fits the whole site box on screen with a margin. */
-export function fitOrthoZoom(bounds: SiteBounds, dir: Vec3, viewport: Viewport, margin = 0.82): number {
+export function fitOrthoZoom(bounds: SiteBounds, dir: Vec3, viewport: Viewport, margin = 0.62): number {
   const { right, up } = screenAxes(dir)
   let minR = Infinity, maxR = -Infinity, minU = Infinity, maxU = -Infinity
   for (const x of [bounds.x, bounds.x + bounds.w]) {
@@ -81,30 +84,61 @@ export function fitOrthoZoom(bounds: SiteBounds, dir: Vec3, viewport: Viewport, 
 }
 
 /** Where the camera goes for a preset, framing the whole site. */
-export function presetView(preset: CameraPreset, bounds: SiteBounds, viewport: Viewport, elevation = 0): CameraView {
+/** Screen space covered by editor chrome (top bar, dock, status bar), px. */
+export interface ScreenInsets {
+  top: number
+  bottom: number
+}
+
+export function presetView(
+  preset: CameraPreset,
+  bounds: SiteBounds,
+  fullViewport: Viewport,
+  elevation = 0,
+  insets: ScreenInsets = { top: 0, bottom: 0 },
+): CameraView {
+  // Fit into the part of the canvas the chrome leaves clear.
+  const viewport = { width: fullViewport.width, height: Math.max(fullViewport.height - insets.top - insets.bottom, 1) }
   const target: Vec3 = [bounds.x + bounds.w / 2, elevation, bounds.z + bounds.d / 2]
   const dir = PRESET_DIRECTION[preset]
   if (preset === 'perspective') {
     // Back off with the site size (or a tall mass), more
     // on portrait viewports so the model is not clipped at the sides.
     const portraitScale = Math.max(1, (0.95 * viewport.height) / Math.max(viewport.width, 1))
-    const distance = Math.max(bounds.w, bounds.d, bounds.h * 1.4, 8) * 1.15 * portraitScale
+    // Back off further when chrome covers part of the canvas, then aim a little
+    // below the model so it sits in the middle of the clear area.
+    const chromeScale = fullViewport.height / viewport.height
+    const distance = Math.max(bounds.w, bounds.d, bounds.h * 1.4, 8) * 1.15 * portraitScale * chromeScale
+    const offset = Math.hypot(0.8, 1, 0.8) * distance
+    const worldPerPx = (2 * offset * Math.tan((PERSPECTIVE_FOV / 2) * Math.PI / 180)) / fullViewport.height
+    const { up } = screenAxes(PRESET_DIRECTION.perspective)
+    const shift = ((insets.bottom - insets.top) / 2) * worldPerPx
+    const aim: Vec3 = [target[0] - up[0] * shift, target[1] - up[1] * shift, target[2] - up[2] * shift]
     return {
-      position: [target[0] + 0.8 * distance, target[1] + distance, target[2] + 0.8 * distance],
-      target,
+      position: [aim[0] + 0.8 * distance, aim[1] + distance, aim[2] + 0.8 * distance],
+      target: aim,
       zoom: 1,
     }
   }
   // Orthographic: distance only has to clear the model; zoom does the framing.
+  // Axo aims at the middle of the box, not its floor: the zoom fit assumes the
+  // box is centred on screen, and a model rising off its target clips at the top.
+  if (preset === 'axo') target[1] = elevation + bounds.h / 2
   const distance = Math.max(bounds.w, bounds.d, bounds.h, 10) * 3
+  const zoom = fitOrthoZoom(bounds, dir, viewport)
+  // Centre the model in the clear area, not the whole canvas: move the view
+  // down by half the inset imbalance so the model sits higher on screen.
+  const { up } = screenAxes(dir)
+  const shift = (insets.bottom - insets.top) / 2 / zoom
+  const aim: Vec3 = [target[0] - up[0] * shift, target[1] - up[1] * shift, target[2] - up[2] * shift]
   return {
     position: [
-      target[0] + dir[0] * distance,
-      target[1] + dir[1] * distance,
-      target[2] + dir[2] * distance + (preset === 'top' ? 0.001 : 0),
+      aim[0] + dir[0] * distance,
+      aim[1] + dir[1] * distance,
+      aim[2] + dir[2] * distance + (preset === 'top' ? 0.001 : 0),
     ],
-    target,
-    zoom: fitOrthoZoom(bounds, dir, viewport),
+    target: aim,
+    zoom,
   }
 }
 

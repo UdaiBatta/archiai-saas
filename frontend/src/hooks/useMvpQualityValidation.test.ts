@@ -136,6 +136,24 @@ describe('useMvpQualityValidation', () => {
     expect(validateAndSyncMvpLayout).toHaveBeenCalledTimes(1)
   })
 
+  it('still re-derives when an unrelated update lands during the debounce', async () => {
+    // The backend's generate path saves plans without edge data; a re-render
+    // mid-debounce (floors, save status) used to cancel the only request.
+    useCanvasStore.setState((state) => {
+      const { mvpEdges: _dropped, ...metadata } = state.layoutMetadata
+      return { layoutMetadata: metadata }
+    })
+    renderHook(() => useMvpQualityValidation({ debounceMs: 100 }))
+
+    await advance(50)
+    act(() => {
+      useCanvasStore.setState((state) => ({ floors: state.floors.map((floor) => ({ ...floor })) }))
+    })
+    await advance(100)
+
+    expect(validateAndSyncMvpLayout).toHaveBeenCalledTimes(1)
+  })
+
   it('debounces room edits and publishes the latest full quality report', async () => {
     renderHook(() => useMvpQualityValidation({ debounceMs: 100 }))
 
@@ -151,7 +169,7 @@ describe('useMvpQualityValidation', () => {
     await advance(1)
     expect(validateAndSyncMvpLayout).toHaveBeenCalledWith(
       expect.objectContaining({
-        rooms: [expect.objectContaining({ id: 'room-1', x: 5, y: 0 })],
+        rooms: [expect.objectContaining({ id: 'room-1', x: 6, y: 0 })],
       }),
       { requirements, includeVastu: true },
     )
@@ -161,7 +179,8 @@ describe('useMvpQualityValidation', () => {
     expect(synced.rooms.find((object) => object.id === 'door-synced')).toMatchObject({
       hostWallId: 'wall-synced',
     })
-    expect(synced.rooms.find((object) => object.id === 'room-1')?.position.x).toBe(7)
+    // Rooms may overhang the plot now (balconies); the move is kept as made.
+    expect(synced.rooms.find((object) => object.id === 'room-1')?.position.x).toBe(8)
     expect(synced.past).toHaveLength(1)
     expect(synced.activityLog).toHaveLength(1)
     expect(synced.saveStatus).toBe('unsaved')

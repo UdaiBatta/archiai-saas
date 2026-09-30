@@ -33,10 +33,13 @@ interface SceneProps {
   level?: number | 'all'
   /** Bumped to re-frame the camera on demand (re-clicking a preset). */
   frameNonce?: number
+  /** What the camera frames: the building's rooms (plot when absent). */
+  focus?: { x: number; z: number; w: number; d: number } | null
 }
 
-export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage = false, sunHour = 10, preset = 'perspective', site = false, level, frameNonce = 0 }: SceneProps) {
+export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage = false, sunHour = 10, preset = 'perspective', site = false, level, frameNonce = 0, focus = null }: SceneProps) {
   const camera = useThree((s) => s.camera)
+  const invalidate = useThree((s) => s.invalidate)
   const viewportSize = useThree((s) => s.size)
   const floors = useCanvasStore((s) => s.floors)
   const storedFloor = useCanvasStore((s) => s.selectedFloor)
@@ -72,8 +75,8 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
   // Everything on the site: plot, site boundary, masses. Plan lenses keep
   // framing the floor itself.
   const extent = useMemo(
-    () => footprint && (studio ? sceneExtent(footprint, buildingTop, siteModel, masses) : { ...footprint, h: buildingTop }),
-    [footprint, studio, buildingTop, siteModel, masses],
+    () => footprint && (studio ? sceneExtent(focus ?? footprint, buildingTop, siteModel, masses) : { ...footprint, h: buildingTop }),
+    [footprint, focus, studio, buildingTop, siteModel, masses],
   )
   // Reframe when the site changes, not on every mass edit (that would jump
   // the camera mid push/pull).
@@ -83,7 +86,9 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
     if (!extent) return
     const bounds = extent
     const elevation = visibleFloors[0]?.elevation ?? 0
-    const view = presetView(isPlanView ? 'perspective' : preset, bounds, viewportSize, elevation)
+    // Studio chrome: 48 px top bar; dock + status bar take ~112 px at the bottom.
+    const insets = studio ? { top: 56, bottom: 120 } : { top: 0, bottom: 0 }
+    const view = presetView(isPlanView ? 'perspective' : preset, bounds, viewportSize, elevation, insets)
     if (isPlanView) {
       // Plan lenses: the old straight-down perspective framing.
       const distance = view.position[1] - elevation
@@ -95,6 +100,9 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
     camera.lookAt(...view.target)
     orbitRef.current?.target?.set(...view.target)
     orbitRef.current?.update?.()
+    // frameloop="demand": moving the camera here draws nothing by itself, so
+    // the old view could stay on screen under the new view's labels.
+    invalidate()
   }, [framingKey, camera, viewportSize.width, viewportSize.height])
 
   // The 3D sun: aimed at the house centre from where the sun is at
@@ -130,7 +138,7 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
       <ambientLight intensity={isPlanView ? 0.9 : studio ? 0.08 : 0.35} />
       {!isPlanView && (
         studio
-          ? <hemisphereLight args={['#ffffff', '#c8c6c0', 2.2]} />
+          ? <hemisphereLight args={['#ffffff', '#c8c6c0', 1.35]} />
           : <hemisphereLight args={['#BDBDC0', '#26282D', 0.45]} />
       )}
       <directionalLight
@@ -141,7 +149,7 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
             : [centerX + sun.direction[0] * shadow.distance, sun.direction[1] * shadow.distance, centerZ + sun.direction[2] * shadow.distance]
         }
         color={isPlanView ? '#ffffff' : sun.color}
-        intensity={isPlanView ? 0.55 : studio ? sun.intensity * 1.4 : sun.intensity}
+        intensity={isPlanView ? 0.55 : studio ? sun.intensity * 1.9 : sun.intensity}
         castShadow={!isPlanView && !topView}
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}

@@ -45,7 +45,7 @@ const input = `${field} text-right font-mono tabular-nums`
  * Massing panel: tools to create masses, live site metrics against the
  * zoning limits, issues with one-click fixes, and the selected mass's inspector.
  */
-export function MassingPanel({ readOnly, topView, plot }: { readOnly: boolean; topView: boolean; plot: PlotBounds | null }) {
+export function MassingPanel({ readOnly, topView, plot, docked = false }: { readOnly: boolean; topView: boolean; plot: PlotBounds | null; docked?: boolean }) {
   const { site, masses } = useSiteAndMasses()
   const setMasses = useCanvasStore((s) => s.setMasses)
   const { selectedMassId, select, drawMode, setDrawMode } = useMassUi()
@@ -66,16 +66,18 @@ export function MassingPanel({ readOnly, topView, plot }: { readOnly: boolean; t
   return (
     <aside
       aria-label="Massing"
-      className="absolute right-4 top-28 z-20 flex max-h-[calc(100%-9rem)] w-64 flex-col overflow-hidden rounded-xl border border-ink/10 bg-graphite-800/95 text-[11px] text-muted shadow-lg backdrop-blur"
+      className={docked
+        ? 'flex max-h-[min(60vh,32rem)] w-72 flex-col overflow-hidden rounded-xl border border-ink/10 bg-graphite-800 text-[11px] text-muted shadow-xl'
+        : 'absolute right-4 top-28 z-20 flex max-h-[calc(100%-9rem)] w-64 flex-col overflow-hidden rounded-xl border border-ink/10 bg-graphite-800/95 text-[11px] text-muted shadow-lg backdrop-blur'}
     >
-      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="flex items-center justify-between px-3 py-2 font-semibold text-ink">
+      <button type="button" aria-expanded={open} onClick={() => !docked && setOpen(!open)} className="flex items-center justify-between px-3 py-2 font-semibold text-ink">
         <span>Massing{masses.length ? ` · ${masses.length}` : ''}</span>
         <span className="flex items-center gap-2">
           {issues.length > 0 && <span className="rounded-full bg-danger/20 px-1.5 text-danger">{issues.length}</span>}
-          <span aria-hidden>{open ? '▾' : '▸'}</span>
+          {!docked && <span aria-hidden>{open ? '▾' : '▸'}</span>}
         </span>
       </button>
-      {open && (
+      {(open || docked) && (
         <div className="flex flex-col gap-3 overflow-y-auto px-3 pb-3">
           {!readOnly && (
             <div className="flex flex-wrap gap-1">

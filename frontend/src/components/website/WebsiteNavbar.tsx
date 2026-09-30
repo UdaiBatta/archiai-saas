@@ -1,6 +1,8 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useState } from 'react'
 import { useAuthStore } from '../../store/authStore'
+import { useAuth } from '../../hooks/useAuth'
+import { AccountMenu } from '../ui/AccountMenu'
 
 // Every link lands on something that exists: a section of the landing page
 // (scrolled to by useHashScroll) or a real route.
@@ -67,7 +69,7 @@ function NavPill({ isActive }: { isActive: (to: string) => boolean }) {
  * its own blur so it stays readable over whatever scrolls beneath.
  */
 export function WebsiteNavbar() {
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
+  const { isAuthenticated, user, logOut } = useAuth()
   const startTarget = useStartDesigningTarget()
   const [menuOpen, setMenuOpen] = useState(false)
   const { pathname } = useLocation()
@@ -104,6 +106,7 @@ export function WebsiteNavbar() {
           >
             {isAuthenticated ? 'Your projects' : 'Start designing'}
           </Link>
+          {isAuthenticated && <AccountMenu name={user?.name} email={user?.email} onSignOut={logOut} />}
         </div>
 
         <button

@@ -214,3 +214,78 @@ async def test_expired_access_token_rejected(client: AsyncClient):
     )
     response = await client.get("/api/auth/me", headers={"Authorization": f"Bearer {expired}"})
     assert response.status_code == 401
+
+
+# ── Profile and password (settings page) ─────────────────────────────────────
+
+
+async def test_update_me_changes_name(client: AsyncClient):
+    token = (await _register(client, "rename@example.com"))["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    response = await client.patch("/api/auth/me", json={"name": "  New Name  "}, headers=headers)
+    assert response.status_code == 200
+    assert response.json()["name"] == "New Name"
+    assert (await client.get("/api/auth/me", headers=headers)).json()["name"] == "New Name"
+
+
+async def test_update_me_rejects_blank_or_long_name(client: AsyncClient):
+    token = (await _register(client, "blank@example.com"))["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    assert (await client.patch("/api/auth/me", json={"name": "   "}, headers=headers)).status_code == 422
+    assert (await client.patch("/api/auth/me", json={"name": "x" * 101}, headers=headers)).status_code == 422
+
+
+async def test_update_me_requires_auth(client: AsyncClient):
+    assert (await client.patch("/api/auth/me", json={"name": "Nobody"})).status_code == 401
+
+
+async def test_change_password_requires_current_password(client: AsyncClient):
+    token = (await _register(client, "pw@example.com"))["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    wrong = await client.post(
+        "/api/auth/password",
+        json={"current_password": "not-it-123", "new_password": "brandnew123"},
+        headers=headers,
+    )
+    assert wrong.status_code == 400
+    short = await client.post(
+        "/api/auth/password",
+        json={"current_password": "password123", "new_password": "short"},
+        headers=headers,
+    )
+    assert short.status_code == 422
+    assert (await client.post("/api/auth/password", json={"current_password": "password123", "new_password": "brandnew123"})).status_code == 401
+
+    ok = await client.post(
+        "/api/auth/password",
+        json={"current_password": "password123", "new_password": "brandnew123"},
+        headers=headers,
+    )
+    assert ok.status_code == 200
+    assert ok.json()["access_token"] and ok.json()["refresh_token"]
+
+    old = await client.post("/api/auth/login", json={"email": "pw@example.com", "password": "password123"})
+    assert old.status_code == 401
+    new = await client.post("/api/auth/login", json={"email": "pw@example.com", "password": "brandnew123"})
+    assert new.status_code == 200
+
+
+async def test_change_password_signs_out_other_sessions(client: AsyncClient):
+    first = await _register(client, "sessions@example.com")
+    other = (await client.post("/api/auth/login", json={"email": "sessions@example.com", "password": "password123"})).json()
+
+    changed = await client.post(
+        "/api/auth/password",
+        json={"current_password": "password123", "new_password": "brandnew123"},
+        headers={"Authorization": f"Bearer {first['access_token']}"},
+    )
+    assert changed.status_code == 200
+
+    # Both earlier sessions can no longer refresh; the pair returned here can.
+    for stale in (first["refresh_token"], other["refresh_token"]):
+        assert (await client.post("/api/auth/refresh", json={"refresh_token": stale})).status_code == 401
+    fresh = await client.post("/api/auth/refresh", json={"refresh_token": changed.json()["refresh_token"]})
+    assert fresh.status_code == 200

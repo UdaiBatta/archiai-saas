@@ -1,7 +1,7 @@
+import { Settings } from 'lucide-react'
 import { Link, NavLink } from 'react-router-dom'
 
-import { Button } from '../ui/Button'
-import { Avatar } from '../ui/Avatar'
+import { AccountMenu } from '../ui/AccountMenu'
 
 interface SidebarProps {
   userName?: string
@@ -49,41 +49,38 @@ export function Sidebar({
   projectCount,
 }: SidebarProps) {
   const navClassName = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+    `flex items-center justify-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors sm:justify-start ${
       isActive ? 'bg-ink/10 text-ink' : 'text-muted hover:bg-ink/5 hover:text-ink'
     }`
 
-  const displayName = userName ?? userEmail ?? ''
-
   return (
-    <aside className="flex w-44 flex-shrink-0 flex-col border-r border-ink/10 bg-graphite-950 text-ink lg:w-52">
-      <div className="border-b border-ink/10 p-4">
+    // Phones: a narrow icon rail (labels stay for screen readers); sm and up: full.
+    <aside className="flex w-14 flex-shrink-0 flex-col border-r border-ink/10 bg-graphite-950 text-ink sm:w-44 lg:w-52">
+      <div className="border-b border-ink/10 px-2 py-4 text-center sm:p-4 sm:text-left">
         <Link to="/" aria-label="ArchiAI home" className="flex items-baseline gap-px">
-          <span className="text-base font-black tracking-wide text-ink" style={{ fontStretch: '125%' }}>ARCHI</span>
+          <span className="hidden text-base font-black tracking-wide text-ink sm:inline" style={{ fontStretch: '125%' }}>ARCHI</span>
           <span className="text-base font-black tracking-wide text-accent" style={{ fontStretch: '125%' }}>·AI</span>
         </Link>
       </div>
-      <nav className="flex-1 space-y-1 p-3">
+      <nav className="flex-1 space-y-1 p-1.5 sm:p-3">
         <NavLink to="/projects" className={navClassName}>
           <NavIcon name="projects" />
-          <span className="flex-1">Projects</span>
+          <span className="sr-only sm:not-sr-only sm:flex-1">Projects</span>
           {typeof projectCount === 'number' && (
-            <span className="font-mono text-xs text-muted-light">{projectCount}</span>
+            <span className="hidden font-mono text-xs text-muted-light sm:inline">{projectCount}</span>
           )}
         </NavLink>
         <NavLink to="/workspaces" className={navClassName}>
           <NavIcon name="workspaces" />
-          <span className="flex-1">Workspaces</span>
+          <span className="sr-only sm:not-sr-only sm:flex-1">Workspaces</span>
+        </NavLink>
+        <NavLink to="/settings" className={navClassName}>
+          <Settings size={15} strokeWidth={1.8} aria-hidden="true" />
+          <span className="sr-only sm:not-sr-only sm:flex-1">Settings</span>
         </NavLink>
       </nav>
-      <div className="border-t border-ink/10 p-4">
-        <div className="mb-3 flex items-center gap-2.5">
-          <Avatar name={displayName} size={8} />
-          <p className="min-w-0 truncate text-sm text-muted">{displayName}</p>
-        </div>
-        <Button variant="secondary" onClick={onLogout} className="w-full text-sm">
-          Logout
-        </Button>
+      <div className="flex justify-center border-t border-ink/10 p-2 sm:block sm:p-4">
+        <AccountMenu name={userName} email={userEmail} onSignOut={onLogout} side="top" align="start" showName />
       </div>
     </aside>
   )

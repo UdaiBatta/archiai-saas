@@ -21,6 +21,15 @@ export const authService = {
       .then(() => undefined)
   },
 
+  updateMe: (data: { name: string }): Promise<UserOut> =>
+    api.patch<UserOut>('/api/auth/me', data).then((r) => r.data),
+
+  // Other sessions are signed out; this one continues on the fresh pair returned.
+  changePassword: (data: { current_password: string; new_password: string }): Promise<void> =>
+    api.post<AuthResponse>('/api/auth/password', data).then((r) => {
+      useAuthStore.getState().setSessionTokens(r.data.access_token, r.data.refresh_token)
+    }),
+
   getMe: (): Promise<UserOut> => {
     return api.get<UserOut>('/api/auth/me').then((r) => r.data)
   },

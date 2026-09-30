@@ -12,8 +12,8 @@ describe('presetView', () => {
     expect(view.position[0]).toBeCloseTo(10)
     expect(view.position[2]).toBeCloseTo(5, 2)
     expect(view.position[1]).toBeGreaterThan(site.h)
-    // 20 m wide fills 82% of 1000 px -> 41 px/m (depth 10 m needs only 65.6).
-    expect(view.zoom).toBeCloseTo(41)
+    // 20 m wide fills 62% of 1000 px -> 31 px/m (depth 10 m needs only 49.6).
+    expect(view.zoom).toBeCloseTo(31)
     expect(screenAxes([0, 1, 0]).up).toEqual([0, 0, -1])
   })
 
@@ -35,7 +35,7 @@ describe('presetView', () => {
   })
 
   it('fits the narrow viewport axis', () => {
-    expect(fitOrthoZoom(site, [0, 1, 0], { width: 400, height: 800 })).toBeCloseTo(0.82 * 20)
+    expect(fitOrthoZoom(site, [0, 1, 0], { width: 400, height: 800 })).toBeCloseTo(0.62 * 20)
   })
 })
 
@@ -73,5 +73,18 @@ describe('sceneExtent', () => {
     const site = { boundary: [{ x: -5, z: -2 }, { x: 30, z: -2 }, { x: 30, z: 40 }] }
     const tower = { footprint: [{ x: 0, z: 0 }, { x: 5, z: 0 }, { x: 5, z: 50 }], baseM: 0, floors: 10, floorHeightM: 3.2 }
     expect(sceneExtent(plot, 3, site, [tower])).toEqual({ x: -5, z: -2, w: 35, d: 52, h: 32 })
+  })
+})
+
+describe('presetView insets', () => {
+  it('fits into the clear area and lifts the model above the dock', () => {
+    const site = { x: 0, z: 0, w: 20, d: 10, h: 3 }
+    const full = { width: 1000, height: 800 }
+    const plain = presetView('top', site, full)
+    const inset = presetView('top', site, full, 0, { top: 50, bottom: 150 })
+    expect(inset.zoom).toBeLessThanOrEqual(plain.zoom)
+    // Top view: screen up is -z, so lifting the model moves the aim to +z.
+    expect(inset.target[2]).toBeGreaterThan(plain.target[2])
+    expect(inset.target[0]).toBeCloseTo(plain.target[0])
   })
 })

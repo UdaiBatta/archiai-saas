@@ -382,12 +382,24 @@ function normalizeObjectType(room: Partial<Room>): CanvasObjectType {
   return room.objectType ? 'generic' : 'room'
 }
 
+/**
+ * Where objects may go: the plot plus a wide margin. Balconies, canopies and
+ * garden rooms often reach past the building or plot, so the plot itself is
+ * not a limit; the margin only stops an object being dragged off to nowhere.
+ */
+export function workArea(footprint?: { x: number; z: number; w: number; d: number }) {
+  if (!footprint || !(footprint.w > 0) || !(footprint.d > 0)) return footprint
+  const margin = 30 // metres; keeps plan coordinates well inside the API's +-200 m
+  return { x: footprint.x - margin, z: footprint.z - margin, w: footprint.w + 2 * margin, d: footprint.d + 2 * margin }
+}
+
 function clampToFootprint(
   position: { x: number; y: number; z: number },
   size: Pick<ComponentSize, 'w' | 'd'>,
-  footprint?: { x: number; z: number; w: number; d: number },
+  plot?: { x: number; z: number; w: number; d: number },
   rotationY = 0,
 ) {
+  const footprint = workArea(plot)
   if (!footprint) return position
   const worldSize = quarterTurnPlanSize(size, rotationY)
   const clampAxis = (center: number, half: number, min: number, span: number) => {
@@ -405,9 +417,10 @@ function clampToFootprint(
 
 function clampSizeToFootprint(
   size: ComponentSize,
-  footprint?: { x: number; z: number; w: number; d: number },
+  plot?: { x: number; z: number; w: number; d: number },
   rotationY = 0,
 ) {
+  const footprint = workArea(plot)
   if (!footprint || footprint.w <= 0 || footprint.d <= 0) return size
   const worldSize = quarterTurnPlanSize(size, rotationY)
   const clampedWorldSize = {

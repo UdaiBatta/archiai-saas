@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { Edges, Html } from '@react-three/drei'
 import { useThree, type ThreeEvent } from '@react-three/fiber'
 import type { RefObject } from 'react'
@@ -68,6 +69,8 @@ function movedTo(room: Room, position: Room['position']): Partial<Room> {
 
 /** Edge lines of a w x h x d box, rebuilt only when the size changes and
  * freed when it does (the source box is freed at once). */
+const NO_OPENINGS: Room[] = []
+
 function useBoxEdges(w: number, h: number, d: number) {
   const edges = useMemo(() => {
     const box = new THREE.BoxGeometry(w, h, d)
@@ -99,14 +102,19 @@ export function RoomMesh({
   const showDimensions = useCanvasStore((s) => s.showDimensions)
   const setInteractionMode = useCanvasStore((s) => s.setInteractionMode)
   const setPointerIntent = useCanvasStore((s) => s.setPointerIntent)
-  const objects = useCanvasStore((s) => s.rooms)
+  // Only a wall needs other objects (the doors/windows it hosts, to cut its
+  // openings); subscribing every room to the whole list re-rendered them all
+  // on every drag step.
+  const hostedOpenings = useCanvasStore(useShallow((s) => room.objectType === 'wall'
+    ? s.rooms.filter((o) => (o.objectType === 'door' || o.objectType === 'window') && o.hostWallId === room.id)
+    : NO_OPENINGS))
   // Both 3D views draw the real building: engine walls with door openings
   // cut out and rooms as floor slabs, so an open-plan edge (no wall) reads
   // as one continuous space instead of two outlined boxes.
   const solid3d = modelStage || viewMode === '3d'
   const wallPieces = useMemo(() => solid3d && room.objectType === 'wall'
-    ? wallModelPieces(room, objects.filter((object) => object.objectType === 'door' || object.objectType === 'window'))
-    : null, [solid3d, room, objects])
+    ? wallModelPieces(room, hostedOpenings)
+    : null, [solid3d, room, hostedOpenings])
 
   const isSelected = selectedId === room.id
   const definition = COMPONENT_REGISTRY[room.objectType]
@@ -404,7 +412,9 @@ export function RoomMesh({
 
   if (ghost) return mesh
 
-  const shouldShowLabel = !plan && (modelStage ? isSelected : !isThinComponent || isSelected)
+  // 3D reads as a model, not a diagram: only the selected object is labelled
+  // there (Top view labels every room through the plan overlay).
+  const shouldShowLabel = !plan && (modelStage || solid3d ? isSelected : !isThinComponent || isSelected)
   const label = shouldShowLabel ? (
     <Html
       position={[room.position.x, room.position.y + room.size.h / 2 + 0.35, room.position.z]}

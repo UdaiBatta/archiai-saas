@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Project } from '../../services/project.service'
-import { PlaceholderThumbnail } from './PlaceholderThumbnail'
+import { getLatestProjectDesign } from '../../services/design.service'
+import type { Room } from '../../store/canvasStore'
+import { PlanThumbnail } from './PlanThumbnail'
 import { panelClass } from '../website/FeatureBento'
 import { formatRelative } from '../../utils/time'
 
@@ -13,9 +15,29 @@ interface ProjectCardProps {
 
 export function ProjectCard({ project, onClick, onDuplicate }: ProjectCardProps) {
   const [duplicating, setDuplicating] = useState(false)
-  // Derived from real data only (whether a layout has ever been saved) — not
-  // a fabricated workflow status, since the app doesn't track project stages.
-  const hasSavedLayout = Boolean(project.thumbnail_url)
+  // The preview is drawn from the plan itself, not the stored `thumbnail_url`
+  // image (older ones are canvas screenshots with every floor stacked).
+  // ponytail: one layout fetch per card; add a lightweight plan-outline field
+  // to the project list API if dashboards grow large.
+  // Ask for the plan itself: `thumbnail_url` is only set by the editor's save,
+  // so plans made any other way (e.g. the generate API) would read as empty.
+  // A project without one answers 404, which shows the empty state.
+  const [rooms, setRooms] = useState<Room[] | null>(null)
+  const [loadingPlan, setLoadingPlan] = useState(true)
+  // Derived from real data only (a plan exists), not a fabricated stage.
+  const hasSavedLayout = Boolean(rooms?.length)
+
+  useEffect(() => {
+    let live = true
+    setLoadingPlan(true)
+    getLatestProjectDesign(project.id)
+      .then((design) => live && setRooms(design.rooms ?? []))
+      .catch(() => live && setRooms(null))
+      .finally(() => live && setLoadingPlan(false))
+    return () => {
+      live = false
+    }
+  }, [project.id, project.updated_at])
 
   const handleDuplicate = async () => {
     if (!onDuplicate || duplicating) return
@@ -35,15 +57,7 @@ export function ProjectCard({ project, onClick, onDuplicate }: ProjectCardProps)
         aria-label={`Open ${project.title}`}
       >
         <div className="relative">
-          {project.thumbnail_url ? (
-            <img
-              src={project.thumbnail_url}
-              alt=""
-              className="h-36 w-full bg-surface object-cover"
-            />
-          ) : (
-            <PlaceholderThumbnail seed={project.id} />
-          )}
+          <PlanThumbnail rooms={rooms} loading={loadingPlan} />
           <span
             className={`absolute right-2 top-2 rounded-lg px-2 py-0.5 text-[10px] font-semibold ${
               hasSavedLayout ? 'bg-graphite-900/85 text-ok' : 'bg-graphite-900/85 text-muted'

@@ -7,7 +7,7 @@ Full plan and competitor map: [roadmap.html](roadmap.html) (published as the
 `python docs/sync_progress.py` to copy them into it. Near-term engine
 work lives in [ROADMAP.md](ROADMAP.md).
 
-_Last updated: 2026-09-28_
+_Last updated: 2026-09-30_
 
 ## Foundation: layout engine quality — PR #44 (merged)
 
@@ -40,7 +40,11 @@ _Last updated: 2026-09-28_
 - [x] Retire the separate 2D editor: the 2D Plan tab opens Top view
 - [x] Frame budget: ~8 ms/frame orbiting the 3-bedroom example on an integrated GPU (was ~17 ms)
 - [ ] Re-measure on a 4-bedroom home
-- [ ] Rooms re-render only when they change (today one drag re-renders every room)
+- [x] Drags stay light: only the validator and the moved room re-render (PR #48)
+- [x] One bottom dock for tools, views, lenses, site, massing, sun (PR #48)
+- [x] Camera frames the building in the space the chrome leaves clear (PR #48)
+- [x] Rooms may overhang the plot (balconies); plot line still reported (PR #48)
+- [x] Account menu and settings page (profile, password, preferences, plan) (PR #48)
 - [ ] On-screen zoom buttons in Top view
 
 ## P2: Site & massing — PR #47 (in progress)

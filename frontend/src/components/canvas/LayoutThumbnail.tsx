@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import type { CanvasFloor, Room } from '../../store/canvasStore'
-import { COMPONENT_REGISTRY } from '../../store/componentRegistry'
-import { EDITOR_PALETTE, displayRoomColor } from './editorPalette'
+import { groundFloorShapes, type PlanShape } from '../projects/PlanThumbnail'
+import { EDITOR_PALETTE } from './editorPalette'
 
 interface LayoutThumbnailProps {
   rooms: Room[]
@@ -9,41 +9,38 @@ interface LayoutThumbnailProps {
   className?: string
 }
 
-/** The ground floor's spaces and a padded view box around them. */
+/** The ground floor's spaces (rotation-aware, polygon outlines kept) and a
+ * padded view box around them. */
 function thumbnailGeometry(rooms: Room[], floors?: CanvasFloor[]) {
+  const shapes = groundFloorShapes(rooms)
   const levels = rooms.map((room) => room.floorLevel ?? 0)
   const groundLevel = levels.length > 0 ? Math.min(...levels) : 0
-  const floorSpaces = rooms.filter(
-    (room) =>
-      (room.floorLevel ?? 0) === groundLevel &&
-      COMPONENT_REGISTRY[room.objectType]?.category === 'space',
-  )
   const footprint = floors?.find((floor) => floor.level === groundLevel)?.footprint
 
   let minX = footprint ? footprint.x : Infinity
   let minZ = footprint ? footprint.z : Infinity
   let maxX = footprint ? footprint.x + footprint.w : -Infinity
   let maxZ = footprint ? footprint.z + footprint.d : -Infinity
-  for (const room of floorSpaces) {
-    minX = Math.min(minX, room.position.x - room.size.w / 2)
-    maxX = Math.max(maxX, room.position.x + room.size.w / 2)
-    minZ = Math.min(minZ, room.position.z - room.size.d / 2)
-    maxZ = Math.max(maxZ, room.position.z + room.size.d / 2)
+  for (const shape of shapes) {
+    for (const p of shape.points) {
+      minX = Math.min(minX, p.x)
+      maxX = Math.max(maxX, p.x)
+      minZ = Math.min(minZ, p.z)
+      maxZ = Math.max(maxZ, p.z)
+    }
   }
   if (!Number.isFinite(minX)) {
-    return { spaces: floorSpaces, bounds: { x: 0, z: 0, w: 10, d: 10 } }
+    return { shapes, bounds: { x: 0, z: 0, w: 10, d: 10 } }
   }
   const pad = Math.max((maxX - minX) * 0.06, 0.4)
   return {
-    spaces: floorSpaces,
-    bounds: {
-      x: minX - pad,
-      z: minZ - pad,
-      w: maxX - minX + pad * 2,
-      d: maxZ - minZ + pad * 2,
-    },
+    shapes,
+    bounds: { x: minX - pad, z: minZ - pad, w: maxX - minX + pad * 2, d: maxZ - minZ + pad * 2 },
   }
 }
+
+const n = (value: number) => Number(value.toFixed(3))
+const pointsAttr = (points: PlanShape['points']) => points.map((p) => `${n(p.x)},${n(p.z)}`).join(' ')
 
 /**
  * Mini 2D plan snapshot rendered straight from layout data — the shared
@@ -55,7 +52,7 @@ function thumbnailGeometry(rooms: Room[], floors?: CanvasFloor[]) {
  * architectural drawings rather than noisy screenshots.
  */
 export function LayoutThumbnail({ rooms, floors, className }: LayoutThumbnailProps) {
-  const { spaces, bounds } = useMemo(() => thumbnailGeometry(rooms, floors), [rooms, floors])
+  const { shapes, bounds } = useMemo(() => thumbnailGeometry(rooms, floors), [rooms, floors])
 
   const stroke = Math.max(bounds.w, bounds.d) * 0.006
 
@@ -74,14 +71,11 @@ export function LayoutThumbnail({ rooms, floors, className }: LayoutThumbnailPro
         height={bounds.d}
         fill={EDITOR_PALETTE.planSheetEnd}
       />
-      {spaces.map((room) => (
-        <rect
-          key={room.id}
-          x={room.position.x - room.size.w / 2}
-          y={room.position.z - room.size.d / 2}
-          width={room.size.w}
-          height={room.size.d}
-          fill={displayRoomColor(room)}
+      {shapes.map((shape) => (
+        <polygon
+          key={shape.id}
+          points={pointsAttr(shape.points)}
+          fill={shape.color}
           fillOpacity={0.85}
           stroke={EDITOR_PALETTE.planFrame}
           strokeOpacity={0.5}
@@ -98,15 +92,13 @@ export function LayoutThumbnail({ rooms, floors, className }: LayoutThumbnailPro
  * which canvas) happens to be on screen when the project is saved.
  */
 export function layoutThumbnailDataUrl(rooms: Room[], floors?: CanvasFloor[]): string | null {
-  const { spaces, bounds } = thumbnailGeometry(rooms, floors)
-  if (spaces.length === 0) return null
+  const { shapes, bounds } = thumbnailGeometry(rooms, floors)
+  if (shapes.length === 0) return null
   const stroke = Math.max(bounds.w, bounds.d) * 0.006
-  const n = (value: number) => Number(value.toFixed(3))
-  const rects = spaces
+  const rects = shapes
     .map(
-      (room) =>
-        `<rect x="${n(room.position.x - room.size.w / 2)}" y="${n(room.position.z - room.size.d / 2)}" ` +
-        `width="${n(room.size.w)}" height="${n(room.size.d)}" fill="${displayRoomColor(room)}" fill-opacity="0.85" ` +
+      (shape) =>
+        `<polygon points="${pointsAttr(shape.points)}" fill="${shape.color}" fill-opacity="0.85" ` +
         `stroke="${EDITOR_PALETTE.planFrame}" stroke-opacity="0.5" stroke-width="${n(stroke)}"/>`,
     )
     .join('')

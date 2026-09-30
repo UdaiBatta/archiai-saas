@@ -91,11 +91,23 @@ describe('zoningIssues', () => {
     expect(issues[0].fix!.masses[0].floors).toBe(3) // 1 + 3 x 3 = 10
   })
 
-  it('flags over-coverage (no automatic fix)', () => {
-    const issues = zoningIssues(site({ maxCoverage: 0.05 }), [mass('a', rect(10, 10, 20, 10))])
+  it('flags over-coverage and fixes it by shrinking footprints about their centres', () => {
+    const s = site({ maxCoverage: 0.05 })
+    const masses = [mass('a', rect(10, 10, 20, 10), 4), mass('b', rect(20, 25, 10, 10), 2)]
+    const issues = zoningIssues(s, masses)
     expect(issues.map((i) => i.code)).toEqual(['coverage'])
     expect(issues[0].massId).toBeNull()
-    expect(issues[0].fix).toBeUndefined()
+    const fixed = issues[0].fix!.masses
+    const after = siteMetrics(s, fixed).coverage!
+    expect(after).toBeLessThanOrEqual(0.05)
+    expect(after).toBeGreaterThan(0.049) // just enough, not more
+    expect(fixed.map((m) => m.floors)).toEqual([4, 2]) // floors kept
+    // Same centre and proportions: a 20 x 10 block stays twice as wide as deep.
+    const [a] = fixed
+    const xs = a.footprint.map((p) => p.x), zs = a.footprint.map((p) => p.z)
+    expect((Math.max(...xs) - Math.min(...xs)) / (Math.max(...zs) - Math.min(...zs))).toBeCloseTo(2)
+    expect((Math.max(...xs) + Math.min(...xs)) / 2).toBeCloseTo(20)
+    expect(zoningIssues(s, fixed).map((i) => i.code)).not.toContain('coverage')
   })
 
   it('flags over-FAR and fixes it by trimming the tallest masses first', () => {

@@ -2,16 +2,18 @@ import hashlib
 from datetime import datetime, timezone
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.refresh_token import RefreshToken
 from app.models.user import User
 from app.schemas.auth import (
     AuthResponse,
+    ChangePasswordRequest,
     LoginRequest,
     RefreshResponse,
     RegisterRequest,
+    UpdateProfileRequest,
     UserOut,
 )
 from app.utils.hashing import hash_password, verify_password
@@ -130,7 +132,7 @@ async def revoke_refresh_token(db: AsyncSession, token: str | None) -> None:
         await db.commit()
 
 
-async def get_current_user(db: AsyncSession, token: str) -> UserOut:
+async def _user_from_token(db: AsyncSession, token: str) -> User:
     try:
         user_id = decode_access_token(token)
     except ValueError:
@@ -142,4 +144,36 @@ async def get_current_user(db: AsyncSession, token: str) -> UserOut:
     if user is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
+    return user
+
+
+async def get_current_user(db: AsyncSession, token: str) -> UserOut:
+    return UserOut.model_validate(await _user_from_token(db, token))
+
+
+async def update_profile(db: AsyncSession, token: str, data: UpdateProfileRequest) -> UserOut:
+    user = await _user_from_token(db, token)
+    user.name = data.name
+    await db.commit()
+    await db.refresh(user)
     return UserOut.model_validate(user)
+
+
+async def change_password(db: AsyncSession, token: str, data: ChangePasswordRequest) -> AuthResponse:
+    """Change the password and sign out every other session: all of the user's
+    refresh tokens are revoked, and this session gets a fresh pair."""
+    user = await _user_from_token(db, token)
+    if not verify_password(data.current_password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    user.hashed_password = hash_password(data.new_password)
+    await db.execute(
+        update(RefreshToken)
+        .where(RefreshToken.user_id == user.id, RefreshToken.revoked_at.is_(None))
+        .values(revoked_at=datetime.now(timezone.utc))
+    )
+    await db.commit()
+    return AuthResponse(
+        access_token=create_access_token(user.id),
+        refresh_token=await _issue_refresh_token(db, user.id),
+        user=UserOut.model_validate(user),
+    )
