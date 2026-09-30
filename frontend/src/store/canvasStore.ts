@@ -194,6 +194,9 @@ interface CanvasState {
   clearClipboardMessage: () => void
   addObject: (objectType: CanvasObjectType) => void
   addObjectAt: (objectType: CanvasObjectType, x: number, z: number) => void
+  /** Swap auto-placed furniture (`derived: 'furnish'`) for `items`, keeping
+   * hand-placed pieces; one undo step. */
+  applyFurnishing: (items: Room[]) => void
   setPlacementMode: (objectType: CanvasObjectType | null) => void
   undo: () => void
   redo: () => void
@@ -1024,6 +1027,28 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
             objectLabel: newObject.label,
             previousValue: null,
             newValue: newObject,
+            createdAt: new Date().toISOString(),
+          },
+          ...state.activityLog,
+        ],
+        ...pushHistory(state),
+        ...markUnsaved(),
+      }
+    }),
+  applyFurnishing: (items) =>
+    set((state) => {
+      const rooms = [...state.rooms.filter((room) => !(room.objectType === 'furniture' && room.derived === 'furnish')), ...items]
+      return {
+        rooms,
+        selectedId: rooms.some((room) => room.id === state.selectedId) ? state.selectedId : null,
+        activityLog: [
+          {
+            id: nextId('activity'),
+            action: 'object.added' as CanvasEditAction,
+            objectId: 'furnish',
+            objectLabel: `Furnished rooms (${items.length} pieces)`,
+            previousValue: null,
+            newValue: items.length,
             createdAt: new Date().toISOString(),
           },
           ...state.activityLog,

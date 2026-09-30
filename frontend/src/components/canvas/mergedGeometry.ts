@@ -13,6 +13,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import type { Room } from '../../store/canvasStore'
 import { COMPONENT_REGISTRY } from '../../store/componentRegistry'
 import { displayRoomColor } from './editorPalette'
+import { furnitureParts } from './furnitureParts'
 import { wallModelPieces } from './modelGeometry'
 import { MODEL_COLORS, floorTint, mixHex } from './modelView'
 
@@ -29,9 +30,10 @@ export interface MergedModel {
   glassOwners: string[]
 }
 
-/** Objects the merged model draws; everything else stays a RoomMesh. */
+/** Objects the merged model draws (furniture as its low-poly proxy parts);
+ * everything else stays a RoomMesh. */
 export function isMergeable(room: Room): boolean {
-  if (room.objectType === 'wall' || room.objectType === 'window') return true
+  if (room.objectType === 'wall' || room.objectType === 'window' || room.objectType === 'furniture') return true
   return COMPONENT_REGISTRY[room.objectType]?.category === 'space'
 }
 
@@ -120,6 +122,17 @@ export function buildMergedModel(objects: Room[], openings: Room[], invalid: Rea
           matrix: matrix.clone().multiply(new THREE.Matrix4().makeTranslation(...piece.position)),
           color: MODEL_COLORS.wall,
           edgeColor: MODEL_COLORS.edge,
+          owner: room.id,
+        })
+      }
+    } else if (room.objectType === 'furniture') {
+      const matrix = objectMatrix(room, room.position.y)
+      for (const part of furnitureParts(room)) {
+        solid.push({
+          geometry: new THREE.BoxGeometry(...part.size),
+          matrix: matrix.clone().multiply(new THREE.Matrix4().makeTranslation(...part.position)),
+          color: part.color,
+          edgeColor: MODEL_COLORS.floorEdge,
           owner: room.id,
         })
       }

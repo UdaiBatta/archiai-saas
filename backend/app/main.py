@@ -11,6 +11,7 @@ from app.services.llm_client import llm_reachable
 from app.api.auth.router import router as auth_router
 from app.api.billing.router import router as billing_router
 from app.api.designs.router import router as designs_router
+from app.api.furnish.router import router as furnish_router
 from app.api.mvp.router import router as mvp_router
 from app.api.projects.router import router as projects_router
 from app.api.shares.router import router as shares_router
@@ -133,6 +134,7 @@ app.include_router(mvp_router)
 app.include_router(shares_router)
 app.include_router(billing_router)
 app.include_router(site_router)
+app.include_router(furnish_router)
 
 
 @app.get("/api/health")
