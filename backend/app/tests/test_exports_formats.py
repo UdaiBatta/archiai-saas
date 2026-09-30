@@ -20,6 +20,7 @@ from app.schemas.layout_plan import LayoutPlan
 from app.schemas.requirements import RequirementsSpec
 from app.services.export import layout_to_dxf, layout_to_glb, layout_to_ifc, layout_to_obj_zip, layout_to_svg
 from app.services.export.model import building_from_plan
+from app.services.export.mesh_export import building_meshes
 from app.services.layout_engine.engine import generate_plan
 from app.services.layout_engine.search import best_candidate
 
@@ -112,12 +113,20 @@ def test_obj_ships_with_its_materials():
     assert "newmtl" in archive.read("plan.mtl").decode()
 
 
+def test_mesh_exports_include_opening_elements():
+    plan = PLANS["villa"]
+    meshes = building_meshes(building_from_plan(plan))
+    assert all(f"door-{door.id}" in meshes for door in plan.doors)
+    assert all(f"window-{window.id}" in meshes for window in plan.windows)
+
+
 def test_svg_is_well_formed_and_escapes_names():
     plan = PLANS["villa"]
     renamed = plan.model_copy(update={"rooms": [plan.rooms[0].model_copy(update={"label": "Den <&> Study"}), *plan.rooms[1:]]})
     root = ET.fromstring(layout_to_svg(renamed, title="A & B"))
     texts = [t.text for t in root.iter("{http://www.w3.org/2000/svg}text")]
     assert "Den <&> Study" in texts and "A & B" in texts
+    assert "stroke-dasharray=\"5 3\"" in layout_to_svg(plan)
 
 
 async def _token(client: AsyncClient, email: str) -> str:
