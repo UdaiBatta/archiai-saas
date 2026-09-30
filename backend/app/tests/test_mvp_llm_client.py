@@ -245,3 +245,15 @@ async def test_hosted_mode_allows_concurrent_requests(monkeypatch):
 
     # no local GPU to protect: the hosted semaphore admits concurrent calls
     assert max_active == 2
+
+
+async def test_chat_structured_maps_http_429_to_rate_limited(monkeypatch):
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/models":
+            return _models_response()
+        return httpx.Response(429, json={"error": "quota"})
+
+    _use_transport(monkeypatch, handler)
+
+    with pytest.raises(llm_client.LLMRateLimited):
+        await llm_client.chat_structured("system", "user", {"type": "object"})

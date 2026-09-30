@@ -30,6 +30,8 @@ export interface EditorMenubarProps {
   onHistory: () => void
   onActivity: () => void
   onEditBrief: () => void
+  /** Plan ▸ Options…: three engine-generated alternatives for this brief. */
+  onOptions: () => void
   optionCount: number
   activeOption: number
   onPickOption: (index: number) => void
@@ -151,6 +153,7 @@ export function EditorMenubar(props: EditorMenubarProps) {
       </MenubarMenu>
 
       <MenubarMenu label="Plan">
+        <MenubarItem onClick={props.onOptions} disabled={!hasPlan}>Options…</MenubarItem>
         <MenubarSubmenu label="Layout options" disabled={props.optionCount < 2}>
           <MenubarRadioGroup
             value={props.activeOption}

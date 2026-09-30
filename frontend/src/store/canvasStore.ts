@@ -173,6 +173,10 @@ interface CanvasState {
   updateRoom: (id: string, patch: Partial<Omit<Room, 'id'>>, options?: UpdateOptions) => void
   /** Choose how two adjacent rooms meet: solid wall, door, or open. */
   setConnection: (roomA: string, roomB: string, kind: ConnectionKind) => void
+  /** Replace the plan's rooms and derived walls/doors/windows with `layout`
+   * (e.g. an accepted assistant edit) as ONE undoable step. Furniture and
+   * other non-plan objects, room colours and floor names are kept. */
+  applyLayoutEdit: (layout: CanvasLayout) => void
   /** Named 3D camera views, saved with the layout (outside undo history). */
   setSavedViews: (views: unknown[]) => void
   /** Site boundary and zoning rules (P2), saved with the layout; undoable. */
@@ -205,6 +209,10 @@ interface CanvasState {
   removeFloor: (level: number) => void
   loadRooms: (rooms: Room[]) => void
   loadLayout: (layout: CanvasLayout) => void
+  /** Swap in a different plan (e.g. a chosen option) as ONE undoable edit.
+   * Unlike applyLayoutEdit it drops the old plan's furniture (the rooms moved);
+   * keeps design ids, saved views, site, masses and housing. */
+  replaceLayout: (layout: CanvasLayout) => void
   clearLayout: () => void
   serializeLayout: () => CanvasLayout
 }
@@ -808,6 +816,31 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         ...markUnsaved(),
       }
     }),
+  applyLayoutEdit: (layout) =>
+    set((state) => {
+      const next = normalizeLayout(layout)
+      const isPlanObject = (o: Room) =>
+        ['room', 'stair', 'wall', 'door'].includes(o.objectType as string)
+        || (o.objectType === 'window' && o.derived === 'engine')
+      const previous = new Map(state.rooms.map((o) => [o.id, o]))
+      const rooms = [
+        ...next.rooms.map((o) => {
+          const color = previous.get(o.id)?.color
+          return o.objectType === 'room' && color ? { ...o, color } : o
+        }),
+        ...state.rooms.filter((o) => !isPlanObject(o)),
+      ]
+      const floors = next.floors.map((f) => ({ ...f, name: state.floors.find((s) => s.level === f.level)?.name ?? f.name }))
+      return {
+        rooms,
+        floors,
+        floorHeight: next.floorHeight,
+        layoutMetadata: { ...state.layoutMetadata, ...layout.metadata },
+        selectedId: rooms.some((o) => o.id === state.selectedId) ? state.selectedId : null,
+        ...pushHistory(state),
+        ...markUnsaved(),
+      }
+    }),
   resizeRoom: (id, size, position) =>
     set((state) => {
       const room = state.rooms.find((r) => r.id === id)
@@ -1183,6 +1216,26 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       measurePoints: [],
     })
   },
+  replaceLayout: (layout) =>
+    set((state) => {
+      const { floors, rooms, floorHeight } = normalizeLayout(layout)
+      // The plan changes; the camera views and site context around it do not.
+      const layoutMetadata = { ...(layout.metadata ?? {}) }
+      for (const key of ['savedViews', 'site', 'masses', 'housing']) {
+        if (state.layoutMetadata[key] !== undefined) layoutMetadata[key] = state.layoutMetadata[key]
+      }
+      return {
+        rooms,
+        floors,
+        floorHeight,
+        layoutMetadata,
+        selectedFloor: floors[0]?.level ?? 0,
+        selectedId: null,
+        pointerIntent: 'idle',
+        ...pushHistory(state),
+        ...markUnsaved(),
+      }
+    }),
   clearLayout: () =>
     set({
       rooms: [],
