@@ -14,6 +14,7 @@ import {
   type PlotBounds,
 } from './massing'
 import { useMassUi, useSiteAndMasses } from './massStore'
+import { HousingPanel } from './HousingPanel'
 
 const STATUS_CLASS: Record<MetricStatus, string> = {
   ok: 'text-ok',
@@ -172,6 +173,7 @@ export function MassingPanel({ readOnly, topView, plot, docked = false }: { read
                   </button>
                 </div>
               )}
+              <HousingPanel key={selected.id} mass={selected} readOnly={readOnly} />
             </section>
           )}
         </div>

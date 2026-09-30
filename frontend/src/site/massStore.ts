@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { create } from 'zustand'
 import { useCanvasStore } from '../store/canvasStore'
 import { parseMasses, parseSite, type Mass } from './siteTypes'
+import { parseHousing } from './housing'
 
 export type DrawMode = 'rect' | 'poly' | null
 
@@ -38,4 +39,27 @@ export function previewMasses(masses: Mass[]) {
 export function commitMasses(start: Mass[], final: Mass[]) {
   previewMasses(start)
   if (JSON.stringify(start) !== JSON.stringify(final)) useCanvasStore.getState().setMasses(final)
+}
+
+/** Housing UI state (not saved): the floor being looked at, the picked unit, auto re-solve. */
+export const useHousingUi = create<{
+  floor: number | 'all'
+  unitId: string | null
+  autoResolve: boolean
+  setFloor: (floor: number | 'all') => void
+  pickUnit: (unitId: string | null) => void
+  setAutoResolve: (on: boolean) => void
+}>((set) => ({
+  floor: 'all',
+  unitId: null,
+  autoResolve: false,
+  setFloor: (floor) => set({ floor }),
+  pickUnit: (unitId) => set({ unitId }),
+  setAutoResolve: (autoResolve) => set({ autoResolve }),
+}))
+
+/** Every mass's stored housing fill, re-parsed only when it changes. */
+export function useHousing() {
+  const raw = useCanvasStore((s) => s.layoutMetadata.housing)
+  return useMemo(() => parseHousing(raw), [raw])
 }
