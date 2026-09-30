@@ -118,6 +118,9 @@ export function WorkspacePanel({ modelStage, reviewChanges, onReviewChanges, onC
             <h3 className="mb-3 truncate text-sm font-semibold text-ink">{selected.label}</h3>
             <fieldset disabled={busy} className="min-w-0"><InspectorProperties room={selected} /></fieldset>
             {selected.objectType === 'room' && <RoomConnections roomId={selected.id} disabled={busy} />}
+            {Array.isArray(selected.separates) && selected.separates.length === 2 && (
+              <RoomConnections roomId={selected.separates[0] as string} onlyWith={selected.separates[1] as string} disabled={busy} />
+            )}
           </>
         ) : (
           <>

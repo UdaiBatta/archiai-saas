@@ -8,6 +8,7 @@ import { RoomMesh as RoomMeshBase } from './RoomMesh'
 import { MergedModel } from './MergedModel'
 import { isMergeable } from './mergedGeometry'
 import { TopPlanOverlay } from './TopPlanOverlay'
+import { NeighbourHighlights } from './NeighbourHighlights'
 import { TopPlanKeyboardLayer } from './TopPlanKeyboardLayer'
 import { PauseWhileMoving, PerfReadout, SHOW_PERF } from './RenderBudget'
 import { useCanvasStore } from '../../store/canvasStore'
@@ -35,7 +36,6 @@ import { SunHoursLayer } from '../../analysis/SunHoursLayer'
 // component no longer re-render every room.
 const RoomMesh = memo(RoomMeshBase)
 
-const AO_KEY = 'archiai:ambient-occlusion'
 
 const segmentClass = (active: boolean) =>
   `flex-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors ${
@@ -92,16 +92,11 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
   // capture canvas behind the plan lenses, nor the empty-brief backdrop).
   const studio = viewMode === '3d' && !briefBackground
   const topView = studio && preset === 'top'
-  // Ambient occlusion is a presentation option, off by default: a full-screen
-  // pass at 4x multisampling was the heaviest thing left in Persp on laptop
-  // GPUs. Remembered per browser; dropped automatically if frames slow down.
-  const [aoWanted, setAoWanted] = useState(() => {
-    try { return window.localStorage.getItem(AO_KEY) === '1' } catch { return false }
-  })
-  const chooseAo = (on: boolean) => {
-    setAoWanted(on)
-    try { window.localStorage.setItem(AO_KEY, on ? '1' : '0') } catch { /* private mode */ }
-  }
+  // Ambient occlusion is a presentation option, off by default and not
+  // remembered: a full-screen pass at 4x multisampling was the heaviest thing
+  // in Persp on laptop GPUs, and a remembered "on" made Persp feel slow for
+  // good. Dropped automatically if frames slow down.
+  const [aoWanted, chooseAo] = useState(false)
   const aoOn = studio && preset === 'perspective' && aoWanted
   // Top shows one level; "all" means the lowest, as the 2D plan did.
   const sortedFloors = [...floors].sort((a, b) => a.level - b.level)
@@ -187,7 +182,8 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
         key={`${viewMode}:${modelStage}`}
         frameloop="demand"
         shadows={viewMode === '3d' ? 'percentage' : false}
-        dpr={[1, 2]}
+        // 2x on a hi-DPI laptop screen is ~1.8x the pixels of 1.5x for little visible gain.
+        dpr={[1, 1.5]}
         // Drop to half resolution while moving (see PauseWhileMoving).
         performance={{ min: 0.5 }}
         camera={camera}
@@ -232,6 +228,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
             plan={topView}
           />
         ))}
+        {!modelStage && <NeighbourHighlights readOnly={readOnly} planY={topView ? (planFloor?.elevation ?? 0) + floorHeight + 0.35 : undefined} />}
         {topView && (
           <TopPlanOverlay
             orbitRef={orbitRef}
