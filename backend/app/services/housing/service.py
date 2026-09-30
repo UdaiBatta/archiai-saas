@@ -15,7 +15,7 @@ from app.schemas.housing import (
 )
 from app.schemas.requirements import Vertex
 from app.services.housing import partition as P
-from app.services.housing.units import placed, solve_unit, unit_width
+from app.services.housing.units import TARGET_AREA, placed, solve_unit, unit_width
 from app.services.layout_engine.geometry import EPS, Rect
 
 
@@ -33,6 +33,19 @@ def _outline(rect: Rect) -> list[Vertex]:
 def _bounds(vertices: list[Vertex]) -> tuple[float, float, float, float]:
     xs, ys = [v.x for v in vertices], [v.y for v in vertices]
     return min(xs), min(ys), max(xs), max(ys)
+
+
+def _floor_range(floors: list[int]) -> str:
+    """[0, 1, 2, 4] -> "Floors 0–2, 4"."""
+    parts, run = [], [floors[0]]
+    for f in floors[1:] + [None]:
+        if f is not None and f == run[-1] + 1:
+            run.append(f)
+            continue
+        parts.append(str(run[0]) if len(run) == 1 else f"{run[0]}–{run[-1]}")
+        if f is not None:
+            run = [f]
+    return ("Floors " if len(floors) > 1 else "Floor ") + ", ".join(parts)
 
 
 def fill_housing(req: HousingFillRequest) -> HousingFillResponse:
@@ -75,7 +88,9 @@ def fill_housing(req: HousingFillRequest) -> HousingFillResponse:
             continue
         locked_by_floor.setdefault(unit.floor, []).append(unit)
 
-    def floor_units(floor: int, locked: list[HousingUnit]) -> tuple[list[HousingUnit], float]:
+    targets = {t: TARGET_AREA[t] / depth for t in fit_shares}
+
+    def segments_for(locked: list[HousingUnit]) -> list[P.Segment]:
         reserved = []
         for unit in locked:
             x0, y0, x1, y1 = _bounds(unit.outline)
@@ -83,17 +98,17 @@ def fill_housing(req: HousingFillRequest) -> HousingFillResponse:
             for i, row in enumerate(plate.rows):
                 if box.overlaps(row.rect):
                     reserved.append((i, *plate.u_range(box)))
-        segments = P.cut_segments(plate.segments, reserved)
-        counts = Counter(u.unit_type for u in locked)
-        seqs = P.choose_types(segments, widths, fit_shares, dict(counts))
-        slots, unused = P.place(plate, segments, seqs, widths)
+        return P.cut_segments(plate.segments, reserved)
+
+    def build(floor: int, segments, seqs, locked: list[HousingUnit]) -> tuple[list[HousingUnit], float]:
+        unused = sum(seg.length for seg, (seq, _) in zip(segments, seqs) if not seq)
         units = list(locked)
         taken = {u.id for u in locked}
         ids = (f"f{floor}-u{n}" for n in range(1, 10_000) if f"f{floor}-u{n}" not in taken)
-        for slot in slots:
+        for slot in P.place(plate, segments, seqs):
             r = slot.rect
             plan = solve_unit(slot.unit_type, round(r.w, 3), round(r.d, 3), plate.rows[slot.row].corridor)
-            if plan is None:  # a widened end unit the engine can't lay out
+            if plan is None:  # a spread width the engine can't lay out
                 unused += plate.u_range(r)[1] - plate.u_range(r)[0]
                 continue
             units.append(HousingUnit(
@@ -106,15 +121,43 @@ def fill_housing(req: HousingFillRequest) -> HousingFillResponse:
             ))
         return units, unused
 
-    # Every floor without locks gets the same partition (stacked wet rooms).
-    typical, unused = floor_units(0, [])
-    units: list[HousingUnit] = []
-    for floor in range(req.floors):
-        if floor in locked_by_floor:
-            here, _ = floor_units(floor, locked_by_floor[floor])
-        else:
-            here = [u.model_copy(update={"id": f"f{floor}-{u.id.split('-', 1)[1]}", "floor": floor}) for u in typical]
-        units.extend(here)
+    types = sorted(fit_shares)
+    fixed = [0] * len(types)
+    by_floor: dict[int, list[HousingUnit]] = {}
+    # Floors with locks first: each fills around its locks on its own.
+    for floor, locked in sorted(locked_by_floor.items()):
+        segments = segments_for(locked)
+        _, states = P.floor_options(segments, widths, targets, fit_shares)
+        lock_counts = tuple(sum(u.unit_type == t for u in locked) for t in types)
+        key = min(states, key=lambda k: (
+            P.mix_error(tuple(a + b for a, b in zip(k, lock_counts)), types, fit_shares), states[k][0],
+        ))
+        by_floor[floor], _ = build(floor, segments, states[key][1], locked)
+        fixed = [f + a + b for f, a, b in zip(fixed, key, lock_counts)]
+
+    # The other floors: one or two stacked floor types (A below, B above),
+    # chosen for the building-wide mix. Wet rooms stack within each group.
+    free = [f for f in range(req.floors) if f not in by_floor]
+    unused = 0.0
+    if free:
+        _, states = P.floor_options(plate.segments, widths, targets, fit_shares)
+        groups = P.choose_floor_types(types, states, fit_shares, len(free), tuple(fixed))
+        start, ranges = 0, []
+        for label, (key, n) in zip("AB", groups):
+            template, left = build(0, plate.segments, states[key][1], [])
+            unused = max(unused, left)
+            floors = free[start:start + n]
+            start += n
+            ranges.append((label, floors))
+            for floor in floors:
+                by_floor[floor] = [
+                    u.model_copy(update={"id": f"f{floor}-{u.id.split('-', 1)[1]}", "floor": floor})
+                    for u in template
+                ]
+        if len(groups) == 2:
+            text = "; ".join(f"{_floor_range(fl)}: plan {label}" for label, fl in ranges)
+            warnings.append(text[0] + text[1:].replace("Floor", "floor"))
+    units = [u for f in sorted(by_floor) for u in by_floor[f]]
     if not units:
         raise HousingDoesNotFit("Too small for housing: not even one unit fits beside the core.")
     if unused > EPS:

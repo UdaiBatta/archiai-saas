@@ -181,12 +181,17 @@ def cut_segments(segments: list[Segment], reserved: list[tuple[int, float, float
     return out
 
 
-# The last TAIL_M of each segment is packed exhaustively (fewest metres
-# wasted, closest to the mix); before that, units are placed greedily.
+# Segments longer than TAIL_M are started greedily; the last TAIL_M is
+# packed exhaustively.
 TAIL_M = 40.0
-# One smallest-unit width of wasted frontage costs as much as this many
-# units of mix deviation.
-WASTE_WEIGHT = 1.5
+# A segment's spare length is spread over its units in proportion to their
+# widths; no unit may end up above CAP_RATIO x its target area unless the
+# facade rooms already force it (its minimum width is the floor).
+CAP_RATIO = 1.35
+# ponytail: floor-option states kept per segment step, pruned by mix error
+# then size penalty; raise if long multi-segment plates lose good mixes.
+STATE_LIMIT = 400
+PAIR_CANDIDATES = 60
 
 
 def _combos(types: list[str], widths: dict[str, float], length: float):
@@ -200,69 +205,161 @@ def _combos(types: list[str], widths: dict[str, float], length: float):
             yield (n, *tail)
 
 
-def choose_types(
-    segments: list[Segment],
-    widths: dict[str, float],
-    shares: dict[str, float],
-    counts: dict[str, int] | None = None,
-) -> list[list[str]]:
-    """Unit types per segment, aiming at the requested mix (shares of unit
-    count). Longest segment first: greedy by deficit (the type furthest
-    below its share) until TAIL_M is left, then the best-scoring exact
-    packing of the tail. ``counts`` seeds already-placed units (locks)."""
-    counts = dict(counts or {})
-    share_sum = sum(shares.values())
-    types = sorted(shares, key=lambda t: -widths[t])
-    min_w = min(widths.values())
-    seqs: list[list[str]] = [[] for _ in segments]
-
-    def deviation(c: dict[str, int]) -> float:
-        n = sum(c.values())
-        return sum(abs(c.get(t, 0) - shares[t] / share_sum * n) for t in shares)
-
-    for i in sorted(range(len(segments)), key=lambda k: -segments[k].length):
-        left = segments[i].length
-        while left > TAIL_M:
-            n = sum(counts.values()) + 1
-            t = max(types, key=lambda t: shares[t] / share_sum * n - counts.get(t, 0))
-            seqs[i].append(t)
-            counts[t] = counts.get(t, 0) + 1
-            left -= widths[t]
-        best = None
-        for combo in _combos(types, widths, left):
-            c = {t: counts.get(t, 0) + k for t, k in zip(types, combo)}
-            waste = left - sum(k * widths[t] for t, k in zip(types, combo))
-            score = deviation(c) + WASTE_WEIGHT * waste / min_w
-            if best is None or score < best[0] - 1e-9:
-                best = (score, combo, c)
-        _, combo, counts = best
-        seqs[i] += [t for t, k in zip(types, combo) for _ in range(k)]
-    return seqs
+def _prefix(length: float, widths: dict[str, float], shares: dict[str, float]) -> tuple[list[str], float]:
+    """Greedy start of a long segment: the type furthest below its share."""
+    seq: list[str] = []
+    left, share_sum = length, sum(shares.values())
+    while left > TAIL_M:
+        n = len(seq) + 1
+        t = max(sorted(widths), key=lambda t: shares[t] / share_sum * n - seq.count(t))
+        seq.append(t)
+        left -= widths[t]
+    return seq, left
 
 
-def place(
-    plate: Plate, segments: list[Segment], seqs: list[list[str]], widths: dict[str, float],
-) -> tuple[list[Slot], float]:
-    """Slots along each segment. Leftover length goes to the segment's end
-    units (half each); a segment with no units leaves its length unused.
-    Returns the slots and the total unused length."""
-    slots: list[Slot] = []
-    unused = 0.0
-    for seg, seq in zip(segments, seqs):
+def spread(seq: list[str], length: float, widths: dict[str, float], caps: dict[str, float]) -> list[float] | None:
+    """Unit widths filling `length`: the spare length shared in proportion
+    to the units' widths, but a unit that reaches its cap stops growing and
+    the rest share what's left. None when even every unit at its cap falls
+    short (or the minimum widths don't fit)."""
+    base = [widths[t] for t in seq]
+    if sum(base) > length + EPS or sum(caps[t] for t in seq) < length - EPS:
+        return None
+    out, free = list(base), set(range(len(seq)))
+    while True:
+        spare = length - sum(out)
+        grow = sum(base[i] for i in free)
+        if spare <= EPS or not free:
+            return out
+        capped = set()
+        for i in free:
+            out[i] += spare * base[i] / grow
+            if out[i] >= caps[seq[i]] - EPS:
+                out[i] = caps[seq[i]]
+                capped.add(i)
+        if not capped:
+            return out
+        free -= capped
+
+
+def segment_options(
+    length: float, widths: dict[str, float], targets: dict[str, float], shares: dict[str, float],
+) -> list[tuple[list[str], list[float], float]]:
+    """(type sequence, unit widths, size penalty) options for one segment.
+    The penalty is the sum over units of |width / target width - 1|. Only
+    packings whose units all stay within their caps; failing that, the
+    evenly spread packings with the least overshoot; failing that (nothing
+    fits), the empty sequence."""
+    caps = cap_widths(widths, targets)
+    types = sorted(widths, key=lambda t: -widths[t])
+    prefix, left = _prefix(length, widths, shares)
+    valid, over_cap = [], []
+    for combo in _combos(types, widths, left):
+        seq = prefix + [t for t, k in zip(types, combo) for _ in range(k)]
         if not seq:
-            unused += seg.length
             continue
-        ws = [widths[t] for t in seq]
-        spare = seg.length - sum(ws)
-        if len(ws) == 1:
-            ws[0] += spare
-        else:
-            ws[0] += spare / 2
-            ws[-1] += spare / 2
+        ws = spread(seq, length, widths, caps)
+        if ws is None:
+            scale = length / sum(widths[t] for t in seq)
+            ws = [widths[t] * scale for t in seq]
+            over_cap.append((max(w / caps[t] for t, w in zip(seq, ws)), seq, ws))
+            continue
+        valid.append((seq, ws, sum(abs(w / targets[t] - 1) for t, w in zip(seq, ws))))
+    if valid:
+        return valid
+    if not over_cap:
+        return [([], [], 0.0)]
+    # Nothing stays under the caps (the facade rule makes every unit too big
+    # already): keep the packings within 10% of the smallest overshoot.
+    least = min(o for o, _, _ in over_cap)
+    return [
+        (seq, ws, sum(abs(w / targets[t] - 1) for t, w in zip(seq, ws)))
+        for o, seq, ws in over_cap if o <= least + 0.1
+    ]
+
+
+def cap_widths(widths: dict[str, float], targets: dict[str, float]) -> dict[str, float]:
+    """The widest each type may grow: CAP_RATIO x target, never below the
+    minimum width the facade rooms need."""
+    return {t: max(targets[t] * CAP_RATIO, widths[t]) for t in widths}
+
+
+def floor_options(
+    segments: list[Segment], widths: dict[str, float], targets: dict[str, float], shares: dict[str, float],
+) -> tuple[list[str], dict[tuple[int, ...], tuple[float, list[list[str]]]]]:
+    """Every distinct per-floor unit count reachable by combining segment
+    options -> (lowest size penalty, (type sequence, widths) per segment)."""
+    types = sorted(shares)
+    states: dict[tuple[int, ...], tuple[float, list]] = {tuple(0 for _ in types): (0.0, [])}
+    for seg in segments:
+        opts = segment_options(seg.length, widths, targets, shares)
+        nxt: dict[tuple[int, ...], tuple[float, list[list[str]]]] = {}
+        for key, (pen, seqs) in states.items():
+            for seq, ws, p in opts:
+                k = tuple(c + seq.count(t) for c, t in zip(key, types))
+                if k not in nxt or pen + p < nxt[k][0]:
+                    nxt[k] = (pen + p, seqs + [(seq, ws)])
+        states = dict(sorted(
+            nxt.items(), key=lambda kv: (mix_error(kv[0], types, shares), kv[1][0]),
+        )[:STATE_LIMIT])
+    return types, states
+
+
+def mix_error(counts: tuple[int, ...], types: list[str], shares: dict[str, float]) -> tuple[float, float]:
+    """(worst, total) distance in units from the ideal counts; no units at
+    all is the worst possible."""
+    n = sum(counts)
+    if n == 0:
+        return (float("inf"), float("inf"))
+    share_sum = sum(shares.values())
+    devs = [abs(c - shares[t] / share_sum * n) for c, t in zip(counts, types)]
+    return (round(max(devs), 6), round(sum(devs), 6))
+
+
+def choose_floor_types(
+    types: list[str],
+    states: dict[tuple[int, ...], tuple[float, list[list[str]]]],
+    shares: dict[str, float],
+    n_floors: int,
+    fixed: tuple[int, ...] | None = None,
+) -> list[tuple[tuple[int, ...], int]]:
+    """One floor type for all `n_floors` when that is within one unit per
+    type of the ideal building mix, else the best pair (A for the first n
+    floors, B for the rest) by (mix error, size penalty). `fixed` counts
+    units already placed elsewhere (locked floors)."""
+    fixed = fixed or tuple(0 for _ in types)
+
+    def score(groups):
+        counts = tuple(f + sum(k[i] * n for k, n in groups) for i, f in enumerate(fixed))
+        return mix_error(counts, types, shares), sum(states[k][0] * n for k, n in groups)
+
+    best = min(([(k, n_floors)] for k in states), key=score)
+    if n_floors < 2 or score(best)[0][0] <= 1 + 1e-9:
+        return best
+    top = sorted(states, key=lambda k: (mix_error(k, types, shares), states[k][0]))[:PAIR_CANDIDATES]
+    best_score = score(best)
+    for a in top:
+        for b in top:
+            if a == b:
+                continue
+            for na in range(1, n_floors):
+                groups = [(a, na), (b, n_floors - na)]
+                sc = score(groups)
+                if sc < best_score:
+                    best, best_score = groups, sc
+    return best
+
+
+def place(plate: Plate, segments: list[Segment], layout: list[tuple[list[str], list[float]]]) -> list[Slot]:
+    """Slots along each segment from its (type sequence, unit widths)."""
+    slots: list[Slot] = []
+    for seg, (seq, ws) in zip(segments, layout):
+        if not seq:
+            continue
         cuts = [seg.u0]
         for w in ws[:-1]:
             cuts.append(round(cuts[-1] + w, 3))
         cuts.append(seg.u1)
         for k, t in enumerate(seq):
             slots.append(Slot(seg.row, t, plate.unit_rect(seg.row, cuts[k], cuts[k + 1])))
-    return slots, unused
+    return slots
