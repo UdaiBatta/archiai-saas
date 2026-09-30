@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.connection import get_db
 from app.models.project import Project
 from app.schemas.mvp import (
+    AssistantRequest,
+    AssistantResponse,
     ExtractRequest,
     ExtractResponse,
     GenerateMvpRequest,
@@ -24,6 +26,7 @@ from app.services.entitlement_service import (
     METRIC_GENERATIONS,
     enforce_and_increment_usage,
 )
+from app.services.assistant import plan_edits
 from app.services.extraction import ExtractionFailed, extract_requirements
 from app.services.layout_adapter import layout_plan_to_canvas
 from app.services.layout_engine import DoesNotFitError
@@ -33,6 +36,7 @@ from app.services.quality.scorer import score as score_layout
 from app.services.llm_client import (
     LLMError,
     LLMInvalidOutput,
+    LLMRateLimited,
     LLMTimeout,
     LLMUnavailable,
 )
@@ -173,6 +177,46 @@ async def extract_brief(
         optional_missing=decision.optional_missing,
         understood_summary=understood_summary(requirements),
     )
+
+
+@router.post(
+    "/assistant/plan-edits",
+    response_model=AssistantResponse,
+    dependencies=[Depends(rate_limit("assistant", limit=10, window_seconds=60))],
+)
+async def assistant_plan_edits(
+    request: AssistantRequest,
+    _user_id: str = Depends(_current_user_id),
+) -> AssistantResponse:
+    """Propose (never save) an edit from a plain-language instruction."""
+    try:
+        result = await plan_edits(
+            request.instruction,
+            request.layout,
+            request.requirements,
+            request.selected_room_id,
+        )
+    except LLMRateLimited as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="The assistant is busy right now; try again in a minute.",
+        ) from exc
+    except LLMTimeout as exc:
+        raise HTTPException(
+            status_code=504,
+            detail="The assistant took too long to respond. Please try again.",
+        ) from exc
+    except LLMInvalidOutput as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="The assistant returned an unreadable answer. Try rephrasing.",
+        ) from exc
+    except LLMError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="The assistant is unavailable right now. Please try again later.",
+        ) from exc
+    return AssistantResponse(**result)
 
 
 @router.post(

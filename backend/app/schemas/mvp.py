@@ -106,3 +106,31 @@ class MvpVersionResponse(BaseModel):
     layout: LayoutPlan
     quality: MvpQualitySnapshot | HardQualitySnapshot
     created_at: datetime = Field(alias="createdAt")
+
+
+class AssistantRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    instruction: str = Field(min_length=1, max_length=500)
+    layout: LayoutPlan
+    requirements: RequirementsSpec
+    selected_room_id: str | None = Field(default=None, max_length=96)
+
+
+class AssistantResponse(BaseModel):
+    """A PROPOSED edit. Nothing is saved; the editor applies ``layout_after``
+    only when the user presses Apply."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    summary: str
+    # Validated commands, each with a plain-words ``description``.
+    commands: list[dict[str, Any]]
+    layout_after: LayoutPlan
+    requirements_after: RequirementsSpec
+    quality_before: MvpQualitySnapshot
+    quality_after: MvpQualitySnapshot
+    introduces_hard_violations: bool
+    # False when there is nothing to apply (explain-only or all rejected).
+    changed: bool
+    warnings: list[str] = Field(default_factory=list)
