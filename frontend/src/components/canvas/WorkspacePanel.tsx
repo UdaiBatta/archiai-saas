@@ -9,6 +9,8 @@ import { ZONE_META, ZONE_ORDER, displayRoomColor } from './editorPalette'
 import { zoneForRoom } from './zoneModel'
 import { roomPlanArea as planArea } from './topViewModel'
 import { formatArea } from '../../utils/format'
+import { furnishRooms } from '../../services/furnish.service'
+import { getApiErrorMessage } from '../../services/apiError'
 
 interface WorkspacePanelProps {
   modelStage: boolean
@@ -22,6 +24,18 @@ interface WorkspacePanelProps {
 
 export function WorkspacePanel({ modelStage, reviewChanges, onReviewChanges, onCreateModel, open, onClose, busy }: WorkspacePanelProps) {
   const [search, setSearch] = useState('')
+  const [furnishing, setFurnishing] = useState(false)
+  const [furnishNotes, setFurnishNotes] = useState<string[] | null>(null)
+  const furnish = async () => {
+    setFurnishing(true)
+    try {
+      setFurnishNotes(await furnishRooms())
+    } catch (error) {
+      setFurnishNotes([getApiErrorMessage(error, 'Could not furnish the rooms.')])
+    } finally {
+      setFurnishing(false)
+    }
+  }
   // Low priority: the list must not hold up the canvas while a room is dragged.
   const rooms = useDeferredValue(useCanvasStore((s) => s.rooms))
   const selectedId = useCanvasStore((s) => s.selectedId)
@@ -138,10 +152,28 @@ export function WorkspacePanel({ modelStage, reviewChanges, onReviewChanges, onC
       </div>
       <div className="border-t border-ink/10 bg-graphite-900/40 p-3">
         {!modelStage && !reviewChanges && <button type="button" onClick={() => onReviewChanges(true)} className="mb-2 w-full rounded-lg border border-ink/15 px-3 py-2 text-xs text-ink">Review & refine{activityLog.length ? ` · ${activityLog.length}` : ''}</button>}
-        <button type="button" data-testid="create-3d-model" disabled={busy} onClick={modelStage ? () => setPlacementMode(placementMode === 'furniture' ? null : 'furniture') : onCreateModel} className="w-full rounded-lg bg-accent px-3 py-2.5 text-xs font-semibold text-graphite-950 hover:bg-accent-bright disabled:opacity-50">
-          {modelStage ? placementMode === 'furniture' ? 'Cancel furniture placement' : '+ Add furniture' : 'Create a 3D model →'}
-        </button>
-        <p className="mt-2 text-center text-[10px] leading-relaxed text-muted-light">{modelStage ? placementMode === 'furniture' ? 'Click on a room floor to place a proxy. Esc cancels.' : 'Generic furniture proxies · a type library comes later' : 'Happy with the layout? Continue to walls & furniture.'}</p>
+        {modelStage && furnishNotes && furnishNotes.length > 0 && (
+          <div role="status" aria-label="Furnishing warnings" className="mb-2 rounded-lg border border-warn/30 bg-warn/10 px-3 py-2 text-[11px] leading-relaxed text-ink">
+            <div className="mb-1 flex items-center justify-between font-semibold text-warn">
+              Not everything fit
+              <button type="button" aria-label="Dismiss warnings" onClick={() => setFurnishNotes(null)} className="text-muted hover:text-ink">✕</button>
+            </div>
+            <ul className="list-disc space-y-0.5 pl-4">
+              {furnishNotes.map((note) => <li key={note}>{note}</li>)}
+            </ul>
+          </div>
+        )}
+        <div className="flex gap-2">
+          {modelStage && (
+            <button type="button" disabled={busy || furnishing} onClick={furnish} title="Place beds, sofas, tables, counters and fixtures, checked against clearances and door swings" className="flex-1 rounded-lg border border-ink/15 px-3 py-2.5 text-xs font-semibold text-ink hover:border-ink/30 disabled:opacity-50">
+              {furnishing ? 'Furnishing…' : 'Furnish rooms'}
+            </button>
+          )}
+          <button type="button" data-testid="create-3d-model" disabled={busy} onClick={modelStage ? () => setPlacementMode(placementMode === 'furniture' ? null : 'furniture') : onCreateModel} className="flex-1 rounded-lg bg-accent px-3 py-2.5 text-xs font-semibold text-graphite-950 hover:bg-accent-bright disabled:opacity-50">
+            {modelStage ? placementMode === 'furniture' ? 'Cancel placement' : '+ Add furniture' : 'Create a 3D model →'}
+          </button>
+        </div>
+        <p className="mt-2 text-center text-[10px] leading-relaxed text-muted-light">{modelStage ? placementMode === 'furniture' ? 'Click on a room floor to place a proxy. Esc cancels.' : 'Furnish rooms re-places auto furniture; hand-placed pieces stay' : 'Happy with the layout? Continue to walls & furniture.'}</p>
       </div>
     </aside>
   )
