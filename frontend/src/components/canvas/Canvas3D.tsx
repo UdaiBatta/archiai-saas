@@ -72,9 +72,11 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
   const preset: CameraPreset = planLens ? 'top' : orbitPreset
   const [frameNonce, setFrameNonce] = useState(0)
   const [focusedRoomId, setFocusedRoomId] = useState<string | null>(null)
+  const [focusedMassId, setFocusedMassId] = useState<string | null>(null)
   const floors = useCanvasStore((s) => s.floors)
   const floorHeight = useCanvasStore((s) => s.floorHeight)
   const [ghostFloors, setGhostFloors] = useState(false)
+  const [pendingRestore, setPendingRestore] = useState<{ view: SavedView; floor: number | 'all' } | null>(null)
   const multiFloor = useCanvasStore((s) => s.floors.length > 1)
   const hasSavedViews = useCanvasStore((s) => parseSavedViews({ savedViews: s.layoutMetadata.savedViews }).length > 0)
   const viewCameraRef = useRef<ViewCameraApi>(null)
@@ -86,7 +88,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
     setGhostFloors(view.ghostFloors)
     const floor = restorableFloor(view, state.floors.map((level) => level.level))
     state.setSelectedFloor(floor)
-    viewCameraRef.current?.restore(view, floor)
+    setPendingRestore({ view, floor })
   }
   // Architectural site presentation for the real 3D view (not the hidden
   // capture canvas behind the plan lenses, nor the empty-brief backdrop).
@@ -212,7 +214,14 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
         }
       >
         <Scene orbitRef={orbitRef} readOnly={readOnly} viewMode={viewMode} modelStage={modelStage} sunHour={sunHour} preset={preset} site={studio} level={planLevel} frameNonce={frameNonce} focus={focus} />
-        {studio && <ViewCamera apiRef={viewCameraRef} preset={preset} />}
+        {studio && (
+          <ViewCamera
+            apiRef={viewCameraRef}
+            preset={preset}
+            pendingRestore={pendingRestore}
+            onRestored={() => setPendingRestore(null)}
+          />
+        )}
         {solidModel && (
           <MergedModel objects={mergedObjects} openings={openings} invalidRoomIds={invalidRoomIds} readOnly={readOnly} plan={topView} />
         )}
@@ -241,7 +250,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
           />
         )}
         {studio && <SunHoursLayer />}
-        {studio && <MassLayer orbitRef={orbitRef} readOnly={readOnly} topView={topView} />}
+        {studio && <MassLayer orbitRef={orbitRef} readOnly={readOnly} topView={topView} focusedMassId={focusedMassId} />}
         {studio && (
           <SiteLayer orbitRef={orbitRef} readOnly={readOnly} topView={topView} planY={(planFloor?.elevation ?? 0) + floorHeight + 0.4} />
         )}
@@ -269,7 +278,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
         {SHOW_PERF && <PerfReadout />}
       </Canvas>
       {topView && !readOnly && (
-        <TopPlanKeyboardLayer rooms={visibleRooms} invalidRoomIds={invalidRoomIds} onFocusRoom={setFocusedRoomId} />
+        <TopPlanKeyboardLayer rooms={visibleRooms} invalidRoomIds={invalidRoomIds} onFocusRoom={setFocusedRoomId} onFocusMass={setFocusedMassId} />
       )}
       {studio && dock && (
         <EditorDock

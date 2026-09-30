@@ -52,6 +52,14 @@ def layout_to_svg(plan: LayoutPlan, title: str | None = None) -> str:
 
     for index, floor in enumerate(building.floors):
         dx = index * (house_w + _GAP_M)
+        if index == 0:
+            boundary = (
+                [(vertex.x, vertex.y) for vertex in plan.plot.boundary]
+                if plan.plot.boundary
+                else [(0.0, 0.0), (building.width, 0.0), (building.width, building.depth), (0.0, building.depth)]
+            )
+            points = " ".join(f"{a},{b}" for a, b in (pt(x, y, dx) for x, y in boundary))
+            out.append(f'<polygon points="{points}" fill="none" stroke="#777" stroke-width="1.5" stroke-dasharray="5 3"/>')
         for room in (r for r in building.rooms if r.floor == floor):
             points = " ".join(f"{a},{b}" for a, b in (pt(x, y, dx) for x, y in room.points))
             out.append(f'<polygon points="{points}" fill="{_ROOM_FILL.get(room.type, "#eeeeee")}" stroke="none"/>')

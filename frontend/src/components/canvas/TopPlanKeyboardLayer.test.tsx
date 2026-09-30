@@ -23,9 +23,9 @@ const room = (id: string, label: string, x: number, overrides: Partial<Room> = {
 
 const ROOMS = [room('room-1', 'Living Room', 2), room('room-2', 'Bedroom', 6)]
 
-function Harness({ onFocusRoom = () => {} }: { onFocusRoom?: (id: string | null) => void }) {
+function Harness({ onFocusRoom = () => {}, onFocusMass = () => {} }: { onFocusRoom?: (id: string | null) => void; onFocusMass?: (id: string | null) => void }) {
   useCanvasKeyboardShortcuts()
-  return <TopPlanKeyboardLayer rooms={ROOMS} invalidRoomIds={new Set(['room-2'])} onFocusRoom={onFocusRoom} />
+  return <TopPlanKeyboardLayer rooms={ROOMS} invalidRoomIds={new Set(['room-2'])} onFocusRoom={onFocusRoom} onFocusMass={onFocusMass} />
 }
 
 beforeEach(() => {
@@ -71,7 +71,8 @@ describe('TopPlanKeyboardLayer', () => {
       { id: 'm1', name: 'Tower', footprint: [{ x: 0, z: 0 }, { x: 10, z: 0 }, { x: 10, z: 8 }, { x: 0, z: 8 }], floors: 5, floorHeightM: 3, baseM: 0 },
       { id: 'm2', name: 'Podium', footprint: [{ x: 0, z: 10 }, { x: 5, z: 10 }, { x: 5, z: 14 }, { x: 0, z: 14 }], floors: 1, floorHeightM: 4, baseM: 0 },
     ])
-    render(<Harness />)
+    const onFocusMass = vi.fn()
+    render(<Harness onFocusMass={onFocusMass} />)
     const user = userEvent.setup()
     expect(screen.getByRole('button', { name: 'Tower, mass, 5 floors, GFA 400.0 m²' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Podium, mass, 1 floor, GFA 20.0 m²' })).toBeInTheDocument()
@@ -81,11 +82,13 @@ describe('TopPlanKeyboardLayer', () => {
     expect(useCanvasStore.getState().selectedId).toBe('room-1')
     await user.tab()
     await user.tab()
+    expect(onFocusMass).toHaveBeenLastCalledWith('m1')
     await user.keyboard('{Enter}')
     expect(useMassUi.getState().selectedMassId).toBe('m1')
     expect(useCanvasStore.getState().selectedId).toBeNull()
     expect(screen.getByTestId('plan-mass-m1')).toHaveAttribute('aria-pressed', 'true')
     await user.tab()
+    expect(onFocusMass).toHaveBeenLastCalledWith('m2')
     await user.keyboard(' ')
     expect(useMassUi.getState().selectedMassId).toBe('m2')
 

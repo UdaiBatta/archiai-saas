@@ -81,6 +81,18 @@ async def test_set_connection_opens_shared_wall():
     )
 
 
+async def test_set_connection_rejects_nonadjacent_rooms():
+    result = await _run(_cmd("set_connection", a="r1", b="r6", kind="open"))
+    assert result["changed"] is False
+    assert result["layout_after"].connections == PLAN.connections
+    assert any("do not share a wall" in warning for warning in result["warnings"])
+
+
+def test_change_program_deduplicates_room_removals():
+    commands, _ = assistant.validate_commands([_cmd("change_program", remove=["r1", "r1"])], PLAN)
+    assert commands[0]["remove"] == ["r1"]
+
+
 async def test_unknown_ids_are_rejected():
     result = await _run(
         _cmd("resize_room", room_id="r99", w=3),
