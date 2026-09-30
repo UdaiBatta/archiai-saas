@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { Mass, Site } from '../site/siteTypes'
+import type { MassHousing } from '../site/housingTypes'
 import {
   COMPONENT_REGISTRY,
   clampComponentSize,
@@ -178,6 +179,8 @@ interface CanvasState {
   setSite: (site: Site | null) => void
   /** Building masses (P2), saved with the layout; undoable. */
   setMasses: (masses: Mass[]) => void
+  /** Housing fill of one mass (P3), saved with the layout; undoable. null removes it. */
+  setHousing: (massId: string, housing: MassHousing | null) => void
   resizeRoom: (
     id: string,
     size: ComponentSize,
@@ -191,6 +194,9 @@ interface CanvasState {
   clearClipboardMessage: () => void
   addObject: (objectType: CanvasObjectType) => void
   addObjectAt: (objectType: CanvasObjectType, x: number, z: number) => void
+  /** Swap auto-placed furniture (`derived: 'furnish'`) for `items`, keeping
+   * hand-placed pieces; one undo step. */
+  applyFurnishing: (items: Room[]) => void
   setPlacementMode: (objectType: CanvasObjectType | null) => void
   undo: () => void
   redo: () => void
@@ -771,6 +777,13 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       ...pushHistory(state),
       ...markUnsaved(),
     })),
+  setHousing: (massId, housing) =>
+    set((state) => {
+      const all = { ...(state.layoutMetadata.housing as Record<string, MassHousing> | undefined) }
+      if (housing) all[massId] = housing
+      else delete all[massId]
+      return { layoutMetadata: { ...state.layoutMetadata, housing: all }, ...pushHistory(state), ...markUnsaved() }
+    }),
   setConnection: (roomA, roomB, kind) =>
     set((state) => {
       const labelOf = (id: string) => state.rooms.find((r) => r.id === id)?.label ?? id
@@ -1014,6 +1027,28 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
             objectLabel: newObject.label,
             previousValue: null,
             newValue: newObject,
+            createdAt: new Date().toISOString(),
+          },
+          ...state.activityLog,
+        ],
+        ...pushHistory(state),
+        ...markUnsaved(),
+      }
+    }),
+  applyFurnishing: (items) =>
+    set((state) => {
+      const rooms = [...state.rooms.filter((room) => !(room.objectType === 'furniture' && room.derived === 'furnish')), ...items]
+      return {
+        rooms,
+        selectedId: rooms.some((room) => room.id === state.selectedId) ? state.selectedId : null,
+        activityLog: [
+          {
+            id: nextId('activity'),
+            action: 'object.added' as CanvasEditAction,
+            objectId: 'furnish',
+            objectLabel: `Furnished rooms (${items.length} pieces)`,
+            previousValue: null,
+            newValue: items.length,
             createdAt: new Date().toISOString(),
           },
           ...state.activityLog,

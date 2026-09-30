@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react'
 
 import { getApiErrorMessage } from '../../services/apiError'
-import { canvasObjectsToLayoutPlan } from '../../services/mvpLayoutAdapter'
+import { currentLayoutPlan } from '../../services/furnish.service'
 import projectService, { type FileExportFormat, type Project } from '../../services/project.service'
 import { useCanvasStore, type CanvasViewMode } from '../../store/canvasStore'
-import type { Connection, Facing, PlanZoneSpan } from '../../types/contracts'
 import { Menubar, MenubarItem, MenubarMenu, MenubarRadioGroup, MenubarSeparator, MenubarSubmenu } from '../ui/Menubar'
 
 export const VIEW_MODE_OPTIONS: { value: CanvasViewMode; label: string }[] = [
@@ -49,16 +48,6 @@ const FILE_EXPORTS: { format: FileExportFormat; label: string }[] = [
   { format: 'obj', label: 'OBJ — 3D model (zip)' },
   { format: 'svg', label: 'SVG — vector plan' },
 ]
-
-// Same plan the post-edit validation sends (useMvpQualityValidation).
-function currentLayoutPlan() {
-  const { rooms, floors, layoutMetadata } = useCanvasStore.getState()
-  const footprint = floors[0]?.footprint // every storey shares the footprint; objects carry their floor
-  if (!footprint) return null
-  const facing = (layoutMetadata.mvpRequirements as { facing?: Facing } | undefined)?.facing
-  const connections = Array.isArray(layoutMetadata.mvpConnections) ? (layoutMetadata.mvpConnections as Connection[]) : []
-  return canvasObjectsToLayoutPlan(rooms, footprint, facing ?? 'east', connections, layoutMetadata.mvpFootprint as PlanZoneSpan | undefined)
-}
 
 /**
  * The editor's File / Edit / View / Plan menus. Everything the project page
