@@ -4,6 +4,7 @@ import pytest
 from httpx import AsyncClient
 
 from app.schemas.housing import HousingFillRequest
+from app.schemas.requirements import Vertex
 from app.services.housing import HousingDoesNotFit, fill_housing
 from app.services.housing.units import TARGET_AREA, facade_violations, solve_unit, unit_spec
 from app.services.layout_engine.geometry import EPS, Rect
@@ -137,7 +138,7 @@ def test_locked_units_are_kept_verbatim(result):
 
 def test_invalid_locked_units_are_dropped_after_a_plate_change(result):
     locked = result.units[0].model_copy(update={"locked": True, "outline": [
-        {"x": -100, "y": -100}, {"x": -99, "y": -100}, {"x": -99, "y": -99}, {"x": -100, "y": -99},
+        Vertex(x=-100, y=-100), Vertex(x=-99, y=-100), Vertex(x=-99, y=-99), Vertex(x=-100, y=-99),
     ]})
     again = fill_housing(_request(locked_units=[locked]))
     assert not any(unit.id == locked.id for unit in again.units)

@@ -97,7 +97,7 @@ def fill_housing(req: HousingFillRequest) -> HousingFillResponse:
             continue
         outline = Polygon(([(v.x, v.y) for v in unit.outline]))
         row_ok = any(Polygon(((row.rect.x, row.rect.y), (row.rect.x2, row.rect.y), (row.rect.x2, row.rect.y2), (row.rect.x, row.rect.y2))).covers(outline) for row in plate.rows)
-        if not outline.is_valid or outline.area <= EPS or not plate_poly.covers(outline) or not row_ok or any(outline.intersects(block) for block in circulation):
+        if not outline.is_valid or outline.area <= EPS or not plate_poly.covers(outline) or not row_ok or any(outline.intersection(block).area > EPS for block in circulation):
             warnings.append(f"Locked unit {unit.id} no longer fits this plate; dropped.")
             continue
         if any(outline.intersects(Polygon([(v.x, v.y) for v in other.outline])) for other in locked_by_floor.get(unit.floor, [])):
