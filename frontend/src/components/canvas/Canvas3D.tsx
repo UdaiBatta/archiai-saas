@@ -23,6 +23,7 @@ import { SavedViewsPanel, ViewCamera, type ViewCameraApi } from './SavedViewsPan
 import { parseSavedViews, restorableFloor, type SavedView } from './savedViews'
 import { MassLayer } from '../../site/MassLayer'
 import { MassingPanel } from '../../site/MassingPanel'
+import { AssistantPanel } from './AssistantPanel'
 import { SiteLayer } from '../../site/SiteLayer'
 import { SitePanel } from '../../site/SitePanel'
 import { useSiteAndMasses } from '../../site/massStore'
@@ -279,6 +280,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
           modelStage={modelStage}
           alerts={{ massing: zoningIssueCount }}
           tools={{
+            assistant: !readOnly && !modelStage && <AssistantPanel />,
             site: <SitePanel defaultOpen topView={topView} onRequestTop={() => applyPreset('top')} />,
             massing: <MassingPanel docked readOnly={readOnly} topView={topView} plot={planBounds ?? null} />,
             views: (!readOnly || hasSavedViews) && (
