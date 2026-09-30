@@ -692,6 +692,32 @@ describe('undo/redo', () => {
     expect(useCanvasStore.getState().rooms.length).toBe(start)
   })
 
+  it('replaceLayout swaps the plan as one undoable edit', () => {
+    useCanvasStore.setState({ designId: 'd1', layoutMetadata: { savedViews: [{ id: 'v1' }], prompt: 'old' } })
+    const before = useCanvasStore.getState().rooms.map((r) => r.id)
+    useCanvasStore.getState().replaceLayout({
+      version: '1.0',
+      metadata: { prompt: 'new' },
+      rooms: [{
+        id: 'opt-1', label: 'Hall', objectType: 'room',
+        position: { x: 1, y: 1.5, z: 1 }, size: { w: 2, h: 3, d: 2 }, rotation: { x: 0, y: 0, z: 0 }, color: '#5F6E88',
+      }],
+    })
+    let state = useCanvasStore.getState()
+    expect(state.rooms.map((r) => r.id)).toEqual(['opt-1'])
+    expect(state.designId).toBe('d1')
+    expect(state.layoutMetadata).toEqual({ prompt: 'new', savedViews: [{ id: 'v1' }] })
+    expect(state.past).toHaveLength(1)
+    expect(state.hasUnsavedChanges).toBe(true)
+
+    state.undo()
+    state = useCanvasStore.getState()
+    expect(state.rooms.map((r) => r.id)).toEqual(before)
+    expect(state.layoutMetadata.prompt).toBe('old')
+    state.redo()
+    expect(useCanvasStore.getState().rooms.map((r) => r.id)).toEqual(['opt-1'])
+  })
+
   it('keeps saved camera views across undo and redo, and saves them with the layout', () => {
     useCanvasStore.getState().updateRoom('room-1', { position: { x: 3, y: 1.5, z: 4 } })
     useCanvasStore.getState().setSavedViews([{ id: 'v1' }])

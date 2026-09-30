@@ -205,6 +205,8 @@ interface CanvasState {
   removeFloor: (level: number) => void
   loadRooms: (rooms: Room[]) => void
   loadLayout: (layout: CanvasLayout) => void
+  /** Swap in another layout as ONE undoable edit (keeps design ids, history and saved views). */
+  replaceLayout: (layout: CanvasLayout) => void
   clearLayout: () => void
   serializeLayout: () => CanvasLayout
 }
@@ -1183,6 +1185,26 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       measurePoints: [],
     })
   },
+  replaceLayout: (layout) =>
+    set((state) => {
+      const { floors, rooms, floorHeight } = normalizeLayout(layout)
+      // The plan changes; the camera views and site context around it do not.
+      const layoutMetadata = { ...(layout.metadata ?? {}) }
+      for (const key of ['savedViews', 'site', 'masses', 'housing']) {
+        if (state.layoutMetadata[key] !== undefined) layoutMetadata[key] = state.layoutMetadata[key]
+      }
+      return {
+        rooms,
+        floors,
+        floorHeight,
+        layoutMetadata,
+        selectedFloor: floors[0]?.level ?? 0,
+        selectedId: null,
+        pointerIntent: 'idle',
+        ...pushHistory(state),
+        ...markUnsaved(),
+      }
+    }),
   clearLayout: () =>
     set({
       rooms: [],

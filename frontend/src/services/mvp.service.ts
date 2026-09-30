@@ -7,6 +7,7 @@ import type {
   MvpQualitySnapshot,
   MvpValidationSyncResponse,
   MvpVersionResponse,
+  OptionsResponse,
   RequirementsSpec,
 } from '../types/contracts'
 
@@ -39,6 +40,15 @@ export async function generateMvpLayout(
     },
     { signal },
   )
+  return data
+}
+
+/** Three distinct, scored layouts for a brief, from the engine alone. */
+export async function fetchLayoutOptions(
+  requirements: RequirementsSpec,
+  signal?: AbortSignal,
+): Promise<OptionsResponse> {
+  const { data } = await api.post<OptionsResponse>('/api/options', { requirements, count: 3 }, { signal })
   return data
 }
 
