@@ -63,7 +63,8 @@ describe('siteMetrics', () => {
     const t = performance.now()
     siteMetrics(site({ maxFar: 2 }), masses)
     zoningIssues(site({ maxFar: 2, maxHeightM: 10, maxCoverage: 0.3 }), masses)
-    // Hosted CI runners can exceed the local 100ms budget without changing the result.
+    // Hosted runners vary substantially; this guards accidental blowups without
+    // making a 100 ms wall-clock promise for a live geometry interaction.
     expect(performance.now() - t).toBeLessThan(250)
   })
 })
@@ -150,6 +151,16 @@ describe('zoningIssues', () => {
     expect(issues).toHaveLength(1)
     expect(issues[0]).toMatchObject({ code: 'overlap', massId: 'b' })
     expect(polygonArea(issues[0].fix!.masses[1].footprint)).toBeCloseTo(50)
+  })
+
+  it('does not offer a lossy overlap fix for contained or split footprints', () => {
+    const contained = zoningIssues(site(), [mass('a', rect(10, 10, 20, 20)), mass('b', rect(15, 15, 5, 5))])
+    expect(contained.find((issue) => issue.code === 'overlap')?.fix).toBeUndefined()
+    const split = zoningIssues(site(), [
+      mass('a', rect(15, 10, 5, 20)),
+      mass('b', rect(10, 15, 20, 5)),
+    ])
+    expect(split.find((issue) => issue.code === 'overlap')?.fix).toBeUndefined()
   })
 })
 

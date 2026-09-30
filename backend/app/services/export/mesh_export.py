@@ -19,7 +19,7 @@ from shapely.geometry.polygon import orient
 
 from app.config.mvp_defaults import WALL_HEIGHT_M
 from app.schemas.layout_plan import LayoutPlan
-from app.services.export.model import SLAB_THICKNESS_M, Building, building_from_plan
+from app.services.export.model import DOOR_HEIGHT_M, SLAB_THICKNESS_M, WINDOW_HEAD_M, WINDOW_SILL_M, Building, building_from_plan
 
 _WALL_RGBA = (226, 225, 215, 255)
 _FLOOR_RGBA = {
@@ -31,6 +31,8 @@ _FLOOR_RGBA = {
     "corridor": (62, 57, 54, 255), "hallway": (62, 57, 54, 255),
 }
 _DEFAULT_FLOOR_RGBA = (94, 80, 73, 255)
+_DOOR_RGBA = (126, 78, 43, 255)
+_WINDOW_RGBA = (91, 143, 176, 180)
 
 
 def _box(center: tuple[float, float, float], extents: tuple[float, float, float], angle: float, rgba) -> trimesh.Trimesh:
@@ -89,6 +91,16 @@ def building_meshes(building: Building) -> dict[str, trimesh.Trimesh]:
             x, z = wall.x1 + ux * mid, wall.y1 + uz * mid
             meshes[f"{wall.id}-{index}"] = _box(
                 (x, base + (bottom + top) / 2, z), (end - start, top - bottom, wall.thickness), angle, _WALL_RGBA
+            )
+        for opening in wall.openings:
+            mid = (opening.start + opening.end) / 2
+            x, z = wall.x1 + ux * mid, wall.y1 + uz * mid
+            sill, head = opening.sill, opening.head
+            meshes[f"{opening.kind}-{opening.id}"] = _box(
+                (x, base + (sill + head) / 2, z),
+                (opening.width, head - sill, max(wall.thickness * 0.25, 0.03)),
+                angle,
+                _DOOR_RGBA if opening.kind == "door" else _WINDOW_RGBA,
             )
     for room in building.rooms:
         polygon = Polygon(room.points)
