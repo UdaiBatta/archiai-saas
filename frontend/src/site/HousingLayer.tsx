@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react'
 import { Html } from '@react-three/drei'
 import type { ThreeEvent } from '@react-three/fiber'
 import { useCanvasStore } from '../store/canvasStore'
+import { usePixelsPerMetre } from '../components/canvas/TopPlanOverlay'
 import type { MassHousing } from './housingTypes'
 import { buildHousingModel, disposeHousingModel } from './housingGeometry'
 import { useHousing, useHousingUi, useMassUi, useSiteAndMasses } from './massStore'
@@ -22,6 +23,7 @@ function HousedMass({ mass, housing, topView }: { mass: Mass; housing: MassHousi
   const selected = useMassUi((s) => s.selectedMassId === mass.id)
   const floor = useHousingUi((s) => s.floor)
   const unitId = useHousingUi((s) => s.unitId)
+  const px = usePixelsPerMetre()
   // Only the selected mass opens a floor; others stay closed volumes.
   const view = { floor: selected ? floor : ('all' as const), top: topView, pickedUnitId: selected ? unitId : null }
   const model = useMemo(
@@ -64,10 +66,10 @@ function HousedMass({ mass, housing, topView }: { mass: Mass; housing: MassHousi
       )}
       {model.markers && (
         <lineSegments geometry={model.markers} raycast={() => null} renderOrder={4}>
-          <lineBasicMaterial vertexColors depthTest={false} />
+          <lineBasicMaterial vertexColors />
         </lineSegments>
       )}
-      {topView && model.labels.map((l) => (
+      {topView && model.labels.filter((l) => l.size * px >= l.text.length * 5 + 4).map((l) => (
         <Html key={l.key} position={l.position} center zIndexRange={[1, 0]} style={{ pointerEvents: 'none' }}>
           <div className="whitespace-nowrap text-[9px] font-medium leading-none text-graphite-900/80">{l.text}</div>
         </Html>

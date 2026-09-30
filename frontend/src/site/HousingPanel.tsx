@@ -190,7 +190,7 @@ export function HousingYield({ housing }: { housing: MassHousing }) {
                 </div>
               </td>
               <td className={`py-0.5 text-right font-semibold ${DRIFT_TEXT[r.status]}`}>{pct(r.achieved)}</td>
-              <td className="py-0.5 pl-1 text-right text-muted-light">/ {pct(r.target)}</td>
+              <td className="whitespace-nowrap py-0.5 pl-1 text-right text-muted-light">/ {pct(r.target)}</td>
             </tr>
           ))}
         </tbody>

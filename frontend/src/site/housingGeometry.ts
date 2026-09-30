@@ -41,6 +41,8 @@ export interface HousingView {
 export interface RoomLabel {
   key: string
   text: string
+  /** Room width in metres (labels wider than the room are skipped). */
+  size: number
   position: [number, number, number]
 }
 
@@ -148,7 +150,7 @@ export function buildHousingModel(housing: MassHousing, mass: Mass, view: Housin
         solid.push(part(prism(outline, y + 0.005, TILE), floorTint(displayRoomColor({ roomType: room.type, label: room.label })), unit.id, MODEL_COLORS.floorEdge))
         if (view.top) {
           const c = outline.reduce((s, p) => ({ x: s.x + p.x / outline.length, y: s.y + p.y / outline.length }), { x: 0, y: 0 })
-          labels.push({ key: `${unit.id}:${room.id}`, text: room.label, position: [c.x, y + TILE + 0.05, c.y] })
+          labels.push({ key: `${unit.id}:${room.id}`, text: room.label, size: room.w, position: [c.x, y + TILE + 0.05, c.y] })
         }
       }
       outlines.push(part(prism(unit.outline, y, TILE * 2), '', unit.id, MODEL_COLORS.edge))
