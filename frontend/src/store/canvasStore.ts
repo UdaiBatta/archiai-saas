@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { Mass, Site } from '../site/siteTypes'
 import {
   COMPONENT_REGISTRY,
   clampComponentSize,
@@ -173,6 +174,10 @@ interface CanvasState {
   setConnection: (roomA: string, roomB: string, kind: ConnectionKind) => void
   /** Named 3D camera views, saved with the layout (outside undo history). */
   setSavedViews: (views: unknown[]) => void
+  /** Site boundary and zoning rules (P2), saved with the layout; undoable. */
+  setSite: (site: Site | null) => void
+  /** Building masses (P2), saved with the layout; undoable. */
+  setMasses: (masses: Mass[]) => void
   resizeRoom: (
     id: string,
     size: ComponentSize,
@@ -738,6 +743,19 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   setSavedViews: (views) =>
     set((state) => ({
       layoutMetadata: { ...state.layoutMetadata, savedViews: views },
+      ...markUnsaved(),
+    })),
+  setSite: (site) =>
+    set((state) => {
+      const layoutMetadata = { ...state.layoutMetadata }
+      if (site) layoutMetadata.site = site
+      else delete layoutMetadata.site
+      return { layoutMetadata, ...pushHistory(state), ...markUnsaved() }
+    }),
+  setMasses: (masses) =>
+    set((state) => ({
+      layoutMetadata: { ...state.layoutMetadata, masses },
+      ...pushHistory(state),
       ...markUnsaved(),
     })),
   setConnection: (roomA, roomB, kind) =>

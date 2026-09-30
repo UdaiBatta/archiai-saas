@@ -183,7 +183,7 @@ thead th.col-today, thead th.col-target { color: var(--accent); }
       <dt>Updated</dt><dd id="updated">2026-09-28</dd>
       <dt>Scope</dt><dd>Site, massing, housing, interior</dd>
       <dt>Status</dt><dd>P1 in progress</dd>
-      <dt>Progress</dt><dd id="overall">24 / 55 items</dd>
+      <dt>Progress</dt><dd id="overall">32 / 62 items</dd>
     </dl>
   </div>
   <p class="lede"><strong>ArchiAI is a browser-based, 3D-first design tool for the first weeks of a residential project</strong>: draw the site, shape the mass, and fill it with homes and rooms that already obey the rules an architect would check by hand (daylight, street entry, circulation, adjacency). It is for architects and small practices doing early-stage site and housing design who today stitch together a massing tool, a plan sketcher and a spreadsheet. The engine is deterministic and explainable; AI sits on top as an optional suggestion layer. Everything leaves as clean DXF and IFC, so the work continues in AutoCAD, Revit or ArchiCAD without redrawing.</p>
@@ -287,7 +287,7 @@ thead th.col-today, thead th.col-target { color: var(--accent); }
       <h3>Professional 3D workspace</h3>
       <div class="meta"><span class="tag now">In progress</span><span class="tag size">Size L</span><span class="tag">Free</span></div>
       <p>Goal: the 3D view is good enough to be the only view.</p>
-      <!--P1--><div class="meter" aria-hidden="true"><i style="width:76%"></i></div><span class="tag prog">13 / 17 done</span>
+      <!--P1--><div class="meter" aria-hidden="true"><i style="width:84%"></i></div><span class="tag prog">16 / 19 done</span>
       <ul class="check">
         <li class="ok">White model: matte walls, crisp edges, pale room-floor tints, glass windows</li>
         <li class="ok">Ambient occlusion and soft sun shadows fitted to the site</li>
@@ -295,7 +295,9 @@ thead th.col-today, thead th.col-target { color: var(--accent); }
         <li class="ok">View cube</li>
         <li class="ok">Perspective / Axo / Top (orthographic, north up) views framing the site</li>
         <li class="ok">Hide or ghost other floors on multi-storey plans</li>
-        <li>Setback lines on the ground (needs setback data, comes with P2)</li>
+        <li class="ok">Setback lines on the ground (with P2&#x27;s site rules)</li>
+        <li class="ok">No ghost trails in Top view after visiting Persp/Axo</li>
+        <li class="ok">Camera frames the whole site and its masses</li>
         <li class="ok">Saved views: named cameras saved with the project (restore, rename, delete)</li>
         <li class="ok">Dimensions and room labels in Top view</li>
         <li class="ok">Editing in Top view: move, 8 resize grips, polygon corners, doors and windows, undo</li>
@@ -317,13 +319,18 @@ thead th.col-today, thead th.col-target { color: var(--accent); }
       <h3>Site &amp; massing</h3>
       <div class="meta"><span class="tag size">Size L</span><span class="tag">Free: 1 site / Pro: unlimited</span></div>
       <p>Goal: go from a parcel to a zoning-compliant mass in minutes.</p>
-      <!--P2--><div class="meter" aria-hidden="true"><i style="width:0%"></i></div><span class="tag prog">0 / 5 done</span>
+      <!--P2--><div class="meter" aria-hidden="true"><i style="width:50%"></i></div><span class="tag prog">5 / 10 done</span>
       <ul class="check">
-        <li>Draw or import the site polygon (DXF, GeoJSON); map tile underlay</li>
-        <li>Per-edge setbacks, height limit, coverage and FAR as site rules</li>
-        <li>Push/pull masses, floor count, floor-to-floor height</li>
-        <li>Live metrics panel: GFA, FAR, coverage, height, floors</li>
-        <li>Zoning warnings in 3D with a reason and a suggested fix</li>
+        <li class="ok">Site from the plot, drawn in Top view, or imported (GeoJSON, DXF); drag its corners</li>
+        <li>Map tile underlay</li>
+        <li>Add or remove corners on an existing site or mass</li>
+        <li>DXF arcs and curves (today replaced by their chords)</li>
+        <li class="ok">Per-edge setbacks, height limit, coverage and FAR as site rules</li>
+        <li class="ok">Masses: add, fill the envelope, draw; push/pull floors; move and reshape in Top view</li>
+        <li class="ok">Live metrics panel: GFA, FAR, coverage, height, floors against the limits</li>
+        <li class="ok">Zoning warnings in 3D with a reason and a one-click fix (trim, height, FAR, overlap)</li>
+        <li>Automatic fix for over-coverage</li>
+        <li>Timed test: parcel to a compliant mass in under 5 minutes</li>
       </ul><!--/P2-->
       <div class="done"><b>Done when</b>a test user draws a site, sets four zoning rules and produces a compliant mass in under 5 minutes, and metrics update in under 100 ms per edit.</div>
     </div>

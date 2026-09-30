@@ -208,7 +208,7 @@ export function resizeRoomFromPlanHandle({
   }
 }
 
-function snappedCoord(value: number, enabled: boolean, gridSize: number) {
+export function snappedCoord(value: number, enabled: boolean, gridSize: number) {
   if (!enabled || gridSize <= 0) return value
   return Math.round(value / gridSize) * gridSize
 }

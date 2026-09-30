@@ -6,7 +6,8 @@ import { CanvasViewMode, useCanvasStore } from '../../store/canvasStore'
 import { canClearSelectionFromEmptyCanvas } from '../../store/interactionModel'
 import { edgeCardinals, northAngleDeg, parseOrientation, type ScreenEdge } from './orientationModel'
 import { sunAt } from './sunModel'
-import { MODEL_COLORS, presetView, shadowFrustum, type CameraPreset } from './modelView'
+import { MODEL_COLORS, presetView, sceneExtent, shadowFrustum, type CameraPreset } from './modelView'
+import { parseMasses, parseSite } from '../../site/siteTypes'
 
 /** Site ground sits below floor level so the ground-floor slab reads as a plinth. */
 const GROUND_Y = -0.2
@@ -44,6 +45,8 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
   // Narrow selectors: other metadata (quality, saved views) must not re-render the scene.
   const orientationMeta = useCanvasStore((s) => s.layoutMetadata.orientation)
   const mvpFootprint = useCanvasStore((s) => s.layoutMetadata.mvpFootprint)
+  const siteMeta = useCanvasStore((s) => s.layoutMetadata.site)
+  const massMeta = useCanvasStore((s) => s.layoutMetadata.masses)
   const orientation = useMemo(() => parseOrientation({ orientation: orientationMeta }), [orientationMeta])
   const visibleFloors =
     selectedFloor === 'all'
@@ -64,10 +67,21 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
   const buildingTop = Math.max(0, ...floors.map((floor) => floor.elevation)) + floorHeight
   // Frame the active level on entry; editing a room must not reset the camera.
   const footprint = visibleFloors[0]?.footprint
-  const framingKey = `${frameNonce}:${selectedFloor}:${viewMode}:${modelStage}:${preset}:${footprint?.w ?? 0}:${footprint?.d ?? 0}`
+  const siteModel = useMemo(() => parseSite(siteMeta), [siteMeta])
+  const masses = useMemo(() => parseMasses(massMeta), [massMeta])
+  // Everything on the site: plot, site boundary, masses. Plan lenses keep
+  // framing the floor itself.
+  const extent = useMemo(
+    () => footprint && (studio ? sceneExtent(footprint, buildingTop, siteModel, masses) : { ...footprint, h: buildingTop }),
+    [footprint, studio, buildingTop, siteModel, masses],
+  )
+  // Reframe when the site changes, not on every mass edit (that would jump
+  // the camera mid push/pull).
+  const siteKey = siteModel ? siteModel.boundary.map((p) => `${p.x.toFixed(1)},${p.z.toFixed(1)}`).join(';') : ''
+  const framingKey = `${frameNonce}:${selectedFloor}:${viewMode}:${modelStage}:${preset}:${footprint?.w ?? 0}:${footprint?.d ?? 0}:${siteKey}`
   useEffect(() => {
-    if (!footprint) return
-    const bounds = { ...footprint, h: buildingTop }
+    if (!extent) return
+    const bounds = extent
     const elevation = visibleFloors[0]?.elevation ?? 0
     const view = presetView(isPlanView ? 'perspective' : preset, bounds, viewportSize, elevation)
     if (isPlanView) {
@@ -87,9 +101,9 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
   // `sunHour`, with a shadow box fitted to the site so shadows stay crisp.
   const sunRef = useRef<THREE.DirectionalLight>(null)
   const sun = sunAt(sunHour)
-  const centerX = footprint ? footprint.x + footprint.w / 2 : 0
-  const centerZ = footprint ? footprint.z + footprint.d / 2 : 0
-  const shadow = shadowFrustum({ x: 0, z: 0, w: footprint?.w ?? 10, d: footprint?.d ?? 10, h: buildingTop })
+  const centerX = extent ? extent.x + extent.w / 2 : 0
+  const centerZ = extent ? extent.z + extent.d / 2 : 0
+  const shadow = shadowFrustum({ x: 0, z: 0, w: extent?.w ?? 10, d: extent?.d ?? 10, h: extent?.h ?? buildingTop })
   useEffect(() => {
     const light = sunRef.current
     if (!light) return
@@ -195,6 +209,7 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
       {studio && footprint && (
         <SiteGround
           plot={footprint}
+          showPlot={!siteModel}
           northAngle={orientationNorth}
           fadeDistance={shadow.radius * 8}
         />
@@ -368,10 +383,13 @@ const ringPoints = Array.from({ length: 49 }, (_, i) => {
  * grid, the plot pad and boundary, and a north arrow off the plot corner. */
 function SiteGround({
   plot,
+  showPlot,
   northAngle,
   fadeDistance,
 }: {
   plot: { x: number; z: number; w: number; d: number }
+  /** Off once a site is drawn: the site layer draws the real boundary. */
+  showPlot: boolean
   northAngle: number
   fadeDistance: number
 }) {
@@ -402,10 +420,12 @@ function SiteGround({
         <planeGeometry args={[fadeDistance * 5, fadeDistance * 5]} />
         <meshStandardMaterial color={MODEL_COLORS.ground} roughness={1} />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[cx, GROUND_Y + 0.02, cz]} receiveShadow raycast={() => null}>
-        <planeGeometry args={[plot.w, plot.d]} />
-        <meshStandardMaterial color={MODEL_COLORS.plot} roughness={1} />
-      </mesh>
+      {showPlot && (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[cx, GROUND_Y + 0.02, cz]} receiveShadow raycast={() => null}>
+          <planeGeometry args={[plot.w, plot.d]} />
+          <meshStandardMaterial color={MODEL_COLORS.plot} roughness={1} />
+        </mesh>
+      )}
       <Grid
         position={[cx, GROUND_Y + 0.03, cz]}
         args={[1, 1]}
@@ -419,12 +439,14 @@ function SiteGround({
         fadeStrength={1.5}
         infiniteGrid
       />
-      <Line
-        points={[[x0, 0, z0], [x1, 0, z0], [x1, 0, z1], [x0, 0, z1], [x0, 0, z0]]}
-        position={[0, GROUND_Y + 0.04, 0]}
-        color={MODEL_COLORS.plotLine}
-        lineWidth={1.6}
-      />
+      {showPlot && (
+        <Line
+          points={[[x0, 0, z0], [x1, 0, z0], [x1, 0, z1], [x0, 0, z1], [x0, 0, z0]]}
+          position={[0, GROUND_Y + 0.04, 0]}
+          color={MODEL_COLORS.plotLine}
+          lineWidth={1.6}
+        />
+      )}
       <group position={[x1 + offset, GROUND_Y + 0.04, z0 - offset]} rotation={[0, -northAngle, 0]} scale={size}>
         <group rotation={[-Math.PI / 2, 0, 0]}>
           <mesh geometry={arrowDark} raycast={() => null}>

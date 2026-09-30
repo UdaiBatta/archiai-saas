@@ -58,7 +58,7 @@ interface ActiveEdit {
 }
 
 const GROUND = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
-const HANDLE_PX = 11
+export const HANDLE_PX = 11
 const INWARD_ARROW: Record<ScreenEdge, string> = { top: '↓', bottom: '↑', left: '→', right: '←' }
 const OUTWARD: Record<ScreenEdge, PlanPoint> = {
   top: { x: 0, z: -1 },
@@ -68,7 +68,7 @@ const OUTWARD: Record<ScreenEdge, PlanPoint> = {
 }
 
 /** Orthographic zoom = screen pixels per metre; re-rendered only on a real change. */
-function usePixelsPerMetre() {
+export function usePixelsPerMetre() {
   const [zoom, setZoom] = useState(30)
   const last = useRef(zoom)
   useFrame(({ camera }) => {
@@ -452,7 +452,7 @@ interface HandleMarkProps {
 }
 
 /** A flat, screen-constant grip drawn over everything. */
-function HandleMark({ name, position, size, round, faint, ...events }: HandleMarkProps) {
+export function HandleMark({ name, position, size, round, faint, ...events }: HandleMarkProps) {
   const shape = (s: number) => (round ? <circleGeometry args={[s / 2, 20]} /> : <planeGeometry args={[s, s]} />)
   return (
     <group position={position}>

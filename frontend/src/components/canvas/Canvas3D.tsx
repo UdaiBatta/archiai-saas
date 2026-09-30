@@ -17,6 +17,10 @@ import { SUNRISE, SUNSET, formatHour, sunAt } from './sunModel'
 import { CAMERA_PRESETS, MODEL_COLORS, floorDisplay, type CameraPreset } from './modelView'
 import { SavedViewsPanel, ViewCamera, type ViewCameraApi } from './SavedViewsPanel'
 import { restorableFloor, type SavedView } from './savedViews'
+import { MassLayer } from '../../site/MassLayer'
+import { MassingPanel } from '../../site/MassingPanel'
+import { SiteLayer } from '../../site/SiteLayer'
+import { SitePanel } from '../../site/SitePanel'
 
 // Props are stable per room, so metadata or UI-state changes in this
 // component no longer re-render every room.
@@ -187,6 +191,10 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
             y={(planFloor?.elevation ?? 0) + floorHeight + 0.4}
           />
         )}
+        {studio && <MassLayer orbitRef={orbitRef} readOnly={readOnly} topView={topView} />}
+        {studio && (
+          <SiteLayer orbitRef={orbitRef} readOnly={readOnly} topView={topView} planY={(planFloor?.elevation ?? 0) + floorHeight + 0.4} />
+        )}
         {ghostRooms.map((r) => (
           <RoomMesh key={r.id} room={r} orbitRef={orbitRef} readOnly viewMode={viewMode} modelStage={modelStage} ghost />
         ))}
@@ -219,6 +227,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
             )}
           </div>
         )}
+        {!readOnly && <SitePanel topView={topView} onRequestTop={() => applyPreset('top')} />}
         <SavedViewsPanel
           readOnly={readOnly}
           capture={() => ({
@@ -272,6 +281,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
         </label>
         </div>
       )}
+      {studio && <MassingPanel readOnly={readOnly} topView={topView} plot={planBounds ?? null} />}
       {topView && selectedFloor === 'all' && planFloor && floors.length > 1 && (
         <div role="status" className="pointer-events-none absolute left-1/2 top-28 z-20 -translate-x-1/2 rounded-full border border-warn/30 bg-graphite-800/95 px-3 py-1.5 text-[11px] font-medium text-warn shadow-sm">
           Top view shows {planFloor.name}. Choose a level to edit another floor.
