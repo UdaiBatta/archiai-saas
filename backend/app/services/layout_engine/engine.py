@@ -614,6 +614,10 @@ def _place_doors(
             continue
         best = max(by_pair[pair], key=_wall_length)
         width = door_width_for(best)
+        if chosen.width is not None and _wall_length(best) >= chosen.width - EPS:
+            width = chosen.width
+        elif chosen.width is not None:
+            width = _wall_length(best)
         if width is not None:
             add_door(best, width, chosen.at)
 

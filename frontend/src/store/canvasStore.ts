@@ -13,6 +13,7 @@ import {
 import type { InteractionMode, PointerIntent } from './interactionModel'
 import { quarterTurnPlanSize } from '../utils/quarterTurn'
 import { snapDoorToWall, upsertConnection } from './connections'
+import { snapToNeighbours } from './edgeSnap'
 import type { Connection, ConnectionKind } from '../types/contracts'
 
 export type { CanvasObjectType } from './componentRegistry'
@@ -722,13 +723,26 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         )
       }
 
+      // Rooms snap onto neighbours' edges so a near-miss never builds two
+      // walls side by side. ponytail: polygon rooms don't snap (their
+      // vertices would need the same shift); add when they're common.
+      if (objectType === 'room' && !updated.polygonVertices && (patchPosition || nextPatch.size)) {
+        const others = state.rooms.filter(
+          (other) => other.id !== id && other.objectType === 'room' && (other.floorLevel ?? 0) === (updated.floorLevel ?? 0),
+        )
+        updated = snapToNeighbours(updated, room, others)
+      }
+
       // A hosted door slides along its wall; between two rooms, where it
       // stops becomes the user's door connection for that pair.
       let layoutMetadata = state.layoutMetadata
-      if (objectType === 'door' && typeof room.hostWallId === 'string' && patchPosition) {
+      // Resizing it records its width, so a widened door (part of the wall
+      // taken out) survives the rebuild.
+      const doorSize = nextPatch.size as Room['size'] | undefined
+      if (objectType === 'door' && typeof room.hostWallId === 'string' && (patchPosition || doorSize)) {
         const wall = state.rooms.find((object) => object.id === room.hostWallId)
         if (wall) {
-          const snapped = snapDoorToWall(updated, wall, patchPosition)
+          const snapped = snapDoorToWall(updated, wall, patchPosition ?? updated.position)
           updated.position = snapped.position
           const between = wall.betweenRooms
           if (Array.isArray(between) && between.length === 2) {
@@ -740,6 +754,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
                 String(between[1]),
                 'door',
                 snapped.at,
+                Math.round(Math.max(updated.size.w, updated.size.d) * 1000) / 1000,
               ),
             }
           }

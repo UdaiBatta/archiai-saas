@@ -59,7 +59,14 @@ describe('canvas store connections', () => {
     const door = useCanvasStore.getState().rooms.find((r) => r.id === 'd1')!
     expect(door.position).toMatchObject({ x: 4, z: 0.45 })
     expect(useCanvasStore.getState().layoutMetadata.mvpConnections).toEqual([
-      { room_a: 'a', room_b: 'b', kind: 'door', at: 0.113 },
+      { room_a: 'a', room_b: 'b', kind: 'door', at: 0.113, width: 0.9 },
+    ])
+  })
+
+  it('records a widened door as the opening width for that pair', () => {
+    useCanvasStore.getState().updateRoom('d1', { size: { w: 0.16, h: 2.1, d: 2.4 } })
+    expect(useCanvasStore.getState().layoutMetadata.mvpConnections).toEqual([
+      { room_a: 'a', room_b: 'b', kind: 'door', at: 0.5, width: 2.4 },
     ])
   })
 })
