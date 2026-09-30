@@ -209,7 +209,9 @@ interface CanvasState {
   removeFloor: (level: number) => void
   loadRooms: (rooms: Room[]) => void
   loadLayout: (layout: CanvasLayout) => void
-  /** Swap in another layout as ONE undoable edit (keeps design ids, history and saved views). */
+  /** Swap in a different plan (e.g. a chosen option) as ONE undoable edit.
+   * Unlike applyLayoutEdit it drops the old plan's furniture (the rooms moved);
+   * keeps design ids, saved views, site, masses and housing. */
   replaceLayout: (layout: CanvasLayout) => void
   clearLayout: () => void
   serializeLayout: () => CanvasLayout
