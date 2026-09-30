@@ -27,6 +27,8 @@ import { SitePanel } from '../../site/SitePanel'
 import { useSiteAndMasses } from '../../site/massStore'
 import { zoningIssues } from '../../site/massing'
 import { SunPanel } from '../../analysis/SunPanel'
+import { AnalysisPanel } from '../../analysis/AnalysisPanel'
+import { SunHoursLayer } from '../../analysis/SunHoursLayer'
 
 // Props are stable per room, so metadata or UI-state changes in this
 // component no longer re-render every room.
@@ -240,6 +242,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
             y={(planFloor?.elevation ?? 0) + floorHeight + 0.4}
           />
         )}
+        {studio && <SunHoursLayer />}
         {studio && <MassLayer orbitRef={orbitRef} readOnly={readOnly} topView={topView} />}
         {studio && (
           <SiteLayer orbitRef={orbitRef} readOnly={readOnly} topView={topView} planY={(planFloor?.elevation ?? 0) + floorHeight + 0.4} />
@@ -305,6 +308,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
                 </label>
               </SunPanel>
             ),
+            analysis: <AnalysisPanel />,
             floors: multiFloor && (
               <div role="group" aria-label="Other floors" className={DOCK_CARD}>
                 <span className="font-semibold text-ink">Other floors</span>
