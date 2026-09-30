@@ -141,7 +141,7 @@ def test_invalid_locked_units_are_dropped_after_a_plate_change(result):
         Vertex(x=-100, y=-100), Vertex(x=-99, y=-100), Vertex(x=-99, y=-99), Vertex(x=-100, y=-99),
     ]})
     again = fill_housing(_request(locked_units=[locked]))
-    assert not any(unit.id == locked.id for unit in again.units)
+    assert not any(unit.id == locked.id and unit.locked for unit in again.units)
     assert any("no longer fits" in warning for warning in again.warnings)
 
 

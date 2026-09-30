@@ -99,7 +99,7 @@ def fill_housing(req: HousingFillRequest) -> HousingFillResponse:
         if not outline.is_valid or outline.area <= EPS or not plate_poly.covers(outline) or any(outline.intersection(block).area > EPS for block in circulation):
             warnings.append(f"Locked unit {unit.id} no longer fits this plate; dropped.")
             continue
-        if any(outline.intersects(Polygon([(v.x, v.y) for v in other.outline])) for other in locked_by_floor.get(unit.floor, [])):
+        if any(outline.intersection(Polygon([(v.x, v.y) for v in other.outline])).area > EPS for other in locked_by_floor.get(unit.floor, [])):
             warnings.append(f"Locked unit {unit.id} overlaps another lock; dropped.")
             continue
         seen_lock_ids.add(unit.id)
