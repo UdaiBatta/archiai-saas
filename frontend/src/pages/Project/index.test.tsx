@@ -255,13 +255,13 @@ describe('ProjectPage canvas views', () => {
     expect(projectService.activity).not.toHaveBeenCalled()
   })
 
-  it('switches the 2D Plan tab to the shared-state SVG floor plan', async () => {
+  it('opens the 2D Plan tab as the 3D Top view, not a separate SVG editor', async () => {
     renderProjectPage()
     const user = userEvent.setup()
 
     await user.click(await screen.findByRole('tab', { name: '2D Plan' }))
 
-    expect(screen.getByRole('application', { name: 'Editable floor plan' })).toBeInTheDocument()
+    expect(screen.queryByRole('application', { name: 'Editable floor plan' })).not.toBeInTheDocument()
     expect(useCanvasStore.getState().viewMode).toBe('floor_plan')
     expect(screen.getByRole('tab', { name: '3D Edit' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'More views' }))

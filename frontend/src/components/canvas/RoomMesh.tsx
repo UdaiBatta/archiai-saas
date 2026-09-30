@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { Html } from '@react-three/drei'
-import type { ThreeEvent } from '@react-three/fiber'
+import { Edges, Html } from '@react-three/drei'
+import { useThree, type ThreeEvent } from '@react-three/fiber'
 import type { RefObject } from 'react'
 import * as THREE from 'three'
 import { CanvasHistorySnapshot, CanvasViewMode, Room, useCanvasStore } from '../../store/canvasStore'
@@ -14,8 +14,11 @@ import {
 import { DimensionAnnotations } from './DimensionAnnotations'
 import { ResizeHandles } from './ResizeHandles'
 import { roomVisualTreatment } from './roomVisualTreatment'
-import { displayRoomColor } from './editorPalette'
+import { EDITOR_PALETTE, displayRoomColor } from './editorPalette'
 import { wallModelPieces } from './modelGeometry'
+import { MODEL_COLORS, floorTint, mixHex } from './modelView'
+import { roomLabelLayout, roomPlanArea, roomWorldBounds } from './topViewModel'
+import { formatArea, formatDims } from '../../utils/format'
 
 interface OrbitHandle {
   enabled: boolean
@@ -28,6 +31,10 @@ interface RoomMeshProps {
   viewMode?: CanvasViewMode
   invalid?: boolean
   modelStage?: boolean
+  /** Context from another floor: translucent, not interactive. */
+  ghost?: boolean
+  /** Top plan view: labels, dimensions and handles come from TopPlanOverlay. */
+  plan?: boolean
 }
 
 interface PendingMove {
@@ -46,7 +53,30 @@ function cloneRoomForInteraction(room: Room): Room {
     position: { ...room.position },
     size: { ...room.size },
     rotation: { ...room.rotation },
+    polygonVertices: room.polygonVertices?.map((vertex) => ({ ...vertex })),
   }
+}
+
+/** Position (and a polygon room's outline, which is absolute) of `room` moved to `position`. */
+function movedTo(room: Room, position: Room['position']): Partial<Room> {
+  const dx = position.x - room.position.x
+  const dz = position.z - room.position.z
+  return room.polygonVertices
+    ? { position, polygonVertices: room.polygonVertices.map((v) => ({ x: v.x + dx, z: v.z + dz })) }
+    : { position }
+}
+
+/** Edge lines of a w x h x d box, rebuilt only when the size changes and
+ * freed when it does (the source box is freed at once). */
+function useBoxEdges(w: number, h: number, d: number) {
+  const edges = useMemo(() => {
+    const box = new THREE.BoxGeometry(w, h, d)
+    const geometry = new THREE.EdgesGeometry(box)
+    box.dispose()
+    return geometry
+  }, [w, h, d])
+  useEffect(() => () => edges.dispose(), [edges])
+  return edges
 }
 
 export function RoomMesh({
@@ -56,8 +86,12 @@ export function RoomMesh({
   viewMode = '3d',
   invalid = false,
   modelStage = false,
+  ghost = false,
+  plan = false,
 }: RoomMeshProps) {
   const meshRef = useRef<THREE.Mesh>(null)
+  const canvasElement = useThree((s) => s.gl.domElement)
+  const camera = useThree((s) => s.camera)
   const pendingMoveRef = useRef<PendingMove | null>(null)
   const selectedId = useCanvasStore((s) => s.selectedId)
   const selectRoom = useCanvasStore((s) => s.selectRoom)
@@ -85,8 +119,37 @@ export function RoomMesh({
   const isSpace = definition.category === 'space'
   const modelSurface = solid3d && (isSpace || (room.objectType === 'door' && typeof room.hostWallId === 'string'))
   const renderHeight = modelSurface ? 0.045 : room.size.h
+  const boxEdges = useBoxEdges(room.size.w, room.size.h, room.size.d)
+  const selectionEdges = useBoxEdges(room.size.w + 0.08, Math.max(renderHeight + 0.08, 0.12), room.size.d + 0.08)
   const renderY = modelSurface ? room.position.y - room.size.h / 2 + renderHeight / 2 : room.position.y
   const modelFurniture = modelStage && room.objectType === 'furniture'
+  // White model: matte surfaces, floors keep a pale tint of their room colour,
+  // windows read as glass.
+  const isGlass = solid3d && room.objectType === 'window'
+  const noRaycast = () => null
+  const modelColor = isSelected
+    ? MODEL_COLORS.wallSelected
+    : isGlass
+      ? MODEL_COLORS.glass
+      : invalid
+        ? mixHex(floorTint(displayRoomColor(room)), MODEL_COLORS.invalid, 0.35)
+        : floorTint(displayRoomColor(room))
+  // A polygon room's floor follows its outline, not its bounding box.
+  const polygonSlab = useMemo(() => {
+    const vertices = room.polygonVertices
+    if (!modelSurface || !vertices || vertices.length < 3) return null
+    const shape = new THREE.Shape(
+      vertices.map((v) => new THREE.Vector2(v.x - room.position.x, v.z - room.position.z)),
+    )
+    const geometry = new THREE.ExtrudeGeometry(shape, { depth: renderHeight, bevelEnabled: false })
+    // Shape y -> world z, extrusion -> y centred on the slab.
+    geometry.rotateX(Math.PI / 2)
+    geometry.translate(0, renderHeight / 2, 0)
+    return geometry
+  }, [modelSurface, room.polygonVertices, room.position.x, room.position.z, renderHeight])
+  useEffect(() => () => polygonSlab?.dispose(), [polygonSlab])
+  const see = ghost ? 0.12 : isGlass ? 0.35 : 1
+  const edgeColor = isSpace ? MODEL_COLORS.floorEdge : MODEL_COLORS.edge
   const visual = roomVisualTreatment(
     definition,
     room.objectType,
@@ -107,7 +170,7 @@ export function RoomMesh({
     const cancelInteraction = () => {
       const pending = pendingMoveRef.current
       if (pending?.moving) {
-        updateRoom(room.id, { position: pending.startRoom.position }, { log: false })
+        updateRoom(room.id, movedTo(pending.startRoom, pending.startRoom.position), { log: false })
       }
       resetMoveState()
     }
@@ -183,13 +246,11 @@ export function RoomMesh({
 
     updateRoom(
       room.id,
-      {
-        position: {
-          x: hit.x - pending.offset.x,
-          y: pending.startRoom.position.y,
-          z: hit.z - pending.offset.z,
-        },
-      },
+      movedTo(pending.startRoom, {
+        x: hit.x - pending.offset.x,
+        y: pending.startRoom.position.y,
+        z: hit.z - pending.offset.z,
+      }),
       { log: false },
     )
   }
@@ -208,11 +269,11 @@ export function RoomMesh({
         Math.abs(current.position.x - pending.startRoom.position.x) > 0.001 ||
         Math.abs(current.position.z - pending.startRoom.position.z) > 0.001
       if (moved && cancelled) {
-        updateRoom(room.id, { position: pending.startRoom.position }, { log: false })
+        updateRoom(room.id, movedTo(pending.startRoom, pending.startRoom.position), { log: false })
       } else if (moved) {
         updateRoom(
           room.id,
-          { position: current.position },
+          movedTo(pending.startRoom, current.position),
           {
             action: 'object.moved',
             previousValue: pending.startRoom,
@@ -232,10 +293,10 @@ export function RoomMesh({
   const mesh = (
     <mesh
       ref={meshRef}
-      castShadow={!isPlanView}
+      castShadow={!isPlanView && see === 1}
       receiveShadow
       position={[room.position.x, renderY, room.position.z]}
-      raycast={wallPieces ? () => null : undefined}
+      raycast={wallPieces || ghost ? noRaycast : undefined}
       rotation={[
         THREE.MathUtils.degToRad(room.rotation.x),
         THREE.MathUtils.degToRad(room.rotation.y),
@@ -245,30 +306,60 @@ export function RoomMesh({
       onPointerMove={readOnly ? undefined : handlePointerMove}
       onPointerUp={readOnly ? undefined : finishPointerDrag}
       onPointerCancel={readOnly ? undefined : finishPointerDrag}
-      onPointerOut={
-        readOnly
-          ? undefined
-          : (event) => {
-              if (pendingMoveRef.current?.pointerId === event.pointerId) event.stopPropagation()
+      onPointerOver={
+        plan
+          ? (event) => {
+              // Native tooltip for rooms too small to carry a Top-view label.
+              event.stopPropagation()
+              const world = roomWorldBounds(room)
+              const { showName } = roomLabelLayout({
+                label: room.label,
+                w: world.w,
+                d: world.d,
+                pxPerMetre: camera.zoom,
+                isSpace,
+              })
+              canvasElement.title = showName
+                ? ''
+                : `${room.label} — ${formatDims(world.w, world.d)} · ${formatArea(roomPlanArea(room))}`
             }
+          : undefined
       }
+      onPointerOut={(event) => {
+        if (plan) canvasElement.title = ''
+        if (!readOnly && pendingMoveRef.current?.pointerId === event.pointerId) event.stopPropagation()
+      }}
     >
-      <boxGeometry args={[room.size.w, renderHeight, room.size.d]} />
+      {polygonSlab ? (
+        <primitive object={polygonSlab} attach="geometry" />
+      ) : (
+        <boxGeometry args={[room.size.w, renderHeight, room.size.d]} />
+      )}
       <meshStandardMaterial
         visible={!wallPieces && !modelFurniture}
-        color={modelStage && isSpace ? (isSelected ? '#F3D5CB' : '#eeeae1') : displayRoomColor(room)}
+        color={solid3d ? modelColor : displayRoomColor(room)}
         emissive={visual.emissive}
         emissiveIntensity={visual.emissiveIntensity}
-        transparent={!solid3d && visual.opacity < 1}
-        opacity={solid3d ? 1 : visual.opacity}
-        depthWrite={solid3d || visual.depthWrite}
-        roughness={visual.roughness}
-        metalness={visual.metalness}
+        transparent={solid3d ? see < 1 : visual.opacity < 1}
+        opacity={solid3d ? see : visual.opacity}
+        depthWrite={solid3d ? see === 1 : visual.depthWrite}
+        roughness={solid3d ? (isGlass ? 0.05 : 0.92) : visual.roughness}
+        metalness={solid3d ? (isGlass ? 0.1 : 0) : visual.metalness}
       />
+      {solid3d && !wallPieces && !modelFurniture && (
+        <Edges color={edgeColor} transparent={ghost} opacity={ghost ? 0.3 : 1} />
+      )}
       {wallPieces?.map((piece, index) => (
-        <mesh key={index} position={piece.position} castShadow receiveShadow>
+        <mesh key={index} position={piece.position} castShadow={!ghost} receiveShadow raycast={ghost ? noRaycast : undefined}>
           <boxGeometry args={piece.size} />
-          <meshStandardMaterial color={isSelected ? '#F0C4B6' : '#e2e1d7'} roughness={0.9} />
+          <meshStandardMaterial
+            color={isSelected ? MODEL_COLORS.wallSelected : MODEL_COLORS.wall}
+            roughness={0.95}
+            transparent={ghost}
+            opacity={see}
+            depthWrite={!ghost}
+          />
+          <Edges color={MODEL_COLORS.edge} transparent={ghost} opacity={ghost ? 0.3 : 1} />
         </mesh>
       ))}
       {modelFurniture && (
@@ -287,7 +378,7 @@ export function RoomMesh({
       )}
       {!solid3d && (isSelected || definition.category === 'space' || room.objectType === 'stair') && (
         <lineSegments>
-          <edgesGeometry args={[new THREE.BoxGeometry(room.size.w, room.size.h, room.size.d)]} />
+          <primitive object={boxEdges} attach="geometry" />
           <lineBasicMaterial
             color={visual.edgeColor}
             transparent
@@ -298,17 +389,9 @@ export function RoomMesh({
       )}
       {isSelected && (
         <lineSegments>
-          <edgesGeometry
-            args={[
-              new THREE.BoxGeometry(
-                room.size.w + 0.08,
-                Math.max(renderHeight + 0.08, 0.12),
-                room.size.d + 0.08,
-              ),
-            ]}
-          />
+          <primitive object={selectionEdges} attach="geometry" />
           <lineBasicMaterial
-            color="#ffffff"
+            color={solid3d ? EDITOR_PALETTE.selection : '#ffffff'}
             transparent
             opacity={0.9}
             linewidth={2}
@@ -319,7 +402,9 @@ export function RoomMesh({
     </mesh>
   )
 
-  const shouldShowLabel = modelStage ? isSelected : !isThinComponent || isSelected
+  if (ghost) return mesh
+
+  const shouldShowLabel = !plan && (modelStage ? isSelected : !isThinComponent || isSelected)
   const label = shouldShowLabel ? (
     <Html
       position={[room.position.x, room.position.y + room.size.h / 2 + 0.35, room.position.z]}
@@ -351,14 +436,14 @@ export function RoomMesh({
   ) : null
 
   const dimensions =
-    !modelStage && isDimensionable && (isSelected || (showDimensions && isPlanView)) ? (
+    !plan && !modelStage && isDimensionable && (isSelected || (showDimensions && isPlanView)) ? (
       <DimensionAnnotations room={room} emphasized={isSelected} />
     ) : null
 
   return (
     <>
       {mesh}
-      {!modelStage && isSelected && (isPlanView || room.objectType === 'room') && (
+      {!plan && !modelStage && isSelected && (isPlanView || room.objectType === 'room') && (
         <ResizeHandles
           room={room}
           orbitRef={orbitRef}

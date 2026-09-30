@@ -1,7 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Canvas } from '@react-three/fiber'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { Canvas, useThree } from '@react-three/fiber'
+import { EffectComposer, N8AO, ToneMapping } from '@react-three/postprocessing'
+import { ToneMappingMode } from 'postprocessing'
 import { Scene } from './Scene'
-import { RoomMesh } from './RoomMesh'
+import { RoomMesh as RoomMeshBase } from './RoomMesh'
+import { TopPlanOverlay } from './TopPlanOverlay'
+import { TopPlanKeyboardLayer } from './TopPlanKeyboardLayer'
+import { PauseWhileMoving, PerfReadout, SHOW_PERF } from './RenderBudget'
 import { useCanvasStore } from '../../store/canvasStore'
 import { canClearSelectionFromEmptyCanvas } from '../../store/interactionModel'
 import { useCanvasKeyboardShortcuts } from './useCanvasKeyboardShortcuts'
@@ -9,6 +14,18 @@ import { shouldRenderCanvasObject } from './canvasObjectVisibility'
 import { EDITOR_PALETTE } from './editorPalette'
 import { hardViolationRoomIds, parseMvpQuality } from './qualityModel'
 import { SUNRISE, SUNSET, formatHour, sunAt } from './sunModel'
+import { CAMERA_PRESETS, MODEL_COLORS, floorDisplay, type CameraPreset } from './modelView'
+import { SavedViewsPanel, ViewCamera, type ViewCameraApi } from './SavedViewsPanel'
+import { restorableFloor, type SavedView } from './savedViews'
+
+// Props are stable per room, so metadata or UI-state changes in this
+// component no longer re-render every room.
+const RoomMesh = memo(RoomMeshBase)
+
+const segmentClass = (active: boolean) =>
+  `flex-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors ${
+    active ? 'bg-accent text-graphite-950' : 'text-muted hover:bg-ink/10 hover:text-ink'
+  }`
 
 interface Canvas3DProps {
   className?: string
@@ -22,29 +39,77 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
   const rooms = useCanvasStore((s) => s.rooms)
   const selectedFloor = useCanvasStore((s) => s.selectedFloor)
   const storedViewMode = useCanvasStore((s) => s.viewMode)
-  const viewMode = briefBackground ? '3d' : storedViewMode
-  const layoutMetadata = useCanvasStore((s) => s.layoutMetadata)
+  const setViewMode = useCanvasStore((s) => s.setViewMode)
+  // The plan tab *is* the 3D Top view: floor_plan in the store <=> Top here.
+  const planLens = !briefBackground && storedViewMode === 'floor_plan'
+  const viewMode = briefBackground || planLens ? '3d' : storedViewMode
+  const mvpQuality = useCanvasStore((s) => s.layoutMetadata.mvpQuality)
+  const mvpFootprint = useCanvasStore((s) => s.layoutMetadata.mvpFootprint)
   const clipboardMessage = useCanvasStore((s) => s.clipboardMessage)
   const clearClipboardMessage = useCanvasStore((s) => s.clearClipboardMessage)
   // 10:00 by default: morning light, so an east-facing front reads as lit.
   const [sunHour, setSunHour] = useState(10)
-  const visibleRooms =
-    selectedFloor === 'all'
-      ? rooms.filter((room) => shouldRenderCanvasObject(room, viewMode))
-      : rooms.filter(
-          (room) =>
-            (room.floorLevel ?? 0) === selectedFloor &&
-            shouldRenderCanvasObject(room, viewMode),
-        )
+  const [orbitPreset, setOrbitPreset] = useState<CameraPreset>('perspective')
+  const preset: CameraPreset = planLens ? 'top' : orbitPreset
+  const [frameNonce, setFrameNonce] = useState(0)
+  const [focusedRoomId, setFocusedRoomId] = useState<string | null>(null)
+  const floors = useCanvasStore((s) => s.floors)
+  const floorHeight = useCanvasStore((s) => s.floorHeight)
+  const [ghostFloors, setGhostFloors] = useState(false)
+  const [pendingRestore, setPendingRestore] = useState<{ view: SavedView; floor: number | 'all' } | null>(null)
+  const multiFloor = useCanvasStore((s) => s.floors.length > 1)
+  const viewCameraRef = useRef<ViewCameraApi>(null)
+  const aoRef = useRef<{ enabled: boolean }>(null)
+  const restoreView = (view: SavedView) => {
+    const state = useCanvasStore.getState()
+    applyPreset(view.preset)
+    setSunHour(view.sunHour)
+    setGhostFloors(view.ghostFloors)
+    const floor = restorableFloor(view, state.floors.map((level) => level.level))
+    state.setSelectedFloor(floor)
+    setPendingRestore({ view, floor })
+  }
+  // Architectural site presentation for the real 3D view (not the hidden
+  // capture canvas behind the plan lenses, nor the empty-brief backdrop).
+  const studio = viewMode === '3d' && !briefBackground
+  const topView = studio && preset === 'top'
+  // Top shows one level; "all" means the lowest, as the 2D plan did.
+  const sortedFloors = [...floors].sort((a, b) => a.level - b.level)
+  const planLevel = topView && selectedFloor === 'all' ? sortedFloors[0]?.level ?? 0 : selectedFloor
+  const planFloor = sortedFloors.find((floor) => floor.level === planLevel)
+  const building = mvpFootprint as { x: number; y: number; w: number; h: number } | undefined
+  const planBounds = building?.w && building.h
+    ? { x: building.x, z: building.y, w: building.w, d: building.h }
+    : planFloor?.footprint
+  const applyPreset = (value: CameraPreset) => {
+    if (value === 'top' && !modelStage) {
+      if (!planLens) setViewMode('floor_plan')
+    } else {
+      setOrbitPreset(value)
+      if (planLens) setViewMode('3d')
+    }
+  }
+  const choosePreset = (value: CameraPreset) => {
+    if (value === preset) setFrameNonce((n) => n + 1)
+    else applyPreset(value)
+  }
+  const roomDisplay = (room: (typeof rooms)[number]) =>
+    shouldRenderCanvasObject(room, viewMode)
+      ? floorDisplay(room.floorLevel ?? 0, planLevel, studio && ghostFloors)
+      : 'hidden'
+  const visibleRooms = rooms.filter((room) => roomDisplay(room) === 'active')
+  const ghostRooms = studio ? rooms.filter((room) => roomDisplay(room) === 'ghost') : []
   const invalidRoomIds = useMemo(
-    () => hardViolationRoomIds(parseMvpQuality(layoutMetadata)),
-    [layoutMetadata],
+    () => hardViolationRoomIds(parseMvpQuality({ mvpQuality })),
+    [mvpQuality],
   )
   const camera =
     viewMode === '3d'
       ? { position: [10, 12, 10] as [number, number, number], fov: 50 }
       : { position: [0, 28, 0.01] as [number, number, number], fov: 42 }
-  const background = `radial-gradient(circle at 50% 10%, ${EDITOR_PALETTE.workspaceHighlight} 0%, ${EDITOR_PALETTE.workspaceStart} 48%, ${EDITOR_PALETTE.workspaceEnd} 100%)`
+  const background = studio
+    ? `linear-gradient(180deg, #dde3ea 0%, ${MODEL_COLORS.sky} 55%, ${MODEL_COLORS.sky} 100%)`
+    : `radial-gradient(circle at 50% 10%, ${EDITOR_PALETTE.workspaceHighlight} 0%, ${EDITOR_PALETTE.workspaceStart} 48%, ${EDITOR_PALETTE.workspaceEnd} 100%)`
 
   useCanvasKeyboardShortcuts({ disabled: readOnly })
 
@@ -63,10 +128,12 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
       <Canvas
         key={`${viewMode}:${modelStage}`}
         frameloop="demand"
-        shadows={viewMode === '3d'}
+        shadows={viewMode === '3d' ? 'percentage' : false}
         dpr={[1, 2]}
         camera={camera}
-        gl={{ preserveDrawingBuffer: true, antialias: true }}
+        // The studio composer multisamples itself; canvas MSAA there only
+        // costs fill rate (~25-40% of the frame) for a full-screen blit.
+        gl={{ preserveDrawingBuffer: true, antialias: !studio }}
         onPointerMissed={
           readOnly
             ? undefined
@@ -88,7 +155,15 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
               }
         }
       >
-        <Scene orbitRef={orbitRef} readOnly={readOnly} viewMode={viewMode} modelStage={modelStage} sunHour={sunHour} />
+        <Scene orbitRef={orbitRef} readOnly={readOnly} viewMode={viewMode} modelStage={modelStage} sunHour={sunHour} preset={preset} site={studio} level={planLevel} frameNonce={frameNonce} />
+        {studio && (
+          <ViewCamera
+            apiRef={viewCameraRef}
+            preset={preset}
+            pendingRestore={pendingRestore}
+            onRestored={() => setPendingRestore(null)}
+          />
+        )}
         {visibleRooms.map((r) => (
           <RoomMesh
             key={r.id}
@@ -98,11 +173,90 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
             viewMode={viewMode}
             invalid={invalidRoomIds.has(r.id)}
             modelStage={modelStage}
+            plan={topView}
           />
         ))}
+        {topView && (
+          <TopPlanOverlay
+            orbitRef={orbitRef}
+            readOnly={readOnly}
+            rooms={visibleRooms}
+            invalidRoomIds={invalidRoomIds}
+            focusedRoomId={focusedRoomId}
+            bounds={planBounds}
+            y={(planFloor?.elevation ?? 0) + floorHeight + 0.4}
+          />
+        )}
+        {ghostRooms.map((r) => (
+          <RoomMesh key={r.id} room={r} orbitRef={orbitRef} readOnly viewMode={viewMode} modelStage={modelStage} ghost />
+        ))}
+        {/* Top reads as a drawing: no ambient occlusion (and no sun shadows, see Scene). */}
+        {!(studio && !topView) && <RendererAutoClear />}
+        {studio && !topView && (
+          <EffectComposer multisampling={4}>
+            <N8AO ref={aoRef as never} aoRadius={1.2} distanceFalloff={0.6} intensity={2.4} quality="medium" halfRes color="#1f1d1a" />
+            <ToneMapping mode={ToneMappingMode.NEUTRAL} />
+          </EffectComposer>
+        )}
+        {studio && <PauseWhileMoving pass={aoRef} />}
+        {SHOW_PERF && <PerfReadout />}
       </Canvas>
-      {viewMode === '3d' && !briefBackground && (
-        <label className="absolute bottom-12 left-4 z-20 flex w-56 flex-col gap-1.5 rounded-xl border border-ink/10 bg-graphite-800/95 px-3 py-2.5 text-[11px] text-muted shadow-lg backdrop-blur">
+      {topView && !readOnly && (
+        <TopPlanKeyboardLayer rooms={visibleRooms} invalidRoomIds={invalidRoomIds} onFocusRoom={setFocusedRoomId} />
+      )}
+      {studio && (
+        <div className="absolute bottom-12 left-4 z-20 flex w-56 flex-col gap-2">
+        {!readOnly && (
+          <div className="pointer-events-none hidden text-[10px] leading-relaxed text-muted-light xl:block">
+            {topView ? (
+              <>
+                Click to select · drag selected to move · drag grips to resize<br />
+                Double-click a polygon edge to add a corner, a corner to remove it<br />
+                Right or middle drag to pan · scroll to zoom · Top again to fit
+              </>
+            ) : (
+              <>Click to select · drag selected to move<br />Right drag to pan · middle drag to orbit</>
+            )}
+          </div>
+        )}
+        <SavedViewsPanel
+          readOnly={readOnly}
+          capture={() => ({
+            ...viewCameraRef.current!.capture(),
+            preset,
+            sunHour,
+            selectedFloor,
+            ghostFloors,
+          })}
+          onRestore={restoreView}
+        />
+        <div className="flex flex-col gap-1.5 rounded-xl border border-ink/10 bg-graphite-800/95 px-3 py-2.5 text-[11px] text-muted shadow-lg backdrop-blur">
+          <span className="font-semibold text-ink">View</span>
+          <div role="group" aria-label="Camera view" className="flex gap-0.5 rounded-lg bg-graphite-900/60 p-0.5">
+            {CAMERA_PRESETS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                aria-label={`${option.value === 'top' ? 'Top plan' : option.value === 'axo' ? 'Axonometric' : 'Perspective'} view`}
+                aria-pressed={preset === option.value}
+                onClick={() => choosePreset(option.value)}
+                className={segmentClass(preset === option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          {multiFloor && selectedFloor !== 'all' && (
+            <div role="group" aria-label="Other floors" className="flex items-center gap-2">
+              <span className="text-muted-light">Other floors</span>
+              <div className="flex flex-1 gap-0.5 rounded-lg bg-graphite-900/60 p-0.5">
+                <button type="button" aria-label="Hide other floors" aria-pressed={!ghostFloors} onClick={() => setGhostFloors(false)} className={segmentClass(!ghostFloors)}>Hide</button>
+                <button type="button" aria-label="Ghost other floors" aria-pressed={ghostFloors} onClick={() => setGhostFloors(true)} className={segmentClass(ghostFloors)}>Ghost</button>
+              </div>
+            </div>
+          )}
+        </div>
+        <label className="flex flex-col gap-1.5 rounded-xl border border-ink/10 bg-graphite-800/95 px-3 py-2.5 text-[11px] text-muted shadow-lg backdrop-blur">
           <span className="font-semibold text-ink">Sun · {formatHour(sunHour)}</span>
           <span className="text-muted-light">{sunAt(sunHour).label}</span>
           <input
@@ -116,10 +270,11 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
             className="accent-accent"
           />
         </label>
+        </div>
       )}
-      {viewMode === '3d' && !readOnly && (
-        <div className="pointer-events-none absolute bottom-64 left-4 hidden max-w-[12rem] text-[10px] leading-relaxed text-muted-light xl:block">
-          Click to select · drag selected to move<br />Right drag to pan · middle drag to orbit
+      {topView && selectedFloor === 'all' && planFloor && floors.length > 1 && (
+        <div role="status" className="pointer-events-none absolute left-1/2 top-28 z-20 -translate-x-1/2 rounded-full border border-warn/30 bg-graphite-800/95 px-3 py-1.5 text-[11px] font-medium text-warn shadow-sm">
+          Top view shows {planFloor.name}. Choose a level to edit another floor.
         </div>
       )}
       {clipboardMessage && (
@@ -132,4 +287,17 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
       )}
     </div>
   )
+}
+
+/** The AO composer turns the renderer's autoClear off for good (postprocessing's
+ * setRenderer) and never turns it back on; without the composer (Top view,
+ * after visiting Persp/Axo) each frame would draw over the last one. */
+function RendererAutoClear() {
+  const gl = useThree((s) => s.gl)
+  const invalidate = useThree((s) => s.invalidate)
+  useEffect(() => {
+    gl.autoClear = true
+    invalidate()
+  }, [gl, invalidate])
+  return null
 }

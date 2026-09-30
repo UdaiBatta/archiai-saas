@@ -1,11 +1,15 @@
-import { useEffect, useRef, type RefObject } from 'react'
+import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useThree } from '@react-three/fiber'
-import { OrbitControls, Grid, Html, Line } from '@react-three/drei'
+import { OrbitControls, OrthographicCamera, Grid, Html, Line, Edges, GizmoHelper, GizmoViewcube } from '@react-three/drei'
 import * as THREE from 'three'
 import { CanvasViewMode, useCanvasStore } from '../../store/canvasStore'
 import { canClearSelectionFromEmptyCanvas } from '../../store/interactionModel'
-import { edgeCardinals, parseOrientation, type ScreenEdge } from './orientationModel'
+import { edgeCardinals, northAngleDeg, parseOrientation, type ScreenEdge } from './orientationModel'
 import { sunAt } from './sunModel'
+import { MODEL_COLORS, presetView, shadowFrustum, type CameraPreset } from './modelView'
+
+/** Site ground sits below floor level so the ground-floor slab reads as a plinth. */
+const GROUND_Y = -0.2
 
 interface OrbitHandle {
   enabled: boolean
@@ -20,54 +24,84 @@ interface SceneProps {
   modelStage?: boolean
   /** Time of day for the 3D sun (06:00-18:00). */
   sunHour?: number
+  /** Camera preset for the 3D view (ignored by the plan lenses). */
+  preset?: CameraPreset
+  /** Architectural site presentation: white model, site ground, AO-ready lighting. */
+  site?: boolean
+  /** Level to show instead of the store's selection (Top view shows one level). */
+  level?: number | 'all'
+  /** Bumped to re-frame the camera on demand (re-clicking a preset). */
+  frameNonce?: number
 }
 
-export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage = false, sunHour = 10 }: SceneProps) {
+export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage = false, sunHour = 10, preset = 'perspective', site = false, level, frameNonce = 0 }: SceneProps) {
   const camera = useThree((s) => s.camera)
   const viewportSize = useThree((s) => s.size)
   const floors = useCanvasStore((s) => s.floors)
-  const selectedFloor = useCanvasStore((s) => s.selectedFloor)
+  const storedFloor = useCanvasStore((s) => s.selectedFloor)
+  const selectedFloor = level ?? storedFloor
   const measurePoints = useCanvasStore((s) => s.measurePoints)
-  const layoutMetadata = useCanvasStore((s) => s.layoutMetadata)
-  const orientation = parseOrientation(layoutMetadata)
+  // Narrow selectors: other metadata (quality, saved views) must not re-render the scene.
+  const orientationMeta = useCanvasStore((s) => s.layoutMetadata.orientation)
+  const mvpFootprint = useCanvasStore((s) => s.layoutMetadata.mvpFootprint)
+  const orientation = useMemo(() => parseOrientation({ orientation: orientationMeta }), [orientationMeta])
   const visibleFloors =
     selectedFloor === 'all'
       ? floors
       : floors.filter((floor) => floor.level === selectedFloor)
   const isPlanView = viewMode !== '3d'
+  const studio = site && !isPlanView
+  const topView = !isPlanView && preset === 'top'
   const mouseButtons = isPlanView
     ? { LEFT: undefined, MIDDLE: undefined, RIGHT: THREE.MOUSE.PAN }
-    : { LEFT: undefined, MIDDLE: THREE.MOUSE.ROTATE, RIGHT: THREE.MOUSE.PAN }
+    : topView
+      ? { LEFT: undefined, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.PAN }
+      : { LEFT: undefined, MIDDLE: THREE.MOUSE.ROTATE, RIGHT: THREE.MOUSE.PAN }
   // Floor slab: thin in plan view, thicker in 3D so multi-floor separation is visible
   const slabHeight = isPlanView ? 0.06 : 0.45
   const isMultiFloor = floors.length > 1
+  const floorHeight = useCanvasStore((s) => s.floorHeight)
+  const buildingTop = Math.max(0, ...floors.map((floor) => floor.elevation)) + floorHeight
   // Frame the active level on entry; editing a room must not reset the camera.
   const footprint = visibleFloors[0]?.footprint
-  const framingKey = `${selectedFloor}:${viewMode}:${modelStage}:${footprint?.w ?? 0}:${footprint?.d ?? 0}`
+  const framingKey = `${frameNonce}:${selectedFloor}:${viewMode}:${modelStage}:${preset}:${footprint?.w ?? 0}:${footprint?.d ?? 0}`
   useEffect(() => {
     if (!footprint) return
-    const target = new THREE.Vector3(footprint.x + footprint.w / 2, visibleFloors[0]?.elevation ?? 0, footprint.z + footprint.d / 2)
-    const portraitScale = Math.max(1, 0.95 * viewportSize.height / Math.max(viewportSize.width, 1))
-    const distance = Math.max(footprint.w, footprint.d, 8) * 1.15 * portraitScale
-    camera.position.copy(target).add(isPlanView ? new THREE.Vector3(0, distance * 1.7, 0.01) : new THREE.Vector3(distance * 0.8, distance, distance * 0.8))
-    camera.lookAt(target)
-    orbitRef.current?.target?.copy(target)
+    const bounds = { ...footprint, h: buildingTop }
+    const elevation = visibleFloors[0]?.elevation ?? 0
+    const view = presetView(isPlanView ? 'perspective' : preset, bounds, viewportSize, elevation)
+    if (isPlanView) {
+      // Plan lenses: the old straight-down perspective framing.
+      const distance = view.position[1] - elevation
+      view.position = [view.target[0], elevation + distance * 1.7, view.target[2] + 0.01]
+    }
+    camera.position.set(...view.position)
+    camera.zoom = view.zoom
+    camera.updateProjectionMatrix()
+    camera.lookAt(...view.target)
+    orbitRef.current?.target?.set(...view.target)
     orbitRef.current?.update?.()
   }, [framingKey, camera, viewportSize.width, viewportSize.height])
 
   // The 3D sun: aimed at the house centre from where the sun is at
-  // `sunHour`, with a shadow box that covers the whole house.
+  // `sunHour`, with a shadow box fitted to the site so shadows stay crisp.
   const sunRef = useRef<THREE.DirectionalLight>(null)
   const sun = sunAt(sunHour)
   const centerX = footprint ? footprint.x + footprint.w / 2 : 0
   const centerZ = footprint ? footprint.z + footprint.d / 2 : 0
-  const reach = Math.max(footprint?.w ?? 10, footprint?.d ?? 10, 8)
+  const shadow = shadowFrustum({ x: 0, z: 0, w: footprint?.w ?? 10, d: footprint?.d ?? 10, h: buildingTop })
   useEffect(() => {
     const light = sunRef.current
     if (!light) return
     light.target.position.set(centerX, 0, centerZ)
     light.target.updateMatrixWorld()
-  }, [centerX, centerZ])
+    light.shadow.camera.updateProjectionMatrix()
+  }, [centerX, centerZ, shadow.radius])
+
+  // The building's own outline on the plot (the engine sizes it inside the
+  // plot); slabs use it so upper floors are not plot-sized in the model.
+  const building = mvpFootprint as { x: number; y: number; w: number; h: number } | undefined
+  const orientationNorth = orientation ? THREE.MathUtils.degToRad(northAngleDeg(orientation)) : 0
 
   // Distinct floor slab colours so stacked floors are visually separable
   const floorSlabColor = (level: number) => {
@@ -79,44 +113,54 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
 
   return (
     <>
-      <ambientLight intensity={isPlanView ? 0.9 : 0.35} />
+      <ambientLight intensity={isPlanView ? 0.9 : studio ? 0.08 : 0.35} />
       {!isPlanView && (
-        <hemisphereLight args={['#BDBDC0', '#26282D', 0.45]} />
+        studio
+          ? <hemisphereLight args={['#ffffff', '#c8c6c0', 2.2]} />
+          : <hemisphereLight args={['#BDBDC0', '#26282D', 0.45]} />
       )}
       <directionalLight
         ref={sunRef}
         position={
           isPlanView
             ? [10, 20, 10]
-            : [centerX + sun.direction[0] * reach * 2, sun.direction[1] * reach * 2, centerZ + sun.direction[2] * reach * 2]
+            : [centerX + sun.direction[0] * shadow.distance, sun.direction[1] * shadow.distance, centerZ + sun.direction[2] * shadow.distance]
         }
         color={isPlanView ? '#ffffff' : sun.color}
-        intensity={isPlanView ? 0.55 : sun.intensity}
-        castShadow={!isPlanView}
+        intensity={isPlanView ? 0.55 : studio ? sun.intensity * 1.4 : sun.intensity}
+        castShadow={!isPlanView && !topView}
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
-        shadow-bias={-0.0002}
-        shadow-camera-left={-reach}
-        shadow-camera-right={reach}
-        shadow-camera-top={reach}
-        shadow-camera-bottom={-reach}
-        shadow-camera-near={0.5}
-        shadow-camera-far={reach * 5}
+        shadow-bias={-0.0001}
+        shadow-normalBias={0.03}
+        shadow-radius={studio ? 4 : 1}
+        shadow-camera-left={-shadow.radius}
+        shadow-camera-right={shadow.radius}
+        shadow-camera-top={shadow.radius}
+        shadow-camera-bottom={-shadow.radius}
+        shadow-camera-near={shadow.near}
+        shadow-camera-far={shadow.far}
       />
+      {!isPlanView && preset !== 'perspective' && <OrthographicCamera makeDefault near={0.1} far={2000} />}
 
       {visibleFloors.map((floor) => {
-        const footprint = floor.footprint
-        if (!footprint || !footprint.w || !footprint.d) return null
+        const plot = floor.footprint
+        if (!plot || !plot.w || !plot.d) return null
+        // Studio: slabs follow the building outline; otherwise the floor footprint.
+        const footprint = studio && building?.w && building.h
+          ? { x: building.x, z: building.y, w: building.w, d: building.h }
+          : plot
         const centerX = footprint.x + footprint.w / 2
         const centerZ = footprint.z + footprint.d / 2
         const slabY = floor.elevation - slabHeight / 2
-        const edgeGeometry = new THREE.BoxGeometry(footprint.w, slabHeight, footprint.d)
         return (
           <group key={floor.id}>
             {/* Floor slab */}
-            <group position={[centerX, slabY, centerZ]}>
-              <mesh raycast={() => null} receiveShadow>
-                <boxGeometry args={[footprint.w, slabHeight, footprint.d]} />
+            <mesh position={[centerX, slabY, centerZ]} raycast={() => null} castShadow={studio} receiveShadow>
+              <boxGeometry args={[footprint.w, slabHeight, footprint.d]} />
+              {studio ? (
+                <meshStandardMaterial color={MODEL_COLORS.slab} roughness={0.95} />
+              ) : (
                 <meshStandardMaterial
                   color={floorSlabColor(floor.level)}
                   transparent
@@ -124,15 +168,12 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
                   roughness={0.82}
                   metalness={0.04}
                 />
-              </mesh>
-              <lineSegments raycast={() => null}>
-                <edgesGeometry args={[edgeGeometry]} />
-                <lineBasicMaterial color={floor.level === 0 ? '#909094' : '#6A6A6E'} />
-              </lineSegments>
-            </group>
+              )}
+              <Edges color={studio ? MODEL_COLORS.edge : floor.level === 0 ? '#909094' : '#6A6A6E'} />
+            </mesh>
 
             {/* Ceiling plane between floors (only in 3D multi-floor mode) */}
-            {!isPlanView && isMultiFloor && floor.level > 0 && (
+            {!isPlanView && !studio && isMultiFloor && floor.level > 0 && (
               <mesh
                 position={[centerX, floor.elevation - 0.01, centerZ]}
                 rotation={[-Math.PI / 2, 0, 0]}
@@ -150,6 +191,14 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
           </group>
         )
       })}
+
+      {studio && footprint && (
+        <SiteGround
+          plot={footprint}
+          northAngle={orientationNorth}
+          fadeDistance={shadow.radius * 8}
+        />
+      )}
 
       {/* Orientation markers: cardinal letters at the footprint edges, the
           facing edge labelled as Front — same mapping as the 2D plan. */}
@@ -175,6 +224,7 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
             <>
               {(Object.keys(positions) as ScreenEdge[]).map((edge) => {
                 const isFacing = cardinals[edge] === facing
+                const isRoad = cardinals[edge] === orientation.roadSide
                 return (
                   <Html
                     key={edge}
@@ -192,6 +242,7 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
                     >
                       {cardinals[edge]}
                       {isFacing ? ' · FRONT' : ''}
+                      {isRoad ? ' · ROAD' : ''}
                     </span>
                   </Html>
                 )
@@ -200,24 +251,35 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
           )
         })()}
 
-      <Grid
+      {!studio && <Grid
         args={[40, 40]}
         position={[0, 0, 0]}
         cellColor={isPlanView ? '#323233' : '#323233'}
         sectionColor={isPlanView ? '#464648' : '#464648'}
         fadeDistance={isPlanView ? 80 : 60}
         infiniteGrid={!isPlanView}
-      />
+      />}
 
       <OrbitControls
         ref={orbitRef as RefObject<any>}
         makeDefault
-        enableRotate={!isPlanView}
+        enableRotate={!isPlanView && !topView}
         enablePan
         enableZoom
         screenSpacePanning
         mouseButtons={mouseButtons}
       />
+      {studio && !topView && (
+        <GizmoHelper alignment="top-right" margin={[76, 160]} renderPriority={2}>
+          <GizmoViewcube
+            color={MODEL_COLORS.wall}
+            textColor="#2f2e2b"
+            strokeColor="#8a877f"
+            hoverColor="#FF9A7A"
+            opacity={0.95}
+          />
+        </GizmoHelper>
+      )}
 
       {/* Invisible ground plane — click-to-place when a tool is armed,
           otherwise deselects when clicking empty canvas. */}
@@ -293,6 +355,93 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
           </Html>
         </>
       )}
+    </>
+  )
+}
+
+const ringPoints = Array.from({ length: 49 }, (_, i) => {
+  const angle = (i / 48) * Math.PI * 2
+  return [Math.cos(angle), 0, Math.sin(angle)] as [number, number, number]
+})
+
+/** Site context under the model: shadow-catching ground with a faint metre
+ * grid, the plot pad and boundary, and a north arrow off the plot corner. */
+function SiteGround({
+  plot,
+  northAngle,
+  fadeDistance,
+}: {
+  plot: { x: number; z: number; w: number; d: number }
+  northAngle: number
+  fadeDistance: number
+}) {
+  const cx = plot.x + plot.w / 2
+  const cz = plot.z + plot.d / 2
+  const x0 = plot.x, x1 = plot.x + plot.w, z0 = plot.z, z1 = plot.z + plot.d
+  const size = Math.min(4, Math.max(1.2, Math.max(plot.w, plot.d) * 0.08))
+  const offset = size * 2.2
+  // Classic split north arrow in shape space (+y = north), laid on the ground.
+  const [arrowDark, arrowLight] = useMemo(() => {
+    const half = (side: number) => {
+      const shape = new THREE.Shape()
+      shape.moveTo(0, 1)
+      shape.lineTo(side * 0.42, -0.62)
+      shape.lineTo(0, -0.3)
+      shape.closePath()
+      return new THREE.ShapeGeometry(shape)
+    }
+    return [half(-1), half(1)]
+  }, [])
+  useEffect(() => () => { arrowDark.dispose(); arrowLight.dispose() }, [arrowDark, arrowLight])
+
+  return (
+    <>
+      {/* Fog must attach to the scene itself, so this component returns a fragment. */}
+      <fog attach="fog" args={[MODEL_COLORS.sky, fadeDistance * 0.9, fadeDistance * 2.2]} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[cx, GROUND_Y, cz]} receiveShadow raycast={() => null}>
+        <planeGeometry args={[fadeDistance * 5, fadeDistance * 5]} />
+        <meshStandardMaterial color={MODEL_COLORS.ground} roughness={1} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[cx, GROUND_Y + 0.02, cz]} receiveShadow raycast={() => null}>
+        <planeGeometry args={[plot.w, plot.d]} />
+        <meshStandardMaterial color={MODEL_COLORS.plot} roughness={1} />
+      </mesh>
+      <Grid
+        position={[cx, GROUND_Y + 0.03, cz]}
+        args={[1, 1]}
+        cellSize={1}
+        sectionSize={5}
+        cellThickness={0.6}
+        sectionThickness={1}
+        cellColor={MODEL_COLORS.gridCell}
+        sectionColor={MODEL_COLORS.gridSection}
+        fadeDistance={fadeDistance}
+        fadeStrength={1.5}
+        infiniteGrid
+      />
+      <Line
+        points={[[x0, 0, z0], [x1, 0, z0], [x1, 0, z1], [x0, 0, z1], [x0, 0, z0]]}
+        position={[0, GROUND_Y + 0.04, 0]}
+        color={MODEL_COLORS.plotLine}
+        lineWidth={1.6}
+      />
+      <group position={[x1 + offset, GROUND_Y + 0.04, z0 - offset]} rotation={[0, -northAngle, 0]} scale={size}>
+        <group rotation={[-Math.PI / 2, 0, 0]}>
+          <mesh geometry={arrowDark} raycast={() => null}>
+            <meshBasicMaterial color={MODEL_COLORS.plotLine} />
+          </mesh>
+          <mesh geometry={arrowLight} raycast={() => null}>
+            <meshBasicMaterial color="#ffffff" />
+          </mesh>
+        </group>
+        <Line points={ringPoints} scale={0.78} color={MODEL_COLORS.plotLine} lineWidth={1} />
+        {/* "N" beyond the tip (world -z is shape +y). */}
+        <Line
+          points={[[-0.2, 0, -1.25], [-0.2, 0, -1.7], [0.2, 0, -1.25], [0.2, 0, -1.7]]}
+          color={MODEL_COLORS.plotLine}
+          lineWidth={1.6}
+        />
+      </group>
     </>
   )
 }

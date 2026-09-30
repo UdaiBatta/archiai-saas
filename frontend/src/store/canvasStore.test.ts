@@ -685,6 +685,17 @@ describe('undo/redo', () => {
     expect(useCanvasStore.getState().rooms.length).toBe(start)
   })
 
+  it('keeps saved camera views across undo and redo, and saves them with the layout', () => {
+    useCanvasStore.getState().updateRoom('room-1', { position: { x: 3, y: 1.5, z: 4 } })
+    useCanvasStore.getState().setSavedViews([{ id: 'v1' }])
+    expect(useCanvasStore.getState().hasUnsavedChanges).toBe(true)
+    useCanvasStore.getState().undo()
+    expect(useCanvasStore.getState().layoutMetadata.savedViews).toEqual([{ id: 'v1' }])
+    useCanvasStore.getState().redo()
+    expect(useCanvasStore.getState().layoutMetadata.savedViews).toEqual([{ id: 'v1' }])
+    expect(useCanvasStore.getState().serializeLayout().metadata?.savedViews).toEqual([{ id: 'v1' }])
+  })
+
   it('reverts a move', () => {
     useCanvasStore.getState().updateRoom('room-1', { position: { x: 3, y: 1.5, z: 4 } })
     useCanvasStore.getState().undo()
