@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
-import { Canvas, useThree } from '@react-three/fiber'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { AdaptiveDpr } from '@react-three/drei'
 import { EffectComposer, N8AO, ToneMapping } from '@react-three/postprocessing'
 import { ToneMappingMode } from 'postprocessing'
@@ -239,6 +239,10 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
             and AO under an orthographic camera was costly enough to slow the
             whole window. Top also drops sun shadows (see Scene). */}
         {!aoOn && <RendererAutoClear />}
+        {/* The view cube (Scene, Persp/Axo) renders at priority 2, which stops
+            R3F's own render; in Persp the AO composer draws the scene, so
+            without it (Axo) something must, or the canvas stays blank. */}
+        {studio && !aoOn && !topView && <MainScenePass />}
         {aoOn && (
           <EffectComposer multisampling={4}>
             <N8AO ref={aoRef as never} aoRadius={1.2} distanceFalloff={0.6} intensity={2.4} quality="medium" halfRes color="#1f1d1a" />
@@ -335,5 +339,15 @@ function RendererAutoClear() {
     gl.autoClear = true
     invalidate()
   }, [gl, invalidate])
+  return null
+}
+
+/** Draws the scene when a higher-priority frame callback (the view cube) has
+ * taken over rendering and no composer is there to draw it. */
+function MainScenePass() {
+  useFrame(({ gl, scene, camera }) => {
+    gl.autoClear = true
+    gl.render(scene, camera)
+  }, 1)
   return null
 }
