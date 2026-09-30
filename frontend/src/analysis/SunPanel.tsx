@@ -5,7 +5,8 @@ import { setSunLocation, useSunContext, useSunUi } from './sunStore'
 
 const QUICK_DATES = [
   ['06-21', 'Jun 21'],
-  ['03-21', 'Mar/Sep 21'],
+  ['03-21', 'Mar 21'],
+  ['09-21', 'Sep 21'],
   ['12-21', 'Dec 21'],
 ] as const
 
