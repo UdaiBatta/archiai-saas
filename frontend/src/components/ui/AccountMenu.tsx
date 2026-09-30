@@ -44,7 +44,7 @@ export function AccountMenu({ name, email, onSignOut, align = 'end', side = 'bot
         className="flex min-w-0 items-center gap-2.5 rounded-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/50"
       >
         <Avatar name={displayName} size={8} />
-        {showName && <span className="min-w-0 truncate text-sm text-muted">{displayName}</span>}
+        {showName && <span className="hidden min-w-0 truncate text-sm text-muted sm:inline">{displayName}</span>}
       </DropdownMenuTrigger>
       <DropdownMenuContent align={align} side={side} className="w-72 rounded-2xl">
         <DropdownMenuLabel className="flex items-center gap-3 px-3 py-2.5 font-normal">

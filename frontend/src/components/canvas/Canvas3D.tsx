@@ -263,6 +263,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
         )}
         {studio && <PauseWhileMoving pass={aoRef} />}
         {studio && <AdaptiveDpr />}
+        {studio && preset !== 'perspective' && <OrthoZoom />}
         {aoOn && <PerformanceMonitor onDecline={() => chooseAo(false)} />}
         {SHOW_PERF && <PerfReadout />}
       </Canvas>
@@ -337,6 +338,18 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
           Top view shows {planFloor.name}. Choose a level to edit another floor.
         </div>
       )}
+      {studio && preset !== 'perspective' && (
+        <div role="group" aria-label="Zoom" className="absolute bottom-14 right-3 z-20 flex flex-col overflow-hidden rounded-xl border border-ink/10 bg-graphite-800/95 shadow-lg backdrop-blur">
+          {([['in', '+', 'Zoom in'], ['out', '−', 'Zoom out']] as const).map(([dir, glyph, label]) => (
+            <button key={dir} type="button" aria-label={label} title={label} onClick={() => window.dispatchEvent(new CustomEvent(ZOOM_EVENT, { detail: dir }))} className="h-8 w-8 text-base leading-none text-muted transition-colors hover:bg-ink/10 hover:text-ink focus-visible:bg-ink/10 focus-visible:outline-none">
+              {glyph}
+            </button>
+          ))}
+          <button type="button" aria-label="Zoom to fit" title="Zoom to fit" onClick={() => setFrameNonce((n) => n + 1)} className="h-8 w-8 border-t border-ink/10 text-[10px] font-semibold text-muted transition-colors hover:bg-ink/10 hover:text-ink focus-visible:bg-ink/10 focus-visible:outline-none">
+            FIT
+          </button>
+        </div>
+      )}
       {clipboardMessage && (
         <div
           role="status"
@@ -369,5 +382,24 @@ function MainScenePass() {
     gl.autoClear = true
     gl.render(scene, camera)
   }, 1)
+  return null
+}
+
+const ZOOM_EVENT = 'archiai:ortho-zoom'
+
+/** +/- for the orthographic views (Top, Axo): scale the camera's zoom. */
+function OrthoZoom() {
+  const camera = useThree((s) => s.camera)
+  const invalidate = useThree((s) => s.invalidate)
+  useEffect(() => {
+    const onZoom = (event: Event) => {
+      const factor = (event as CustomEvent<'in' | 'out'>).detail === 'in' ? 1.25 : 0.8
+      camera.zoom = Math.min(400, Math.max(1, camera.zoom * factor))
+      camera.updateProjectionMatrix()
+      invalidate()
+    }
+    window.addEventListener(ZOOM_EVENT, onZoom)
+    return () => window.removeEventListener(ZOOM_EVENT, onZoom)
+  }, [camera, invalidate])
   return null
 }

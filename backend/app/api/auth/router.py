@@ -98,7 +98,7 @@ async def update_me(
 
 @router.post(
     "/password",
-    status_code=204,
+    response_model=AuthResponse,
     dependencies=[Depends(rate_limit("auth_password", limit=5, window_seconds=60, by_ip=True))],
 )
 async def update_password(
@@ -106,4 +106,4 @@ async def update_password(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
     db: AsyncSession = Depends(get_db),
 ):
-    await change_password(db, _token(credentials), data)
+    return await change_password(db, _token(credentials), data)

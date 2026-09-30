@@ -18,7 +18,7 @@ function room(partial: Partial<Room>): Room {
 }
 
 describe('LayoutThumbnail', () => {
-  it('renders one rect per ground-floor space, skipping walls and upper floors', () => {
+  it('draws one outline per ground-floor space, skipping walls and upper floors', () => {
     const { container } = render(
       <LayoutThumbnail
         rooms={[
@@ -32,7 +32,8 @@ describe('LayoutThumbnail', () => {
 
     expect(screen.getByTestId('layout-thumbnail')).toBeInTheDocument()
     // background sheet + 2 ground-floor spaces
-    expect(container.querySelectorAll('rect')).toHaveLength(3)
+    expect(container.querySelectorAll('rect')).toHaveLength(1)
+    expect(container.querySelectorAll('polygon')).toHaveLength(2)
   })
 
   it('renders just the sheet for an empty layout', () => {
@@ -50,7 +51,15 @@ describe('LayoutThumbnail', () => {
     const svg = decodeURIComponent(url!.split(',')[1])
     expect(svg).toContain('xmlns="http://www.w3.org/2000/svg"')
     // background sheet + 2 spaces (the wall is not drawn)
-    expect(svg.match(/<rect /g)).toHaveLength(3)
+    expect(svg.match(/<rect /g)).toHaveLength(1)
+    expect(svg.match(/<polygon /g)).toHaveLength(2)
+  })
+
+  it('draws a quarter-turned room with its turned footprint', () => {
+    const turned = { ...room({ id: 't', size: { w: 6, h: 3, d: 2 } }), rotation: { x: 0, y: 90, z: 0 } } as Room
+    const svg = decodeURIComponent(layoutThumbnailDataUrl([turned])!.split(',')[1])
+    // 6 x 2 turned 90 degrees covers 2 m east-west and 6 m north-south.
+    expect(svg).toContain('points="-1,-3 1,-3 1,3 -1,3"')
   })
 
   it('has no preview for a plan with no rooms', () => {
