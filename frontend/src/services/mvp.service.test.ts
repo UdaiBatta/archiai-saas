@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import api from './api'
 import {
   extractBrief,
+  fetchLayoutOptions,
   fetchMvpVersion,
   generateMvpLayout,
   saveMvpVersion,
@@ -93,6 +94,18 @@ describe('MVP pipeline service', () => {
         projectId: 'project-1',
         prompt: 'one bedroom house',
       },
+      { signal: undefined },
+    )
+  })
+
+  it('fetches layout options for a brief', async () => {
+    const response = { options: [{ layout, score: 90, highlights: ['Highest score'] }], warnings: [] }
+    vi.mocked(api.post).mockResolvedValue({ data: response })
+
+    await expect(fetchLayoutOptions(requirements)).resolves.toBe(response)
+    expect(api.post).toHaveBeenCalledWith(
+      '/api/options',
+      { requirements, count: 3 },
       { signal: undefined },
     )
   })

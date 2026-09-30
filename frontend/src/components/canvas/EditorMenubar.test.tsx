@@ -27,6 +27,7 @@ const props: EditorMenubarProps = {
   onHistory: noop,
   onActivity: noop,
   onEditBrief: noop,
+  onOptions: vi.fn(),
   optionCount: 0,
   activeOption: 0,
   onPickOption: noop,
@@ -56,6 +57,16 @@ async function openExport() {
   await user.keyboard('{ArrowRight}')
   return user
 }
+
+describe('EditorMenubar Plan menu', () => {
+  it('opens layout options', async () => {
+    const user = userEvent.setup()
+    render(<EditorMenubar {...props} />)
+    await user.click(screen.getByRole('menuitem', { name: 'Plan' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Options…' }))
+    expect(props.onOptions).toHaveBeenCalled()
+  })
+})
 
 describe('EditorMenubar export', () => {
   it('lists the CAD/BIM/3D formats and downloads the chosen one', async () => {
