@@ -533,7 +533,7 @@ async def test_layout_sync_honours_a_user_open_connection(client: AsyncClient):
 
     assert response.status_code == 200
     layout = response.json()["layout"]
-    assert layout["connections"] == [{**plan["connections"][0], "at": None}]
+    assert layout["connections"] == [{**plan["connections"][0], "at": None, "width": None}]
     rebuilt = [w for w in layout["walls"] if w.get("rooms") and set(w["rooms"]) == set(wall["rooms"])]
     assert {w["kind"] for w in rebuilt} == {"open"}
 
