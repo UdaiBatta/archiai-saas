@@ -20,10 +20,21 @@ export interface SiteRules {
   maxFar: number | null
 }
 
+/** Where the site is on Earth, for the real sun (P5). Degrees, north / east positive. */
+export interface SiteLocation {
+  lat: number
+  lon: number
+}
+
+/** Used when a site has no location yet: Delhi. Always labelled as a default in the UI. */
+export const DEFAULT_LOCATION: SiteLocation = { lat: 28.6, lon: 77.2 }
+
 export interface Site {
   /** Simple polygon, at least 3 points, either winding. */
   boundary: SitePoint[]
   rules: SiteRules
+  /** Absent on sites saved before P5 (the default location applies). */
+  location?: SiteLocation
 }
 
 export interface Mass {
@@ -61,6 +72,13 @@ const points = (value: unknown): SitePoint[] | null => {
   return out.length >= 3 ? out : null
 }
 
+/** A valid latitude/longitude, or null. */
+export function parseLocation(value: unknown): SiteLocation | null {
+  const lat = num((value as SiteLocation | null)?.lat)
+  const lon = num((value as SiteLocation | null)?.lon)
+  return lat !== null && lon !== null && Math.abs(lat) <= 90 && Math.abs(lon) <= 180 ? { lat, lon } : null
+}
+
 /** Read `layoutMetadata.site` defensively; anything malformed is null. */
 export function parseSite(value: unknown): Site | null {
   const boundary = points((value as Site | null)?.boundary)
@@ -71,8 +89,10 @@ export function parseSite(value: unknown): Site | null {
     const n = num(v)
     return n !== null && n > 0 ? n : null
   }
+  const location = parseLocation((value as Site).location)
   return {
     boundary,
+    ...(location ? { location } : {}),
     rules: {
       setbacks: boundary.map((_, i) => setbacks[i] ?? 0),
       maxHeightM: positive(rules.maxHeightM),

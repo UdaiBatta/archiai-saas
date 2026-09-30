@@ -32,7 +32,8 @@ export function plotBoundary(metadata: Record<string, unknown>, footprint: PlotR
 /** A new boundary for the site; rules survive when the edge count matches. */
 export function withBoundary(current: Site | null, boundary: SitePoint[]): Site {
   const keep = current && current.boundary.length === boundary.length
-  return { boundary, rules: keep ? current.rules : emptyRules(boundary.length) }
+  const rules = keep ? current.rules : emptyRules(boundary.length)
+  return current?.location ? { boundary, rules, location: current.location } : { boundary, rules }
 }
 
 export const edgeLength = (boundary: SitePoint[], index: number) => {

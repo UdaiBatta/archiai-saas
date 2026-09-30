@@ -9,6 +9,12 @@ describe('parseSite', () => {
     expect(site?.rules).toEqual({ setbacks: [3, 0, 0, 0], maxHeightM: null, maxCoverage: 0.4, maxFar: null })
   })
 
+  it('keeps a valid location and drops a bad one (older sites have none)', () => {
+    expect(parseSite({ boundary: square, location: { lat: 12.9, lon: 77.6 } })?.location).toEqual({ lat: 12.9, lon: 77.6 })
+    expect(parseSite({ boundary: square, location: { lat: 95, lon: 0 } })).not.toHaveProperty('location')
+    expect(parseSite({ boundary: square })).not.toHaveProperty('location')
+  })
+
   it('rejects malformed boundaries', () => {
     expect(parseSite(undefined)).toBeNull()
     expect(parseSite({ boundary: square.slice(0, 2) })).toBeNull()
