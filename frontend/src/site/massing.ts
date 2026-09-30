@@ -139,6 +139,31 @@ export function reduceFloorsForGfa(masses: Mass[], maxGfa: number): Mass[] {
   return next
 }
 
+/** Every footprint scaled about its own centroid (shape and floors kept). */
+function scaleFootprints(masses: Mass[], factor: number): Mass[] {
+  return masses.map((mass) => {
+    const cx = mass.footprint.reduce((sum, p) => sum + p.x, 0) / mass.footprint.length
+    const cz = mass.footprint.reduce((sum, p) => sum + p.z, 0) / mass.footprint.length
+    return { ...mass, footprint: mass.footprint.map((p) => ({ x: cx + (p.x - cx) * factor, z: cz + (p.z - cz) * factor })) }
+  })
+}
+
+/**
+ * Shrink all footprints evenly until site coverage fits the limit: area scales
+ * with the square of the factor; overlaps make the union shrink a little
+ * differently, so re-check and tighten a few times. Null if it cannot fit.
+ */
+export function shrinkForCoverage(site: Site | null, masses: Mass[], limit: number): Mass[] | null {
+  let factor = 1
+  for (let i = 0; i < 6; i++) {
+    const coverage = siteMetrics(site, scaleFootprints(masses, factor)).coverage
+    if (coverage === null) return null
+    if (coverage <= limit) return factor < 1 ? scaleFootprints(masses, factor) : null
+    factor *= Math.sqrt(limit / coverage) * 0.999
+  }
+  return null
+}
+
 export function zoningIssues(site: Site | null, masses: Mass[]): ZoningIssue[] {
   const issues: ZoningIssue[] = []
   const envelope = site ? buildableEnvelope(site) : null
@@ -174,10 +199,13 @@ export function zoningIssues(site: Site | null, masses: Mass[]): ZoningIssue[] {
 
   const metrics = siteMetrics(site, masses)
   if (rules?.maxCoverage && metrics.coverage !== null && metrics.coverage > rules.maxCoverage * (1 + 1e-6)) {
+    const limit = rules.maxCoverage
+    const fixed = shrinkForCoverage(site, masses, limit)
     issues.push({
       code: 'coverage',
       massId: null,
-      message: `Coverage is ${(metrics.coverage * 100).toFixed(1)}%; the limit is ${(rules.maxCoverage * 100).toFixed(1)}%. Shrink or remove footprints.`,
+      message: `Coverage is ${(metrics.coverage * 100).toFixed(1)}%; the limit is ${(limit * 100).toFixed(1)}%. Shrink or remove footprints.`,
+      fix: fixed ? { label: 'Shrink footprints to fit', masses: fixed } : undefined,
     })
   }
   if (rules?.maxFar && metrics.far !== null && metrics.siteArea && metrics.far > rules.maxFar * (1 + 1e-6)) {
