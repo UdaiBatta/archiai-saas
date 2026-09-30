@@ -10,10 +10,11 @@ export function upsertConnection(
   roomB: string,
   kind: ConnectionKind,
   at: number | null = null,
+  width: number | null = null,
 ): Connection[] {
   const samePair = (c: Connection) =>
     (c.room_a === roomA && c.room_b === roomB) || (c.room_a === roomB && c.room_b === roomA)
-  return [...connections.filter((c) => !samePair(c)), { room_a: roomA, room_b: roomB, kind, at }]
+  return [...connections.filter((c) => !samePair(c)), { room_a: roomA, room_b: roomB, kind, at, ...(width ? { width } : {}) }]
 }
 
 /**

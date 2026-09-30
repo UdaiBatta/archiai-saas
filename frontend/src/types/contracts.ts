@@ -137,6 +137,8 @@ export interface Connection {
   kind: ConnectionKind
   /** Door centre as a 0..1 fraction along the shared edge; null = centred. */
   at?: number | null
+  /** Opening width in metres (a door widened to take out part of the wall); null = standard door. */
+  width?: number | null
 }
 
 /** How two adjacent rooms currently meet, as last derived by the server. */

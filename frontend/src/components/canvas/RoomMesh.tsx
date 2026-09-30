@@ -5,7 +5,7 @@ import { useThree, type ThreeEvent } from '@react-three/fiber'
 import type { RefObject } from 'react'
 import * as THREE from 'three'
 import { CanvasHistorySnapshot, CanvasViewMode, Room, useCanvasStore } from '../../store/canvasStore'
-import { COMPONENT_REGISTRY } from '../../store/componentRegistry'
+import { capabilitiesOf } from '../../store/componentRegistry'
 import {
   hasCrossedMoveThreshold,
   isPrimaryPointerButton,
@@ -118,7 +118,7 @@ export function RoomMesh({
     : null, [solid3d, room, hostedOpenings])
 
   const isSelected = selectedId === room.id
-  const definition = COMPONENT_REGISTRY[room.objectType]
+  const definition = capabilitiesOf(room)
   const isThinComponent =
     definition.renderingTreatment === 'thin' ||
     definition.category === 'opening' ||

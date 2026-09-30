@@ -48,4 +48,9 @@ describe('RoomConnections', () => {
     const { container } = render(<RoomConnections roomId="nowhere" />)
     expect(container).toBeEmptyDOMElement()
   })
+  it('narrows to one pair for a wall between two rooms', () => {
+    render(<RoomConnections roomId="living" onlyWith="bed" />)
+    expect(screen.getAllByRole('radiogroup')).toHaveLength(1)
+    expect(screen.getByText('Living Room ↔ Bedroom')).toBeInTheDocument()
+  })
 })

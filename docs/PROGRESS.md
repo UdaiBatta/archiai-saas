@@ -7,7 +7,7 @@ Full plan and competitor map: [roadmap.html](roadmap.html) (published as the
 `python docs/sync_progress.py` to copy them into it. Near-term engine
 work lives in [ROADMAP.md](ROADMAP.md).
 
-_Last updated: 2026-09-30_
+_Last updated: 2026-10-01_
 
 ## Foundation: layout engine quality — PR #44 (merged)
 
@@ -45,7 +45,9 @@ _Last updated: 2026-09-30_
 - [x] Camera frames the building in the space the chrome leaves clear (PR #48)
 - [x] Rooms may overhang the plot (balconies); plot line still reported (PR #48)
 - [x] Account menu and settings page (profile, password, preferences, plan) (PR #48)
-- [ ] On-screen zoom buttons in Top view
+- [x] On-screen zoom in / out / fit in Top and Axo (PR #48)
+- [x] Ambient occlusion opt-in, off by default: Persp stays light (PR #48)
+- [x] Merged meshes: ~60 draw calls per frame for a 17-room villa (PR #48)
 
 ## P2: Site & massing — PR #47 (in progress)
 
@@ -57,27 +59,31 @@ _Last updated: 2026-09-30_
 - [x] Masses: add, fill the envelope, draw; push/pull floors; move and reshape in Top view
 - [x] Live metrics panel: GFA, FAR, coverage, height, floors against the limits
 - [x] Zoning warnings in 3D with a reason and a one-click fix (trim, height, FAR, overlap)
-- [ ] Automatic fix for over-coverage
+- [x] Automatic fix for over-coverage (shrink footprints to fit) (PR #48)
 - [ ] Timed test: parcel to a compliant mass in under 5 minutes
 
-## P3: Housing + interior inside the mass
+## P3: Housing + interior inside the mass — PR #49
 
-- [ ] Engine fills massing floor plates around a core
-- [ ] Unit mix targets with yield readout
-- [ ] Instant re-solve on mass edit, honouring locked rooms and units
-- [ ] Furniture layouts checked against clearances
+- [x] Engine fills massing floor plates around a core (corridor, stair/lift core, stacked units)
+- [x] Unit mix targets with yield readout (mix within 1 unit per type; NSA, GFA, efficiency)
+- [x] Re-solve on mass edit (optional auto), honouring locked units
+- [ ] Locks for individual rooms inside a unit
+- [ ] Second wing / core for irregular footprints (today: largest rectangle)
+- [x] Furniture layouts checked against clearances (zero violations on the golden plans)
 
-## P4: AI assistant panel (secondary)
+## P4: AI assistant panel (secondary) — PR #50
 
-- [ ] Brief to three scored options
-- [ ] Explain a rule violation with the engine's fix
-- [ ] Suggest alternatives for a selected room or unit
-- [ ] Every AI action is an ordinary, undoable edit
+- [x] Brief to three distinct scored options, engine-only (Plan > Options)
+- [x] Explain a rule violation: why it matters and how to fix it
+- [x] Assistant: plain-language instruction to a previewed, validated edit
+- [x] Every AI action is an ordinary, undoable edit (nothing changes before Apply)
 
-## P5: Analysis
+## P5: Analysis — PR #51
 
-- [ ] Sun-hours heatmap on facades and ground
-- [ ] Per-room daylight check tied to the daylight rule
+- [x] Real solar position (NOAA) for the site's latitude and a chosen date
+- [x] Sun-hours heatmap on ground and façades (0.2 s for villa + 5-floor block)
+- [x] Per-room direct-sun check at the windows of habitable rooms
+- [ ] Validate sun hours against an external tool (Ladybug) on three sites
 - [ ] View analysis per window
 
 ## P6: Collaboration

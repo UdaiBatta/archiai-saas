@@ -361,3 +361,16 @@ export function clampComponentSize(
     d: finite(size.d, fallback.d, min.d),
   }
 }
+
+/** Walls the engine derives from the rooms (rebuilt after every edit): they
+ * follow the rooms, so moving, resizing or rotating one directly can never
+ * stick. Change the rooms, or open the wall (see deleteRoom). */
+export function isEngineWall(room: { objectType: string; derived?: unknown }): boolean {
+  return room.objectType === 'wall' && room.derived === 'engine'
+}
+
+/** A component's capabilities for this particular object. */
+export function capabilitiesOf(room: { objectType: CanvasObjectType; derived?: unknown }): ComponentDefinition {
+  const definition = COMPONENT_REGISTRY[room.objectType]
+  return isEngineWall(room) ? { ...definition, canMove: false, canResize: false, canRotate: false } : definition
+}

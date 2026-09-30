@@ -723,6 +723,17 @@ def test_door_connection_places_the_door_where_the_user_dragged_it():
     assert door.offset == 0.0  # clamped to the wall start, not centred
 
 
+def test_widened_door_takes_out_that_much_wall():
+    spec = _load("4bhk")
+    plan = generate_plan(spec)
+    a, b = _first_pair(plan, "bedroom", "bedroom")
+
+    rebuilt = _rebuilt_with(plan, spec, {"room_a": a, "room_b": b, "kind": "door", "at": 0.5, "width": 2.0})
+    wall = max(_pair_walls(rebuilt, a, b), key=lambda w: abs(w.x2 - w.x1) + abs(w.y2 - w.y1))
+    door = next(d for d in rebuilt.doors if d.wall_ref == wall.id)
+    assert door.width == min(2.0, abs(wall.x2 - wall.x1) + abs(wall.y2 - wall.y1))
+
+
 def test_connection_between_rooms_that_no_longer_touch_is_dropped():
     spec = _load("2bhk")
     plan = generate_plan(spec)

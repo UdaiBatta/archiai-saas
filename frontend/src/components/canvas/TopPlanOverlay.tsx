@@ -3,7 +3,7 @@ import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { Html, Line } from '@react-three/drei'
 import * as THREE from 'three'
 import { type CanvasHistorySnapshot, type Room, useCanvasStore, workArea } from '../../store/canvasStore'
-import { COMPONENT_REGISTRY } from '../../store/componentRegistry'
+import { capabilitiesOf } from '../../store/componentRegistry'
 import { formatArea } from '../../utils/format'
 import {
   insertPolygonVertex,
@@ -215,7 +215,7 @@ export function TopPlanOverlay({ orbitRef, readOnly, rooms, invalidRoomIds, focu
 
   const handleSize = HANDLE_PX * metre
   const editable =
-    selected && !readOnly && COMPONENT_REGISTRY[selected.objectType].canResize ? selected : null
+    selected && !readOnly && capabilitiesOf(selected).canResize ? selected : null
 
   // Main-entry marker, as the 2D plan drew it: outside the entry door,
   // pointing in from the facing edge.
@@ -232,7 +232,7 @@ export function TopPlanOverlay({ orbitRef, readOnly, rooms, invalidRoomIds, focu
       )}
 
       {rooms.map((room) => {
-        const definition = COMPONENT_REGISTRY[room.objectType]
+        const definition = capabilitiesOf(room)
         const isSelected = room.id === selectedId
         const invalid = invalidRoomIds.has(room.id)
         const world = roomWorldBounds(room)

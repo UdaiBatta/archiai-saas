@@ -179,6 +179,9 @@ class Connection(BaseModel):
     room_b: str = Field(min_length=1, max_length=96)
     kind: Literal["wall", "door", "open"]
     at: float | None = Field(default=None, ge=0, le=1)
+    # Door opening width in metres; None = the standard door. A wide one is
+    # how a user takes out part of a wall.
+    width: float | None = Field(default=None, ge=0.6, le=50)
 
     @model_validator(mode="after")
     def _distinct_rooms(self) -> "Connection":

@@ -6,6 +6,7 @@ import { CanvasViewMode, useCanvasStore } from '../../store/canvasStore'
 import { canClearSelectionFromEmptyCanvas } from '../../store/interactionModel'
 import { edgeCardinals, northAngleDeg, parseOrientation, type ScreenEdge } from './orientationModel'
 import { sunAt } from './sunModel'
+import { useSunContext } from '../../analysis/sunStore'
 import { MODEL_COLORS, presetView, sceneExtent, shadowFrustum, type CameraPreset } from './modelView'
 import { parseMasses, parseSite } from '../../site/siteTypes'
 
@@ -108,7 +109,7 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
   // The 3D sun: aimed at the house centre from where the sun is at
   // `sunHour`, with a shadow box fitted to the site so shadows stay crisp.
   const sunRef = useRef<THREE.DirectionalLight>(null)
-  const sun = sunAt(sunHour)
+  const sun = sunAt(sunHour, useSunContext())
   const centerX = extent ? extent.x + extent.w / 2 : 0
   const centerZ = extent ? extent.z + extent.d / 2 : 0
   const shadow = shadowFrustum({ x: 0, z: 0, w: extent?.w ?? 10, d: extent?.d ?? 10, h: extent?.h ?? buildingTop })
