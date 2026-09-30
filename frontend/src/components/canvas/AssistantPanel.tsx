@@ -57,7 +57,8 @@ export function AssistantPanel() {
   const apply = () => {
     if (!preview) return
     const canvas = layoutPlanToCanvas(preview.layout_after, { requirements: preview.requirements_after, quality: preview.quality_after })
-    const metadata = Object.fromEntries(EDIT_METADATA.filter((key) => canvas.metadata?.[key] !== undefined).map((key) => [key, canvas.metadata![key]]))
+    // Keys the new plan lacks (e.g. no footprint after a regenerate) are cleared, not kept stale.
+    const metadata = Object.fromEntries(EDIT_METADATA.map((key) => [key, canvas.metadata?.[key]]))
     useCanvasStore.getState().applyLayoutEdit({ ...canvas, metadata })
     setPreview(null)
     setInstruction('')
