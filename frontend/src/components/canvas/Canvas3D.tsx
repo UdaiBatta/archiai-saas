@@ -56,6 +56,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
   const floors = useCanvasStore((s) => s.floors)
   const floorHeight = useCanvasStore((s) => s.floorHeight)
   const [ghostFloors, setGhostFloors] = useState(false)
+  const [pendingRestore, setPendingRestore] = useState<{ view: SavedView; floor: number | 'all' } | null>(null)
   const multiFloor = useCanvasStore((s) => s.floors.length > 1)
   const viewCameraRef = useRef<ViewCameraApi>(null)
   const aoRef = useRef<{ enabled: boolean }>(null)
@@ -66,7 +67,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
     setGhostFloors(view.ghostFloors)
     const floor = restorableFloor(view, state.floors.map((level) => level.level))
     state.setSelectedFloor(floor)
-    viewCameraRef.current?.restore(view, floor)
+    setPendingRestore({ view, floor })
   }
   // Architectural site presentation for the real 3D view (not the hidden
   // capture canvas behind the plan lenses, nor the empty-brief backdrop).
@@ -155,7 +156,14 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
         }
       >
         <Scene orbitRef={orbitRef} readOnly={readOnly} viewMode={viewMode} modelStage={modelStage} sunHour={sunHour} preset={preset} site={studio} level={planLevel} frameNonce={frameNonce} />
-        {studio && <ViewCamera apiRef={viewCameraRef} preset={preset} />}
+        {studio && (
+          <ViewCamera
+            apiRef={viewCameraRef}
+            preset={preset}
+            pendingRestore={pendingRestore}
+            onRestored={() => setPendingRestore(null)}
+          />
+        )}
         {visibleRooms.map((r) => (
           <RoomMesh
             key={r.id}
