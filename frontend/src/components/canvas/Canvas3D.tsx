@@ -87,6 +87,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
   // capture canvas behind the plan lenses, nor the empty-brief backdrop).
   const studio = viewMode === '3d' && !briefBackground
   const topView = studio && preset === 'top'
+  const aoOn = studio && preset === 'perspective'
   // Top shows one level; "all" means the lowest, as the 2D plan did.
   const sortedFloors = [...floors].sort((a, b) => a.level - b.level)
   const planLevel = topView && selectedFloor === 'all' ? sortedFloors[0]?.level ?? 0 : selectedFloor
@@ -234,9 +235,11 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
         {ghostRooms.map((r) => (
           <RoomMesh key={r.id} room={r} orbitRef={orbitRef} readOnly viewMode={viewMode} modelStage={modelStage} ghost />
         ))}
-        {/* Top reads as a drawing: no ambient occlusion (and no sun shadows, see Scene). */}
-        {!(studio && !topView) && <RendererAutoClear />}
-        {studio && !topView && (
+        {/* Ambient occlusion only in Persp: Top and Axo are drawings (orthographic),
+            and AO under an orthographic camera was costly enough to slow the
+            whole window. Top also drops sun shadows (see Scene). */}
+        {!aoOn && <RendererAutoClear />}
+        {aoOn && (
           <EffectComposer multisampling={4}>
             <N8AO ref={aoRef as never} aoRadius={1.2} distanceFalloff={0.6} intensity={2.4} quality="medium" halfRes color="#1f1d1a" />
             <ToneMapping mode={ToneMappingMode.NEUTRAL} />

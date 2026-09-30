@@ -84,7 +84,10 @@ describe('Dock edit tools', () => {
     const edit = within(dock).getByRole('group', { name: 'Edit' })
     expect(within(edit).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['Select', 'Room', 'Measure', 'More'])
     expect(screen.getByRole('button', { name: 'Select' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: 'Measure' })).toHaveAttribute('title', 'Measure (Alt)')
+    const measure = screen.getByRole('button', { name: 'Measure' })
+    expect(measure).toHaveAttribute('aria-keyshortcuts', 'Alt')
+    expect(measure).toHaveTextContent('Measure')
+    expect(measure).toHaveTextContent('Alt')
   })
 
   it('arms Room placement and toggles Measure with pressed states', async () => {

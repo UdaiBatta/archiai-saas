@@ -74,7 +74,7 @@ function NavButton({ item, reduced }: { item: HoverGradientNavItem; reduced: boo
       type="button"
       data-dock-item={item.id}
       aria-label={item.label}
-      title={item.shortcut ? `${item.label} (${item.shortcut})` : item.label}
+      aria-keyshortcuts={item.shortcut}
       aria-pressed={item.expanded === undefined ? item.ariaPressed ?? item.active ?? false : undefined}
       aria-haspopup={item.expanded === undefined ? undefined : 'dialog'}
       aria-expanded={item.expanded}
@@ -89,6 +89,17 @@ function NavButton({ item, reduced }: { item: HoverGradientNavItem; reduced: boo
     >
       {item.active && (
         <span aria-hidden className="pointer-events-none absolute inset-0 rounded-xl" style={{ background: ACTIVE_GLOW, transform: 'scale(1.5)' }} />
+      )}
+      {/* Name pops above the icon at once on hover or keyboard focus (a native
+          title waits a second or more); hidden while its popover is open. */}
+      {!item.expanded && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2.5 -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-md border border-ink/10 bg-graphite-900 px-2 py-1 text-[11px] font-medium text-ink opacity-0 shadow-lg transition duration-150 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100 motion-reduce:transition-none"
+        >
+          {item.label}
+          {item.shortcut && <span className="ml-1.5 font-mono text-muted">{item.shortcut}</span>}
+        </span>
       )}
       {flip ? (
         <>
