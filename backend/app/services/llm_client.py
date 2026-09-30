@@ -47,6 +47,10 @@ class LLMUnavailable(LLMError):
     """The provider is down, has no model available, or rejected the request."""
 
 
+class LLMRateLimited(LLMUnavailable):
+    """The provider answered HTTP 429: its quota or rate limit is exhausted."""
+
+
 class LLMInvalidOutput(LLMError):
     """The provider answered, but not with the requested JSON object."""
 
@@ -83,6 +87,10 @@ def _raise_for_status(response: httpx.Response, operation: str) -> None:
     try:
         response.raise_for_status()
     except httpx.HTTPStatusError as exc:
+        if response.status_code == 429:
+            raise LLMRateLimited(
+                f"AI provider {operation} was rate limited (HTTP 429)."
+            ) from exc
         raise LLMUnavailable(
             f"AI provider {operation} failed with HTTP {response.status_code}."
         ) from exc

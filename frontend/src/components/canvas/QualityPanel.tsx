@@ -1,4 +1,6 @@
 import type { MvpQualitySnapshot, QualityWarning } from '../../types/contracts'
+import { useCanvasStore } from '../../store/canvasStore'
+import { violationHelp } from './violationHelp'
 
 const PACK_TITLES: Record<string, string> = {
   generic: 'Layout guidance',
@@ -87,11 +89,29 @@ export function QualityPanel({ quality }: { quality: MvpQualitySnapshot }) {
 
       {!quality.valid && quality.hard_violations.length > 0 && (
         <ul className="mt-2.5 flex flex-col gap-1.5 border-t border-danger/20 pt-2.5">
-          {quality.hard_violations.map((violation, index) => (
-            <li key={`${violation.code}-${index}`} className="text-[10px] leading-relaxed text-danger">
-              {violation.message}
-            </li>
-          ))}
+          {quality.hard_violations.map((violation, index) => {
+            const help = violationHelp(violation.code)
+            const roomId = violation.room_ids[0]
+            return (
+              <li key={`${violation.code}-${index}`} className="text-[10px] leading-relaxed">
+                <details className="group">
+                  <summary className="flex cursor-pointer list-none items-start gap-1.5 text-danger marker:hidden">
+                    <span aria-hidden className="mt-px text-[8px] transition-transform group-open:rotate-90">▶</span>
+                    <span className="flex-1">{violation.message}</span>
+                  </summary>
+                  <div className="mt-1 space-y-1 pl-3 text-muted">
+                    <p><span className="font-semibold text-ink/80">Why: </span>{help.why}</p>
+                    <p><span className="font-semibold text-ink/80">Fix: </span>{help.fix}</p>
+                    {roomId && (
+                      <button type="button" onClick={() => useCanvasStore.getState().selectRoom(roomId)} className="rounded border border-ink/15 px-1.5 py-0.5 text-[10px] text-ink hover:border-ink/30">
+                        Show {violation.room_ids.length > 1 ? 'first room' : 'room'}
+                      </button>
+                    )}
+                  </div>
+                </details>
+              </li>
+            )
+          })}
         </ul>
       )}
 

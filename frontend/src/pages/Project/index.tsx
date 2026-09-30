@@ -38,6 +38,7 @@ import { useAutoSave } from '../../hooks/useAutoSave'
 import { useMvpQualityValidation } from '../../hooks/useMvpQualityValidation'
 import { getApiErrorMessage } from '../../services/apiError'
 import { ShareProjectDialog } from '../../components/projects/ShareProjectDialog'
+import { LayoutOptionsDialog } from '../../components/canvas/LayoutOptionsDialog'
 import type { CanvasLayout } from '../../store/canvasStore'
 import type { ExtractResponse } from '../../types/contracts'
 
@@ -270,6 +271,7 @@ export default function ProjectPage() {
   const [historyOpen, setHistoryOpen] = useState(false)
   const [activityOpen, setActivityOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
+  const [optionsOpen, setOptionsOpen] = useState(false)
   const [exportingImage, setExportingImage] = useState(false)
   const [exportingPdf, setExportingPdf] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
@@ -834,6 +836,7 @@ export default function ProjectPage() {
                   setGenerateError(null)
                   setEditingBrief(true)
                 },
+                onOptions: () => setOptionsOpen(true),
                 optionCount: modelStage ? 0 : alternatives.length,
                 activeOption,
                 onPickOption: (index) => handlePickOption(alternatives[index]),
@@ -964,6 +967,8 @@ export default function ProjectPage() {
         open={shareOpen}
         onClose={() => setShareOpen(false)}
       />
+
+      <LayoutOptionsDialog open={optionsOpen} onClose={() => setOptionsOpen(false)} />
     </div>
   )
 }

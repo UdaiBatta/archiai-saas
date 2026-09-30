@@ -183,6 +183,18 @@ export interface MvpValidationSyncResponse {
   quality: MvpQualitySnapshot
 }
 
+/** One of the engine's distinct, scored options (POST /api/options). */
+export interface MvpLayoutOption {
+  layout: LayoutPlan
+  score: number
+  highlights: string[]
+}
+
+export interface OptionsResponse {
+  options: MvpLayoutOption[]
+  warnings: string[]
+}
+
 export interface GenerateMvpResponse {
   requirements: RequirementsSpec
   layout: LayoutPlan
