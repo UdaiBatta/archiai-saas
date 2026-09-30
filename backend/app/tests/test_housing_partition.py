@@ -5,13 +5,15 @@ from app.services.layout_engine.geometry import EPS, Rect
 
 WIDTHS = {"1bhk": 8.7, "2bhk": 12.25, "3bhk": 15.25}
 MIX = {"1bhk": 0.3, "2bhk": 0.5, "3bhk": 0.2}
+TARGET_AREA = {"1bhk": 45.0, "2bhk": 70.0, "3bhk": 95.0}
 
 
 def _fill(rect: Rect, facing: str | None, widths=WIDTHS, shares=MIX):
     plate = P.layout_plate(rect, facing, 1.5)
-    seqs = P.choose_types(plate.segments, widths, shares)
-    slots, _ = P.place(plate, plate.segments, seqs, widths)
-    return plate, slots
+    targets = {t: TARGET_AREA[t] / plate.depth for t in widths}
+    types, states = P.floor_options(plate.segments, widths, targets, shares)
+    [(key, _)] = P.choose_floor_types(types, states, shares, 1)
+    return plate, P.place(plate, plate.segments, states[key][1])
 
 
 def _shares_edge(a: Rect, b: Rect) -> bool:
@@ -103,3 +105,26 @@ def test_largest_rectangle_of_an_l_shape():
     assert rect == Rect(0, 0, 40, 15)
     rect, whole = P.largest_rectangle([(0, 0), (10, 0), (10, 5), (0, 5)])
     assert whole and rect == Rect(0, 0, 10, 5)
+
+
+def test_spread_shares_spare_length_by_width_up_to_caps():
+    widths = {"a": 6.0, "b": 12.0}
+    even = P.spread(["a", "b"], 19.8, widths, {"a": 9.0, "b": 20.0})
+    assert even == pytest.approx([6.6, 13.2])
+    capped = P.spread(["a", "b"], 24.0, widths, {"a": 7.0, "b": 20.0})
+    assert capped == pytest.approx([7.0, 17.0])
+    assert P.spread(["a", "b"], 30.0, widths, {"a": 7.0, "b": 20.0}) is None
+
+
+def test_single_floor_type_when_within_one_unit():
+    states = {(1, 1): (0.0, []), (2, 0): (0.0, [])}
+    assert P.choose_floor_types(["a", "b"], states, {"a": 0.5, "b": 0.5}, 5) == [((1, 1), 5)]
+
+
+def test_two_floor_types_when_one_cannot_hit_the_mix():
+    # Floors hold (2, 0) or (0, 2): three floors of one type are 3 units off.
+    states = {(2, 0): (0.0, []), (0, 2): (0.0, [])}
+    groups = P.choose_floor_types(["a", "b"], states, {"a": 0.5, "b": 0.5}, 3)
+    assert len(groups) == 2 and sum(n for _, n in groups) == 3
+    counts = [sum(k[i] * n for k, n in groups) for i in range(2)]
+    assert abs(counts[0] - counts[1]) <= 2

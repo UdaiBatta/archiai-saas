@@ -5,7 +5,7 @@ from httpx import AsyncClient
 
 from app.schemas.housing import HousingFillRequest
 from app.services.housing import HousingDoesNotFit, fill_housing
-from app.services.housing.units import facade_violations, solve_unit, unit_spec
+from app.services.housing.units import TARGET_AREA, facade_violations, solve_unit, unit_spec
 from app.services.layout_engine.geometry import EPS, Rect
 from app.services.quality.hard_constraints import validate
 
@@ -103,6 +103,21 @@ def test_yield_is_consistent(result):
     assert "yield" in result.model_dump(by_alias=True)
 
 
+def test_mix_within_one_unit_of_ideal_on_one_floor_type(result):
+    y = result.yield_
+    ideal = {"1bhk": 0.3, "2bhk": 0.5, "3bhk": 0.2}
+    for t, share in ideal.items():
+        assert abs(y.units_by_type[t] - share * y.total_units) <= 1, (t, y.units_by_type)
+    assert not any("plan B" in w for w in result.warnings)
+
+
+def test_no_unit_over_135_percent_of_its_target_area(result):
+    # At 6.75 m deep the facade rule's minimum widths stay under the cap
+    # (1bhk 8.7 m = 1.30x), so spare length can always be spread under it.
+    for unit in result.units:
+        assert unit.area_m2 <= 1.35 * TARGET_AREA[unit.unit_type] + 0.01, (unit.unit_type, unit.area_m2)
+
+
 def test_locked_units_are_kept_verbatim(result):
     locked = [u.model_copy(update={"locked": True}) for u in result.units if u.floor == 2][:2]
     again = fill_housing(_request(mix=[{"unit_type": "1bhk", "share": 1.0}], locked_units=locked))
@@ -159,3 +174,24 @@ async def test_fill_endpoint(client: AsyncClient):
     refused = await client.post("/api/housing/fill", json=tiny, headers=headers)
     assert refused.status_code == 422
     assert "Too small for housing" in refused.json()["error"]
+
+
+def test_two_floor_types_are_stacked_groups_and_reported():
+    plate = [{"x": 0, "y": 0}, {"x": 55, "y": 0}, {"x": 55, "y": 16}, {"x": 0, "y": 16}]
+    mix = [
+        {"unit_type": "studio", "share": 0.2}, {"unit_type": "1bhk", "share": 0.3},
+        {"unit_type": "2bhk", "share": 0.3}, {"unit_type": "3bhk", "share": 0.2},
+    ]
+    res = fill_housing(_request(footprint=plate, floors=7, mix=mix, facing=None))
+    [info] = [w for w in res.warnings if "plan B" in w]
+    assert info.startswith("Floors 0\u2013") and "; floors " in info
+    layouts = [tuple((u.unit_type, tuple((v.x, v.y) for v in u.outline)) for u in res.units if u.floor == f)
+               for f in range(7)]
+    assert len(set(layouts)) == 2
+    changes = sum(layouts[f] != layouts[f + 1] for f in range(6))
+    assert changes == 1  # A below, B above: each group stacks
+    # Best reachable here is 1.4 units off (studio 12 vs 13.4): a 7.25 m
+    # deep studio has no width headroom, and a wider search finds nothing better.
+    y = res.yield_
+    for e in mix:
+        assert abs(y.units_by_type[e["unit_type"]] - e["share"] * y.total_units) <= 1.5
