@@ -106,3 +106,37 @@ export async function fetchMvpVersion(versionId: string): Promise<MvpVersionResp
   const { data } = await api.get<MvpVersionResponse>(`/api/versions/${versionId}`)
   return data
 }
+
+/** One validated assistant command; `description` is its plain-words line. */
+export interface AssistantCommand {
+  op: 'resize_room' | 'move_room' | 'swap_rooms' | 'rename_room' | 'set_connection' | 'change_program' | 'explain'
+  description: string
+  text?: string
+  [key: string]: unknown
+}
+
+/** A PROPOSED edit: nothing changes until the user applies `layout_after`. */
+export interface AssistantResponse {
+  summary: string
+  commands: AssistantCommand[]
+  layout_after: LayoutPlan
+  requirements_after: RequirementsSpec
+  quality_before: MvpQualitySnapshot
+  quality_after: MvpQualitySnapshot
+  introduces_hard_violations: boolean
+  changed: boolean
+  warnings: string[]
+}
+
+export async function planAssistantEdits(
+  payload: {
+    instruction: string
+    layout: LayoutPlan
+    requirements: RequirementsSpec
+    selected_room_id?: string
+  },
+  signal?: AbortSignal,
+): Promise<AssistantResponse> {
+  const { data } = await api.post<AssistantResponse>('/api/assistant/plan-edits', payload, { signal })
+  return data
+}

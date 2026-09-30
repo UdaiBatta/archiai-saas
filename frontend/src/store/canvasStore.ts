@@ -173,6 +173,10 @@ interface CanvasState {
   updateRoom: (id: string, patch: Partial<Omit<Room, 'id'>>, options?: UpdateOptions) => void
   /** Choose how two adjacent rooms meet: solid wall, door, or open. */
   setConnection: (roomA: string, roomB: string, kind: ConnectionKind) => void
+  /** Replace the plan's rooms and derived walls/doors/windows with `layout`
+   * (e.g. an accepted assistant edit) as ONE undoable step. Furniture and
+   * other non-plan objects, room colours and floor names are kept. */
+  applyLayoutEdit: (layout: CanvasLayout) => void
   /** Named 3D camera views, saved with the layout (outside undo history). */
   setSavedViews: (views: unknown[]) => void
   /** Site boundary and zoning rules (P2), saved with the layout; undoable. */
@@ -801,6 +805,31 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
           },
           ...state.activityLog,
         ],
+        ...pushHistory(state),
+        ...markUnsaved(),
+      }
+    }),
+  applyLayoutEdit: (layout) =>
+    set((state) => {
+      const next = normalizeLayout(layout)
+      const isPlanObject = (o: Room) =>
+        ['room', 'stair', 'wall', 'door'].includes(o.objectType as string)
+        || (o.objectType === 'window' && o.derived === 'engine')
+      const previous = new Map(state.rooms.map((o) => [o.id, o]))
+      const rooms = [
+        ...next.rooms.map((o) => {
+          const color = previous.get(o.id)?.color
+          return o.objectType === 'room' && color ? { ...o, color } : o
+        }),
+        ...state.rooms.filter((o) => !isPlanObject(o)),
+      ]
+      const floors = next.floors.map((f) => ({ ...f, name: state.floors.find((s) => s.level === f.level)?.name ?? f.name }))
+      return {
+        rooms,
+        floors,
+        floorHeight: next.floorHeight,
+        layoutMetadata: { ...state.layoutMetadata, ...layout.metadata },
+        selectedId: rooms.some((o) => o.id === state.selectedId) ? state.selectedId : null,
         ...pushHistory(state),
         ...markUnsaved(),
       }
