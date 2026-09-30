@@ -74,7 +74,7 @@ describe('Settings page', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Change password' }))
 
     expect(changePassword).toHaveBeenCalledWith({ current_password: 'password123', new_password: 'brandnew123' })
-    expect(await screen.findByText('Password changed')).toBeInTheDocument()
+    expect(await screen.findByText('Password changed. Other devices were signed out.')).toBeInTheDocument()
   })
 
   it('shows and hides a password', async () => {

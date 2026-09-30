@@ -160,7 +160,7 @@ function SecuritySection() {
       await authService.changePassword({ current_password: current, new_password: next })
       setCurrent('')
       setNext('')
-      setOk('Password changed')
+      setOk('Password changed. Other devices were signed out.')
     } catch (err) {
       setError(getApiErrorMessage(err, 'Could not change your password'))
     } finally {

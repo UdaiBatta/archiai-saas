@@ -142,7 +142,9 @@ function NavButton({ item, reduced }: { item: HoverGradientNavItem; reduced: boo
  * glow behind it; active items keep a subtle accent glow.
  */
 export function HoverGradientNavBar({ groups, className = '', 'aria-label': ariaLabel }: HoverGradientNavBarProps) {
-  const reduced = useReducedMotion() ?? false
+  // The OS setting, or the app's own Reduce motion preference (Settings puts
+  // .reduce-motion on <html>; CSS covers the rest, framer-motion needs this).
+  const reduced = (useReducedMotion() ?? false) || document.documentElement.classList.contains('reduce-motion')
   return (
     <nav
       aria-label={ariaLabel}
