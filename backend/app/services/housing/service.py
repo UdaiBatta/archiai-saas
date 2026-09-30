@@ -82,10 +82,28 @@ def fill_housing(req: HousingFillRequest) -> HousingFillResponse:
     widths = {t: widths_by_row[0][t] for t in fit_shares}
 
     locked_by_floor: dict[int, list[HousingUnit]] = {}
+    plate_poly = Polygon(((plate.rect.x, plate.rect.y), (plate.rect.x2, plate.rect.y), (plate.rect.x2, plate.rect.y2), (plate.rect.x, plate.rect.y2)))
+    circulation = [
+        Polygon(((plate.core.x, plate.core.y), (plate.core.x2, plate.core.y), (plate.core.x2, plate.core.y2), (plate.core.x, plate.core.y2))),
+        Polygon(((plate.corridor.x, plate.corridor.y), (plate.corridor.x2, plate.corridor.y), (plate.corridor.x2, plate.corridor.y2), (plate.corridor.x, plate.corridor.y2))),
+    ]
+    seen_lock_ids: set[str] = set()
     for unit in req.locked_units:
         if unit.floor >= req.floors:
             warnings.append(f"Locked unit {unit.id} is on floor {unit.floor}, above the top floor; dropped.")
             continue
+        if unit.id in seen_lock_ids:
+            warnings.append(f"Locked unit {unit.id} is duplicated; later copy dropped.")
+            continue
+        outline = Polygon(([(v.x, v.y) for v in unit.outline]))
+        row_ok = any(Polygon(((row.rect.x, row.rect.y), (row.rect.x2, row.rect.y), (row.rect.x2, row.rect.y2), (row.rect.x, row.rect.y2))).covers(outline) for row in plate.rows)
+        if not outline.is_valid or outline.area <= EPS or not plate_poly.covers(outline) or not row_ok or any(outline.intersects(block) for block in circulation):
+            warnings.append(f"Locked unit {unit.id} no longer fits this plate; dropped.")
+            continue
+        if any(outline.intersects(Polygon([(v.x, v.y) for v in other.outline])) for other in locked_by_floor.get(unit.floor, [])):
+            warnings.append(f"Locked unit {unit.id} overlaps another lock; dropped.")
+            continue
+        seen_lock_ids.add(unit.id)
         locked_by_floor.setdefault(unit.floor, []).append(unit)
 
     targets = {t: TARGET_AREA[t] / depth for t in fit_shares}
@@ -117,7 +135,7 @@ def fill_housing(req: HousingFillRequest) -> HousingFillResponse:
                 unit_type=slot.unit_type,
                 outline=_outline(r),
                 area_m2=round(r.area, 2),
-                plan=placed(plan, r.x, r.y),
+                plan=placed(plan, r.x, r.y, plate.rect.w, plate.rect.d),
             ))
         return units, unused
 

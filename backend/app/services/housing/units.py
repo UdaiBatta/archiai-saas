@@ -197,6 +197,6 @@ def unit_width(unit_type: str, depth: float, corridor_side: str) -> float | None
     return None
 
 
-def placed(plan: LayoutPlan, x: float, y: float) -> LayoutPlan:
+def placed(plan: LayoutPlan, x: float, y: float, plate_width: float, plate_depth: float) -> LayoutPlan:
     """The unit plan moved to its place on the floor plate."""
-    return _placed_on_plot(plan, x, y, plan.plot.width_m, plan.plot.depth_m)
+    return _placed_on_plot(plan, x, y, plate_width, plate_depth)

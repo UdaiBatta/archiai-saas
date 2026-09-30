@@ -135,6 +135,23 @@ def test_locked_units_are_kept_verbatim(result):
     assert any(not u.locked and u.unit_type == "1bhk" for u in floor2)
 
 
+def test_invalid_locked_units_are_dropped_after_a_plate_change(result):
+    locked = result.units[0].model_copy(update={"locked": True, "outline": [
+        {"x": -100, "y": -100}, {"x": -99, "y": -100}, {"x": -99, "y": -99}, {"x": -100, "y": -99},
+    ]})
+    again = fill_housing(_request(locked_units=[locked]))
+    assert not any(unit.id == locked.id for unit in again.units)
+    assert any("no longer fits" in warning for warning in again.warnings)
+
+
+def test_nested_unit_plans_use_plate_bounds(result):
+    for unit in result.units:
+        xs = [room.x for room in unit.plan.rooms] + [wall.x1 for wall in unit.plan.walls] + [wall.x2 for wall in unit.plan.walls]
+        ys = [room.y for room in unit.plan.rooms] + [wall.y1 for wall in unit.plan.walls] + [wall.y2 for wall in unit.plan.walls]
+        assert min(xs) >= -1e-6 and max(xs) <= unit.plan.plot.width_m + 1e-6
+        assert min(ys) >= -1e-6 and max(ys) <= unit.plan.plot.depth_m + 1e-6
+
+
 def test_irregular_footprint_warns_and_fills():
     l_shape = [
         {"x": 0, "y": 0}, {"x": 40, "y": 0}, {"x": 40, "y": 15},

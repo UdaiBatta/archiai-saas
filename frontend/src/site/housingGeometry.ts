@@ -95,6 +95,31 @@ const roomOutline = (r: { x: number; y: number; w: number; h: number; vertices?:
     ? r.vertices
     : [{ x: r.x, y: r.y }, { x: r.x + r.w, y: r.y }, { x: r.x + r.w, y: r.y + r.h }, { x: r.x, y: r.y + r.h }]
 
+const wallOutline = (wall: { x1: number; y1: number; x2: number; y2: number; thickness: number }): Vertex[] => {
+  const dx = wall.x2 - wall.x1
+  const dy = wall.y2 - wall.y1
+  const length = Math.hypot(dx, dy) || 1
+  const nx = -dy / length * wall.thickness / 2
+  const ny = dx / length * wall.thickness / 2
+  return [
+    { x: wall.x1 + nx, y: wall.y1 + ny }, { x: wall.x2 + nx, y: wall.y2 + ny },
+    { x: wall.x2 - nx, y: wall.y2 - ny }, { x: wall.x1 - nx, y: wall.y1 - ny },
+  ]
+}
+
+const openingOutline = (wall: { x1: number; y1: number; x2: number; y2: number; thickness: number }, offset: number, width: number): Vertex[] => {
+  const dx = wall.x2 - wall.x1
+  const dy = wall.y2 - wall.y1
+  const length = Math.hypot(dx, dy) || 1
+  const ux = dx / length
+  const uy = dy / length
+  const a = { x: wall.x1 + ux * offset, y: wall.y1 + uy * offset }
+  const b = { x: wall.x1 + ux * (offset + width), y: wall.y1 + uy * (offset + width) }
+  const nx = -uy * wall.thickness / 2
+  const ny = ux * wall.thickness / 2
+  return [{ x: a.x + nx, y: a.y + ny }, { x: b.x + nx, y: b.y + ny }, { x: b.x - nx, y: b.y - ny }, { x: a.x - nx, y: a.y - ny }]
+}
+
 export function buildHousingModel(housing: MassHousing, mass: Mass, view: HousingView): HousingModel {
   const { result } = housing
   const floors = Math.min(housing.request.floors, mass.floors)
@@ -152,6 +177,18 @@ export function buildHousingModel(housing: MassHousing, mass: Mass, view: Housin
           const c = outline.reduce((s, p) => ({ x: s.x + p.x / outline.length, y: s.y + p.y / outline.length }), { x: 0, y: 0 })
           labels.push({ key: `${unit.id}:${room.id}`, text: room.label, size: room.w, position: [c.x, y + TILE + 0.05, c.y] })
         }
+      }
+      const walls = new Map(unit.plan.walls.map((wall) => [wall.id, wall]))
+      for (const wall of unit.plan.walls) {
+        solid.push(part(prism(wallOutline(wall), y + TILE + 0.006, TILE), '', unit.id, MODEL_COLORS.floorEdge))
+      }
+      for (const door of unit.plan.doors) {
+        const wall = walls.get(door.wall_ref)
+        if (wall) solid.push(part(prism(openingOutline(wall, door.offset, door.width), y + TILE + 0.008, TILE), '', unit.id, LOCK_COLOR))
+      }
+      for (const window of unit.plan.windows ?? []) {
+        const wall = walls.get(window.wall_ref)
+        if (wall) solid.push(part(prism(openingOutline(wall, window.offset, window.width), y + TILE + 0.008, TILE), '', unit.id, MODEL_COLORS.sky))
       }
       outlines.push(part(prism(unit.outline, y, TILE * 2), '', unit.id, MODEL_COLORS.edge))
     } else {
