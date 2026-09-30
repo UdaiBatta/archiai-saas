@@ -277,6 +277,10 @@ export default function ProjectPage() {
   const [exportError, setExportError] = useState<string | null>(null)
   const designId = useCanvasStore((s) => s.designId)
   const roomCount = useCanvasStore((s) => s.rooms.length)
+  // A project started blank (New project ▸ plot only) has its plot but no
+  // rooms yet: it opens the editor, not the brief step.
+  const plotFootprint = useCanvasStore((s) => (s.layoutMetadata.pipeline === 'mvp' ? s.floors[0]?.footprint : undefined))
+  const hasPlan = roomCount > 0 || plotFootprint !== undefined
   const selectedId = useCanvasStore((s) => s.selectedId)
   const activityCount = useCanvasStore((s) => s.activityLog.length)
   const viewMode = useCanvasStore((s) => s.viewMode)
@@ -762,7 +766,7 @@ export default function ProjectPage() {
         {/* Canvas + Inspector row */}
         <div className="flex-1 flex overflow-hidden">
           <div className="relative h-full min-w-0 flex-1">
-            {roomCount === 0 ? <><Canvas3D className="h-full" readOnly briefBackground /><div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_45%,rgba(25,27,32,0.75)_0%,rgba(25,27,32,0.1)_70%)]" /></> :
+            {!hasPlan ? <><Canvas3D className="h-full" readOnly briefBackground /><div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_45%,rgba(25,27,32,0.75)_0%,rgba(25,27,32,0.1)_70%)]" /></> :
             viewMode === '3d' || viewMode === 'floor_plan' ? (
               // The plan tab is the 3D Top view (Canvas3D maps floor_plan to Top).
               <Canvas3D className="h-full" readOnly={generating} modelStage={modelStage} initialPreset={lensExitPreset} dock={!editingBrief} />
@@ -806,7 +810,7 @@ export default function ProjectPage() {
               avatarEmail={user?.email}
               onSignOut={logOut}
               designId={designId}
-              hasLayout={roomCount > 0}
+              hasLayout={hasPlan}
               layoutSaving={layoutSaving}
               layoutSaveError={layoutSaveError}
               versionName={versionName}
@@ -872,7 +876,7 @@ export default function ProjectPage() {
               />
             )}
 
-            {roomCount > 0 && !editingBrief && <>
+            {hasPlan && !editingBrief && <>
               <div className="absolute inset-x-3 top-16 z-30 flex flex-wrap items-center justify-between gap-2">
                 {modelStage ? <div className="flex items-center gap-3"><button type="button" onClick={leaveModelStage} disabled={generating} className="rounded-lg border border-ink/15 bg-graphite-800/95 px-3 py-2 text-xs text-ink">← Back to layout</button><span className="text-xs font-semibold text-ink">3D model</span></div> : null}
                 <div className="ml-auto flex items-center gap-2">
@@ -913,12 +917,12 @@ export default function ProjectPage() {
               </div>
             )}
 
-            {editingBrief && roomCount > 0 && (
+            {editingBrief && hasPlan && (
               <div aria-hidden="true" className="absolute inset-0 z-10 bg-graphite-900/75 backdrop-blur-sm" />
             )}
 
-            {(roomCount === 0 || editingBrief) && <CommandBar
-              onBackToPlan={roomCount > 0 ? () => setEditingBrief(false) : undefined}
+            {(!hasPlan || editingBrief) && <CommandBar
+              onBackToPlan={hasPlan ? () => setEditingBrief(false) : undefined}
               showParams={showParams}
               setShowParams={setShowParams}
               plotWidthM={plotWidthM}
@@ -943,9 +947,15 @@ export default function ProjectPage() {
               onSubmit={handleSubmit}
             />}
 
-            {roomCount > 0 && <BottomStatusBar />}
+            {hasPlan && roomCount === 0 && !editingBrief && plotFootprint && (
+              <div role="status" className="pointer-events-none absolute left-1/2 top-28 z-20 w-[min(26rem,calc(100%-2rem))] -translate-x-1/2 rounded-xl border border-ink/10 bg-graphite-800/95 px-4 py-3 text-xs leading-relaxed text-muted shadow-lg backdrop-blur">
+                <p className="text-sm font-semibold text-ink">Your {plotFootprint.w} × {plotFootprint.d} m plot is ready</p>
+                <p className="mt-1">Choose <span className="text-ink">+ Add a room</span> in the panel, then click on the plot. Drag rooms against each other: walls, doors and windows build themselves where they meet.</p>
+              </div>
+            )}
+            {hasPlan && <BottomStatusBar />}
           </div>
-          {roomCount > 0 && (viewMode === 'zoning' || viewMode === 'graph' ? <RightPanel onCreateModel={enterModelStage} open={panelOpen} onClose={() => setPanelOpen(false)} /> : <WorkspacePanel modelStage={modelStage} reviewChanges={reviewChanges} onReviewChanges={openReview} onCreateModel={enterModelStage} open={panelOpen} onClose={() => setPanelOpen(false)} busy={generating} />)}
+          {hasPlan && (viewMode === 'zoning' || viewMode === 'graph' ? <RightPanel onCreateModel={enterModelStage} open={panelOpen} onClose={() => setPanelOpen(false)} /> : <WorkspacePanel modelStage={modelStage} reviewChanges={reviewChanges} onReviewChanges={openReview} onCreateModel={enterModelStage} open={panelOpen} onClose={() => setPanelOpen(false)} busy={generating} />)}
         </div>
       </main>
 

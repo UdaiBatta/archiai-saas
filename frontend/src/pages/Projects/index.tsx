@@ -107,7 +107,7 @@ export default function ProjectsPage() {
               Describe the home you want: the plot, which way it faces, and the rooms. You’ll check what was
               understood before any plan is drawn.
             </p>
-            <Link to="/projects/new" className={`mt-5 inline-block ${newProjectClass}`}>Write your first brief</Link>
+            <Link to="/projects/new" className={`mt-5 inline-block ${newProjectClass}`}>Start your first project</Link>
           </section>
         ) : visible.length === 0 ? (
           <p className="text-sm text-muted-light">No projects match “{search}”.</p>
