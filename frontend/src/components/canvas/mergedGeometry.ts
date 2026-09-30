@@ -58,7 +58,7 @@ function slabGeometry(room: Room) {
   return new THREE.BoxGeometry(room.size.w, SLAB, room.size.d)
 }
 
-interface Part {
+export interface Part {
   geometry: THREE.BufferGeometry
   matrix: THREE.Matrix4
   color: string
@@ -66,7 +66,7 @@ interface Part {
   owner: string
 }
 
-function flatten(parts: Part[]) {
+export function flatten(parts: Part[]) {
   if (!parts.length) return { geometry: null, owners: [] as string[] }
   const owners: string[] = []
   const pieces = parts.map((part) => {
@@ -86,7 +86,7 @@ function flatten(parts: Part[]) {
   return { geometry, owners }
 }
 
-function edgesOf(parts: Part[]) {
+export function edgesOf(parts: Part[]) {
   if (!parts.length) return null
   const lines = parts.map((part) => {
     const e = new THREE.EdgesGeometry(part.geometry, EDGE_ANGLE)

@@ -20,7 +20,7 @@ import {
   spillRegion,
   zoningIssues,
 } from './massing'
-import { commitMasses, currentMasses, previewMasses, useMassUi, useSiteAndMasses } from './massStore'
+import { commitMasses, currentMasses, previewMasses, useHousing, useMassUi, useSiteAndMasses } from './massStore'
 
 interface OrbitHandle {
   enabled: boolean
@@ -66,6 +66,7 @@ export function MassLayer({ orbitRef, readOnly, topView }: { orbitRef: RefObject
   const gl = useThree((s) => s.gl)
   const pxPerMetre = usePixelsPerMetre()
   const dragRef = useRef<ActiveDrag | null>(null)
+  const housing = useHousing()
 
   const issues = useMemo(() => zoningIssues(site, masses), [site, masses])
   const offending = useMemo(() => new Set(issues.map((i) => i.massId)), [issues])
@@ -154,7 +155,8 @@ export function MassLayer({ orbitRef, readOnly, topView }: { orbitRef: RefObject
 
   return (
     <group name="masses" onPointerMissed={() => { if (!dragRef.current) select(null) }}>
-      {masses.map((m) => (
+      {/* Housed masses are drawn and picked by HousingLayer. */}
+      {masses.filter((m) => !housing[m.id]).map((m) => (
         <MassBody
           key={m.id}
           mass={m}

@@ -22,6 +22,7 @@ import { DOCK_CARD, EditorDock } from './EditorDock'
 import { SavedViewsPanel, ViewCamera, type ViewCameraApi } from './SavedViewsPanel'
 import { parseSavedViews, restorableFloor, type SavedView } from './savedViews'
 import { MassLayer } from '../../site/MassLayer'
+import { HousingLayer } from '../../site/HousingLayer'
 import { MassingPanel } from '../../site/MassingPanel'
 import { SiteLayer } from '../../site/SiteLayer'
 import { SitePanel } from '../../site/SitePanel'
@@ -229,6 +230,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
           />
         )}
         {studio && <MassLayer orbitRef={orbitRef} readOnly={readOnly} topView={topView} />}
+        {studio && <HousingLayer topView={topView} />}
         {studio && (
           <SiteLayer orbitRef={orbitRef} readOnly={readOnly} topView={topView} planY={(planFloor?.elevation ?? 0) + floorHeight + 0.4} />
         )}
