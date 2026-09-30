@@ -138,6 +138,16 @@ describe('zoningIssues', () => {
     expect(issues[0]).toMatchObject({ code: 'overlap', massId: 'b' })
     expect(polygonArea(issues[0].fix!.masses[1].footprint)).toBeCloseTo(50)
   })
+
+  it('does not offer a lossy overlap fix for contained or split footprints', () => {
+    const contained = zoningIssues(site(), [mass('a', rect(10, 10, 20, 20)), mass('b', rect(15, 15, 5, 5))])
+    expect(contained.find((issue) => issue.code === 'overlap')?.fix).toBeUndefined()
+    const split = zoningIssues(site(), [
+      mass('a', rect(15, 10, 5, 20)),
+      mass('b', rect(10, 15, 20, 5)),
+    ])
+    expect(split.find((issue) => issue.code === 'overlap')?.fix).toBeUndefined()
+  })
 })
 
 describe('mass edits', () => {

@@ -112,6 +112,9 @@ export function largestRing(region: Region): SitePoint[] | null {
   return best
 }
 
+const largestSimpleRing = (region: Region): SitePoint[] | null =>
+  region.every((polygon) => polygon.length === 1) ? largestRing(region) : null
+
 const replace = (masses: Mass[], id: string, patch: Partial<Mass>) =>
   masses.map((m) => (m.id === id ? { ...m, ...patch } : m))
 
@@ -149,7 +152,7 @@ export function zoningIssues(site: Site | null, masses: Mass[]): ZoningIssue[] {
       const spill = spillRegion(m, envelope)
       const spillArea = regionArea(spill)
       if (spillArea > AREA_EPS) {
-        const trimmed = largestRing(intersect(polygonOf(m.footprint), envelope))
+        const trimmed = largestSimpleRing(intersect(polygonOf(m.footprint), envelope))
         issues.push({
           code: 'outside',
           massId: m.id,
@@ -197,7 +200,7 @@ export function zoningIssues(site: Site | null, masses: Mass[]): ZoningIssue[] {
       const b = masses[j]
       const overlap = regionArea(intersect(polygonOf(a.footprint), polygonOf(b.footprint)))
       if (overlap <= AREA_EPS) continue
-      const cut = largestRing(subtract(polygonOf(b.footprint), polygonOf(a.footprint)))
+      const cut = largestSimpleRing(subtract(polygonOf(b.footprint), polygonOf(a.footprint)))
       issues.push({
         code: 'overlap',
         massId: b.id,
@@ -298,7 +301,10 @@ export function defaultMassFootprint(site: Site | null, plot: PlotBounds | null)
 /** "Fill envelope": one mass per envelope polygon. */
 export function fillEnvelope(site: Site, masses: Mass[], floors = 4): Mass[] {
   const created: Mass[] = []
-  for (const ring of outerRings(buildableEnvelope(site))) {
+  const envelope = buildableEnvelope(site)
+  for (const [outer, ...holes] of envelope) {
+    if (holes.length) continue
+    const ring = outerRings([[outer]])[0]
     if (polygonArea(ring) <= AREA_EPS) continue
     created.push(makeMass([...masses, ...created], ring, floors))
   }
