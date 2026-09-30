@@ -180,6 +180,10 @@ export const MODEL_COLORS = {
   gridCell: '#cfcdc6',
   gridSection: '#b5b2aa',
   sky: '#eceef0',
+  /** Furniture proxies: light warm greys (body, cushions / doors, bases). */
+  furniture: '#dedad2',
+  furnitureSoft: '#ebe8e1',
+  furnitureDark: '#cbc6bc',
   /** Hard-violation rooms: outline, label and floor tint. */
   invalid: '#c4553f',
 } as const

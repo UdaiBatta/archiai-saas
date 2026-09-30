@@ -17,6 +17,7 @@ import { ResizeHandles } from './ResizeHandles'
 import { roomVisualTreatment } from './roomVisualTreatment'
 import { EDITOR_PALETTE, displayRoomColor } from './editorPalette'
 import { wallModelPieces } from './modelGeometry'
+import { furnitureParts } from './furnitureParts'
 import { MODEL_COLORS, floorTint, mixHex } from './modelView'
 import { roomLabelLayout, roomPlanArea, roomWorldBounds } from './topViewModel'
 import { formatArea, formatDims } from '../../utils/format'
@@ -130,7 +131,7 @@ export function RoomMesh({
   const boxEdges = useBoxEdges(room.size.w, room.size.h, room.size.d)
   const selectionEdges = useBoxEdges(room.size.w + 0.08, Math.max(renderHeight + 0.08, 0.12), room.size.d + 0.08)
   const renderY = modelSurface ? room.position.y - room.size.h / 2 + renderHeight / 2 : room.position.y
-  const modelFurniture = modelStage && room.objectType === 'furniture'
+  const modelFurniture = solid3d && room.objectType === 'furniture'
   // White model: matte surfaces, floors keep a pale tint of their room colour,
   // windows read as glass.
   const isGlass = solid3d && room.objectType === 'window'
@@ -370,20 +371,13 @@ export function RoomMesh({
           <Edges color={MODEL_COLORS.edge} transparent={ghost} opacity={ghost ? 0.3 : 1} />
         </mesh>
       ))}
-      {modelFurniture && (
-        <>
-          <mesh position={[0, room.size.h / 2 - 0.06, 0]} castShadow receiveShadow>
-            <boxGeometry args={[room.size.w, Math.min(0.12, room.size.h), room.size.d]} />
-            <meshStandardMaterial color={isSelected ? '#C08A6C' : '#8C6A55'} roughness={0.8} />
-          </mesh>
-          {[-1, 1].flatMap((x) => [-1, 1].map((z) => (
-            <mesh key={`${x}:${z}`} position={[x * room.size.w * 0.38, -0.06, z * room.size.d * 0.38]} castShadow>
-              <boxGeometry args={[Math.min(0.07, room.size.w / 4), Math.max(0.05, room.size.h - 0.12), Math.min(0.07, room.size.d / 4)]} />
-              <meshStandardMaterial color="#54575c" roughness={0.6} />
-            </mesh>
-          )))}
-        </>
-      )}
+      {modelFurniture && furnitureParts(room).map((part, index) => (
+        <mesh key={index} position={part.position} castShadow receiveShadow>
+          <boxGeometry args={part.size} />
+          <meshStandardMaterial color={isSelected ? MODEL_COLORS.wallSelected : part.color} roughness={0.9} />
+          <Edges color={MODEL_COLORS.floorEdge} />
+        </mesh>
+      ))}
       {!solid3d && (isSelected || definition.category === 'space' || room.objectType === 'stair') && (
         <lineSegments>
           <primitive object={boxEdges} attach="geometry" />
