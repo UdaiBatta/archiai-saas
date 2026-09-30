@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { Axis3d, Box, Building2, Camera, Layers, LayoutGrid, Map as MapIcon, Network, SquareDashed, Sun } from 'lucide-react'
+import { Axis3d, Box, Building2, Camera, Layers, LayoutGrid, Map as MapIcon, Network, Sparkles, SquareDashed, Sun } from 'lucide-react'
 import { HoverGradientNavBar, type HoverGradientNavGroup, type HoverGradientNavItem } from '@/components/ui/hover-gradient-nav-bar'
 import { useCanvasStore } from '../../store/canvasStore'
 import { CAMERA_PRESETS, type CameraPreset } from './modelView'
 import { useEditTools, type EditTool } from './editTools'
 
-export type DockTool = 'site' | 'massing' | 'views' | 'sun' | 'floors'
+export type DockTool = 'site' | 'massing' | 'views' | 'sun' | 'floors' | 'assistant'
 type DockPopover = DockTool | 'more'
 
 const glow = (rgb: string) =>
@@ -45,6 +45,7 @@ const TOOLS: { id: DockTool; label: string; icon: ReactNode }[] = [
   { id: 'views', label: 'Views', icon: <Camera className={icon} /> },
   { id: 'sun', label: 'Sun', icon: <Sun className={icon} /> },
   { id: 'floors', label: 'Floors', icon: <Layers className={icon} /> },
+  { id: 'assistant', label: 'Assistant', icon: <Sparkles className={icon} /> },
 ]
 
 /** Card style for popover content that has no panel chrome of its own. */
