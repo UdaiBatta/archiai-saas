@@ -60,6 +60,28 @@ class GenerateMvpRequest(BaseModel):
     prompt: str | None = Field(default=None, max_length=MAX_PROMPT_LENGTH)
 
 
+class OptionsRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    requirements: RequirementsSpec
+    count: int = Field(default=3, ge=1, le=5)
+
+
+class LayoutOption(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    layout: LayoutPlan
+    score: int
+    highlights: list[str]
+
+
+class OptionsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    options: list[LayoutOption]
+    warnings: list[str] = Field(default_factory=list)
+
+
 class GenerateMvpResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 

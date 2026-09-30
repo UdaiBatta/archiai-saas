@@ -1,6 +1,9 @@
 """Phase 4 API orchestration for extraction, generation, validation, and save."""
 
+from dataclasses import asdict
+
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.concurrency import run_in_threadpool
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,6 +19,8 @@ from app.schemas.mvp import (
     MvpValidationSyncResponse,
     MvpVersionCreateRequest,
     MvpVersionResponse,
+    OptionsRequest,
+    OptionsResponse,
     ValidateMvpRequest,
 )
 from app.services.auth_service import get_current_user
@@ -45,6 +50,7 @@ from app.services.mvp_pipeline_service import (
     understood_summary,
     version_response,
 )
+from app.services.options import generate_options
 from app.services.workspace_service import require_project_edit_access
 from app.services.parser.vastu import is_vastu_requested
 from app.utils.activity import log_activity
@@ -249,6 +255,29 @@ async def generate_mvp_layout(
         designVersionId=version_id,
         alternatives=alternatives,
     )
+
+
+@router.post(
+    "/options",
+    response_model=OptionsResponse,
+    dependencies=[Depends(rate_limit("mvp_options", limit=20, window_seconds=60))],
+)
+async def layout_options(
+    request: OptionsRequest,
+    _user_id: str = Depends(_current_user_id),
+) -> OptionsResponse:
+    """Brief -> up to ``count`` distinct, scored options from the
+    deterministic engine alone (no LLM, no persistence, no quota)."""
+    decision = assess(request.requirements)
+    if decision.route != "generate":
+        raise _clarification_error(decision)
+    try:
+        result = await run_in_threadpool(
+            generate_options, request.requirements, request.count
+        )
+    except DoesNotFitError as exc:
+        raise _clarification_error(assess(request.requirements, fit_error=exc)) from exc
+    return OptionsResponse.model_validate(asdict(result))
 
 
 @router.post(
