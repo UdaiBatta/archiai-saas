@@ -8,7 +8,7 @@ import {
   type Room,
   useCanvasStore,
 } from '../../store/canvasStore'
-import { COMPONENT_REGISTRY } from '../../store/componentRegistry'
+import { capabilitiesOf } from '../../store/componentRegistry'
 import { isPrimaryPointerButton } from '../../store/interactionModel'
 import {
   CORNER_RESIZE_HANDLES,
@@ -57,7 +57,7 @@ export function ResizeHandles({
   const setInteractionMode = useCanvasStore((s) => s.setInteractionMode)
   const setPointerIntent = useCanvasStore((s) => s.setPointerIntent)
   const floors = useCanvasStore((s) => s.floors)
-  const definition = COMPONENT_REGISTRY[room.objectType]
+  const definition = capabilitiesOf(room)
   const footprint = floors.find((floor) => floor.level === room.floorLevel)?.footprint
 
   useEffect(() => {

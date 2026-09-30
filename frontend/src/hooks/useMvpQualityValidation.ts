@@ -82,7 +82,9 @@ export function useMvpQualityValidation({
 
   useEffect(() => {
     const requirements = parseRequirements(requirementsValue)
-    const floor = floors.length === 1 ? floors[0] : null
+    // Every storey shares the footprint and objects carry their floor, so
+    // multi-storey plans are validated (and their walls rebuilt) too.
+    const floor = floors[0] ?? null
     const footprint = floor?.footprint
     const facing = requirements?.facing
 

@@ -1,4 +1,5 @@
 import { useCanvasStore } from '../../store/canvasStore'
+import { capabilitiesOf, isEngineWall } from '../../store/componentRegistry'
 import { displayRoomColor } from './editorPalette'
 import { formatArea, formatDims } from '../../utils/format'
 import { canonicalQuarterTurn } from '../../utils/quarterTurn'
@@ -59,9 +60,10 @@ export function SelectionGizmo() {
       <button
         type="button"
         aria-label="Rotate 90 degrees"
-        title="Rotate 90°"
+        title={capabilitiesOf(room).canRotate ? 'Rotate 90°' : 'Walls follow the rooms: rotate or move the rooms instead'}
         onClick={rotate90}
-        className="flex h-6 w-6 items-center justify-center rounded-lg text-ink/60 hover:bg-ink/5 hover:text-ink"
+        disabled={!capabilitiesOf(room).canRotate}
+        className="flex h-6 w-6 items-center justify-center rounded-lg text-ink/60 hover:bg-ink/5 hover:text-ink disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent"
       >
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M21 2v6h-6M3 22v-6h6" />
@@ -71,7 +73,7 @@ export function SelectionGizmo() {
       <button
         type="button"
         aria-label="Delete"
-        title="Delete"
+        title={!isEngineWall(room) ? 'Delete' : Array.isArray(room.separates) ? 'Open this wall: join the two rooms' : 'Outer walls follow the building outline'}
         onClick={() => deleteRoom(room.id)}
         className="flex h-6 w-6 items-center justify-center rounded-lg text-danger hover:bg-danger/10"
       >

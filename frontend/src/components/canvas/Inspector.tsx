@@ -1,9 +1,5 @@
 import { CanvasObjectType, Room, useCanvasStore } from '../../store/canvasStore'
-import {
-  COMPONENT_DEFINITIONS,
-  COMPONENT_REGISTRY,
-  componentTypeToRoomType,
-} from '../../store/componentRegistry'
+import { COMPONENT_DEFINITIONS, componentTypeToRoomType, capabilitiesOf } from '../../store/componentRegistry'
 import { formatArea, formatMeters, roomArea, roomPerimeter } from '../../utils/format'
 import { canonicalQuarterTurn } from '../../utils/quarterTurn'
 
@@ -27,7 +23,7 @@ export function InspectorProperties({ room }: InspectorPropertiesProps) {
   const deleteRoom = useCanvasStore((s) => s.deleteRoom)
   const duplicateRoom = useCanvasStore((s) => s.duplicateRoom)
 
-  const definition = COMPONENT_REGISTRY[room.objectType]
+  const definition = capabilitiesOf(room)
   const roomQuarterTurnOnly = room.objectType === 'room'
 
   const rotateY = (degrees: number) => {

@@ -3,6 +3,7 @@ import type { Mass, Site } from '../site/siteTypes'
 import type { MassHousing } from '../site/housingTypes'
 import {
   COMPONENT_REGISTRY,
+  isEngineWall,
   clampComponentSize,
   componentTypeToRoomType,
   normalizeCanvasObjectType,
@@ -881,7 +882,24 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         ...markUnsaved(),
       }
     }),
-  deleteRoom: (id) =>
+  deleteRoom: (id) => {
+    const wall = get().rooms.find((r) => r.id === id)
+    if (wall && isEngineWall(wall)) {
+      // Engine walls are rebuilt from the rooms after every edit, so removing
+      // one outright would just come back. "Delete" opens it instead: an open
+      // connection the rebuild honours (one undo step, via setConnection).
+      const pair = wall.separates as string[] | undefined
+      if (pair?.length === 2) {
+        get().setConnection(pair[0], pair[1], 'open')
+        set((state) => ({
+          rooms: state.rooms.filter((r) => r.id !== id && !(r.objectType === 'door' && r.hostWallId === id)),
+          selectedId: state.selectedId === id ? null : state.selectedId,
+        }))
+      } else {
+        set({ clipboardMessage: 'Outer walls follow the building outline: move or resize the rooms to change them.' })
+      }
+      return
+    }
     set((state) => {
       const room = state.rooms.find((r) => r.id === id)
       if (!room) return state
@@ -903,7 +921,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         ...pushHistory(state),
         ...markUnsaved(),
       }
-    }),
+    })
+  },
   duplicateRoom: (id) =>
     set((state) => {
       const room = state.rooms.find((r) => r.id === id)

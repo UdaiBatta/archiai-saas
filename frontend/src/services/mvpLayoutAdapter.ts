@@ -78,6 +78,10 @@ function wallObject(layout: LayoutPlan, index: number): Room {
     },
     rotation: { x: 0, y: 0, z: 0 },
     color: '#475569',
+    // Rebuilt from the rooms after every edit; the two rooms it separates
+    // (absent on the outline) let "delete" open the wall instead.
+    derived: 'engine',
+    ...(wall.rooms?.length === 2 ? { separates: [...wall.rooms] } : {}),
     ...(wall.rooms?.length === 2 ? { betweenRooms: [...wall.rooms] } : {}),
   }
 }
