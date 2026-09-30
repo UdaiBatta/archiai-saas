@@ -69,6 +69,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
   const preset: CameraPreset = planLens ? 'top' : orbitPreset
   const [frameNonce, setFrameNonce] = useState(0)
   const [focusedRoomId, setFocusedRoomId] = useState<string | null>(null)
+  const [focusedMassId, setFocusedMassId] = useState<string | null>(null)
   const floors = useCanvasStore((s) => s.floors)
   const floorHeight = useCanvasStore((s) => s.floorHeight)
   const [ghostFloors, setGhostFloors] = useState(false)
@@ -240,7 +241,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
             y={(planFloor?.elevation ?? 0) + floorHeight + 0.4}
           />
         )}
-        {studio && <MassLayer orbitRef={orbitRef} readOnly={readOnly} topView={topView} />}
+        {studio && <MassLayer orbitRef={orbitRef} readOnly={readOnly} topView={topView} focusedMassId={focusedMassId} />}
         {studio && (
           <SiteLayer orbitRef={orbitRef} readOnly={readOnly} topView={topView} planY={(planFloor?.elevation ?? 0) + floorHeight + 0.4} />
         )}
@@ -268,7 +269,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
         {SHOW_PERF && <PerfReadout />}
       </Canvas>
       {topView && !readOnly && (
-        <TopPlanKeyboardLayer rooms={visibleRooms} invalidRoomIds={invalidRoomIds} onFocusRoom={setFocusedRoomId} />
+        <TopPlanKeyboardLayer rooms={visibleRooms} invalidRoomIds={invalidRoomIds} onFocusRoom={setFocusedRoomId} onFocusMass={setFocusedMassId} />
       )}
       {studio && dock && (
         <EditorDock
