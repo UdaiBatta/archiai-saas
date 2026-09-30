@@ -13,8 +13,6 @@ export interface CameraPose {
 }
 export interface ViewCameraApi {
   capture: () => CameraPose
-  /** Move the camera once Scene shows the view's preset and `floor`. */
-  restore: (view: SavedView, floor: number | 'all') => void
 }
 interface Controls {
   target: THREE.Vector3
@@ -22,11 +20,20 @@ interface Controls {
 }
 
 /** Lives inside <Canvas>, after <Scene>: reads and sets the live camera. */
-export function ViewCamera({ apiRef, preset }: { apiRef: Ref<ViewCameraApi>; preset: CameraPreset }) {
+export function ViewCamera({
+  apiRef,
+  preset,
+  pendingRestore,
+  onRestored,
+}: {
+  apiRef: Ref<ViewCameraApi>
+  preset: CameraPreset
+  pendingRestore: { view: SavedView; floor: number | 'all' } | null
+  onRestored: () => void
+}) {
   const get = useThree((s) => s.get)
   const camera = useThree((s) => s.camera)
   const selectedFloor = useCanvasStore((s) => s.selectedFloor)
-  const [pending, setPending] = useState<{ view: SavedView; floor: number | 'all' } | null>(null)
   useImperativeHandle(apiRef, () => ({
     capture: () => {
       const { camera, controls } = get()
@@ -37,7 +44,6 @@ export function ViewCamera({ apiRef, preset }: { apiRef: Ref<ViewCameraApi>; pre
         zoom: camera.zoom,
       }
     },
-    restore: (view, floor) => setPending({ view, floor }),
   }), [get])
 
   // Restoring can switch preset and floor, which makes Scene re-frame (and
@@ -45,8 +51,8 @@ export function ViewCamera({ apiRef, preset }: { apiRef: Ref<ViewCameraApi>; pre
   // Scene has all three; this effect then runs after Scene's framing effect
   // in the same commit, so the saved pose lands on top.
   useEffect(() => {
-    if (!pending) return
-    const { view, floor } = pending
+    if (!pendingRestore) return
+    const { view, floor } = pendingRestore
     const ortho = (camera as THREE.OrthographicCamera).isOrthographicCamera === true
     if (preset !== view.preset || selectedFloor !== floor || ortho !== (view.preset !== 'perspective')) return
     camera.position.set(...view.position)
@@ -57,8 +63,8 @@ export function ViewCamera({ apiRef, preset }: { apiRef: Ref<ViewCameraApi>; pre
     orbit?.update()
     camera.lookAt(...view.target)
     get().invalidate()
-    setPending(null)
-  }, [pending, camera, preset, selectedFloor, get])
+    onRestored()
+  }, [pendingRestore, camera, preset, selectedFloor, get, onRestored])
   return null
 }
 

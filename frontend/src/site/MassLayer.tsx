@@ -59,7 +59,7 @@ const regionShapes = (region: Region) =>
  * selection label and push/pull handle, spill regions outside the envelope,
  * and (in Top view) move / corner grips and the rectangle / polygon draw tool.
  */
-export function MassLayer({ orbitRef, readOnly, topView }: { orbitRef: RefObject<OrbitHandle>; readOnly: boolean; topView: boolean }) {
+export function MassLayer({ orbitRef, readOnly, topView, focusedMassId = null }: { orbitRef: RefObject<OrbitHandle>; readOnly: boolean; topView: boolean; focusedMassId?: string | null }) {
   const { site, masses } = useSiteAndMasses()
   const selectedMassId = useMassUi((s) => s.selectedMassId)
   const select = useMassUi((s) => s.select)
@@ -164,6 +164,7 @@ export function MassLayer({ orbitRef, readOnly, topView }: { orbitRef: RefObject
           key={m.id}
           mass={m}
           selected={m.id === selectedMassId}
+          focused={topView && focusedMassId === m.id}
           invalid={offending.has(m.id)}
           onPointerDown={
             topView
@@ -234,6 +235,7 @@ export function MassLayer({ orbitRef, readOnly, topView }: { orbitRef: RefObject
 interface MassBodyProps {
   mass: Mass
   selected: boolean
+  focused: boolean
   invalid: boolean
   onPointerDown: (event: ThreeEvent<PointerEvent>) => void
   onPointerMove?: (event: ThreeEvent<PointerEvent>) => void
@@ -243,7 +245,7 @@ interface MassBodyProps {
   onPointerOut: () => void
 }
 
-function MassBody({ mass, selected, invalid, ...events }: MassBodyProps) {
+function MassBody({ mass, selected, focused, invalid, ...events }: MassBodyProps) {
   const height = mass.floors * mass.floorHeightM
   const shape = useMemo(() => ringsToShape(mass.footprint), [mass.footprint])
   // Slab edges at every floor, in world space, as one line-segments buffer.
@@ -271,6 +273,7 @@ function MassBody({ mass, selected, invalid, ...events }: MassBodyProps) {
         <meshStandardMaterial color={fill} roughness={0.9} metalness={0} />
         <Edges threshold={20} color={edge} lineWidth={selected ? 2 : 1} />
       </mesh>
+      {focused && <Line name={`focus-ring-${mass.id}`} points={[...mass.footprint, mass.footprint[0]].map((p) => [p.x, massTop(mass) + 0.05, p.z] as [number, number, number])} color={EDITOR_PALETTE.selection} lineWidth={4} />}
       <lineSegments geometry={slabs} raycast={() => null}>
         <lineBasicMaterial color={invalid ? MODEL_COLORS.invalid : MODEL_COLORS.floorEdge} />
       </lineSegments>
