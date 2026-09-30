@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { Mass, Site } from '../site/siteTypes'
+import type { MassHousing } from '../site/housingTypes'
 import {
   COMPONENT_REGISTRY,
   clampComponentSize,
@@ -178,6 +179,8 @@ interface CanvasState {
   setSite: (site: Site | null) => void
   /** Building masses (P2), saved with the layout; undoable. */
   setMasses: (masses: Mass[]) => void
+  /** Housing fill of one mass (P3), saved with the layout; undoable. null removes it. */
+  setHousing: (massId: string, housing: MassHousing | null) => void
   resizeRoom: (
     id: string,
     size: ComponentSize,
@@ -771,6 +774,13 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       ...pushHistory(state),
       ...markUnsaved(),
     })),
+  setHousing: (massId, housing) =>
+    set((state) => {
+      const all = { ...(state.layoutMetadata.housing as Record<string, MassHousing> | undefined) }
+      if (housing) all[massId] = housing
+      else delete all[massId]
+      return { layoutMetadata: { ...state.layoutMetadata, housing: all }, ...pushHistory(state), ...markUnsaved() }
+    }),
   setConnection: (roomA, roomB, kind) =>
     set((state) => {
       const labelOf = (id: string) => state.rooms.find((r) => r.id === id)?.label ?? id
