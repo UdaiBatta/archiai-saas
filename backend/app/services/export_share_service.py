@@ -13,7 +13,7 @@ from app.models.project_share import ProjectShare
 from app.services.workspace_service import require_project_edit_access, require_project_read_access
 from app.utils.activity import log_activity
 
-EXPORT_TYPES = {"image", "pdf"}
+EXPORT_TYPES = {"image", "pdf", "dxf", "ifc", "glb", "obj", "svg"}
 
 
 async def create_export_record(

@@ -23,4 +23,12 @@ hypothesis==6.112.0
 # well-tested library here instead. Kept to a small surface (Polygon, box,
 # Point, .intersection, .covers, .boundary, .centroid, .is_valid/.is_simple,
 # .area, .bounds) — no shapely.ops.split, triangulation, or buffering.
-shapely>=2.0,<3.0
+shapely>=2.1,<3.0
+
+# Exports for other tools (app/services/export): DXF for AutoCAD and other
+# CAD, IFC4 for Revit/ArchiCAD/BIM, GLB/OBJ for 3D tools. Each writes a real,
+# validated file format (the tests re-read every export with these libraries),
+# which hand-written serializers could not promise.
+ezdxf==1.4.4
+ifcopenshell==0.8.5
+trimesh==4.11.5

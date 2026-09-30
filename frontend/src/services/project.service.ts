@@ -1,5 +1,8 @@
 import api from './api'
 import type { CanvasLayout } from '../store/canvasStore'
+import type { LayoutPlan } from '../types/contracts'
+
+export type FileExportFormat = 'dxf' | 'ifc' | 'glb' | 'obj' | 'svg'
 
 export interface Project {
   id: string
@@ -95,6 +98,24 @@ const projectService = {
 
   recordExport: (id: string, exportType: 'image' | 'pdf'): Promise<ExportRecord> =>
     api.post(`/api/projects/${id}/export/${exportType}`).then((r) => r.data),
+
+  /** Server-built CAD/BIM/3D file for the given plan. OBJ comes back zipped. */
+  exportFile: async (
+    id: string,
+    format: FileExportFormat,
+    layout: LayoutPlan,
+  ): Promise<{ blob: Blob; filename: string }> => {
+    const r = await api
+      .post(`/api/projects/${id}/export/${format}`, { layout }, { responseType: 'blob' })
+      .catch(async (err) => {
+        // Error bodies arrive as a Blob too; decode so getApiErrorMessage can read them.
+        const data = err?.response?.data
+        if (data instanceof Blob) err.response.data = await data.text().then(JSON.parse).catch(() => data)
+        throw err
+      })
+    const match = /filename="?([^";]+)"?/i.exec(String(r.headers?.['content-disposition'] ?? ''))
+    return { blob: r.data, filename: match?.[1] ?? `plan.${format === 'obj' ? 'zip' : format}` }
+  },
 
   createShare: (id: string): Promise<ProjectShare> =>
     api.post(`/api/projects/${id}/share`).then((r) => r.data),
