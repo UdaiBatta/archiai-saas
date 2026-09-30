@@ -18,6 +18,8 @@ from app.services.layout_engine import DoesNotFitError
 from app.services.layout_engine.engine import generate_plan
 from app.services.llm_client import chat_structured
 from app.services.mvp_pipeline_service import quality_snapshot_with_layout
+from app.services.layout_engine import polygon
+from app.services.layout_engine.geometry import EPS
 
 StructuredChat = Callable[..., Awaitable[dict[str, Any]]]
 
@@ -231,6 +233,10 @@ def validate_commands(
                 if by_id[item["a"]].floor != by_id[item["b"]].floor:
                     warnings.append("Ignored set_connection: the rooms are on different floors.")
                     continue
+                a, b = by_id[item["a"]], by_id[item["b"]]
+                if not polygon.room_to_polygon(a).boundary.intersection(polygon.room_to_polygon(b).boundary).length > EPS:
+                    warnings.append("Ignored set_connection: the rooms do not share a wall.")
+                    continue
                 cmd["kind"] = item["kind"]
             commands.append(cmd)
         elif op == "rename_room":
@@ -255,7 +261,7 @@ def validate_commands(
                     count = 1
                 add.append({"type": key, "count": min(count, MAX_ADD_COUNT)})
             remove = []
-            for room_id in item.get("remove") or []:
+            for room_id in dict.fromkeys(item.get("remove") or []):
                 if room_id in ids:
                     remove.append(room_id)
                 else:

@@ -31,6 +31,7 @@ export function AssistantPanel() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [preview, setPreview] = useState<AssistantResponse | null>(null)
+  const [previewBase, setPreviewBase] = useState<string | null>(null)
 
   const submit = async (event?: FormEvent) => {
     event?.preventDefault()
@@ -45,6 +46,7 @@ export function AssistantPanel() {
     setBusy(true)
     setError(null)
     setPreview(null)
+    setPreviewBase(JSON.stringify(layout))
     try {
       setPreview(await planAssistantEdits({ instruction: text, layout, requirements, ...(selected ? { selected_room_id: selected.id } : {}) }))
     } catch (err) {
@@ -56,11 +58,19 @@ export function AssistantPanel() {
 
   const apply = () => {
     if (!preview) return
+    const current = currentLayoutPlan()
+    if (!current || JSON.stringify(current) !== previewBase) {
+      setError('The layout changed while this preview was open. Ask again before applying it.')
+      setPreview(null)
+      setPreviewBase(null)
+      return
+    }
     const canvas = layoutPlanToCanvas(preview.layout_after, { requirements: preview.requirements_after, quality: preview.quality_after })
     // Keys the new plan lacks (e.g. no footprint after a regenerate) are cleared, not kept stale.
     const metadata = Object.fromEntries(EDIT_METADATA.map((key) => [key, canvas.metadata?.[key]]))
     useCanvasStore.getState().applyLayoutEdit({ ...canvas, metadata })
     setPreview(null)
+    setPreviewBase(null)
     setInstruction('')
   }
 
