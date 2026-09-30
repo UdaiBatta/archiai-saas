@@ -113,7 +113,7 @@ export function largestRing(region: Region): SitePoint[] | null {
 }
 
 const largestSimpleRing = (region: Region): SitePoint[] | null =>
-  region.every((polygon) => polygon.length === 1) ? largestRing(region) : null
+  region.length === 1 && region[0].length === 1 ? largestRing(region) : null
 
 const replace = (masses: Mass[], id: string, patch: Partial<Mass>) =>
   masses.map((m) => (m.id === id ? { ...m, ...patch } : m))
