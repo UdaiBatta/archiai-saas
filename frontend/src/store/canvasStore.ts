@@ -1073,13 +1073,21 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   addObjectAt: (objectType, x, z) =>
     set((state) => {
       const floor = activeFloorForState(state)
-      const newObject = defaultRoomForType(objectType, floor, x, z)
+      let newObject = defaultRoomForType(objectType, floor, x, z)
       newObject.position = clampToFootprint(
         newObject.position,
         newObject.size,
         floor.footprint,
         newObject.objectType === 'room' ? newObject.rotation.y : 0,
       )
+      if (newObject.objectType === 'room') {
+        const level = newObject.floorLevel ?? 0
+        newObject = snapToNeighbours(
+          newObject,
+          newObject,
+          state.rooms.filter((other) => other.objectType === 'room' && (other.floorLevel ?? 0) === level),
+        )
+      }
       return {
         rooms: [...state.rooms, newObject],
         selectedId: newObject.id,

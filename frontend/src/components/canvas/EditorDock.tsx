@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { Axis3d, Box, Building2, Camera, Layers, LayoutGrid, Map as MapIcon, Network, Sparkles, SquareDashed, Sun, SunMedium } from 'lucide-react'
+import { Axis3d, Box, Building2, Camera, Layers, LayoutGrid, Map as MapIcon, MessageSquare, Network, Sparkles, SquareDashed, Sun, SunMedium } from 'lucide-react'
 import { HoverGradientNavBar, type HoverGradientNavGroup, type HoverGradientNavItem } from '@/components/ui/hover-gradient-nav-bar'
 import { useCanvasStore } from '../../store/canvasStore'
 import { CAMERA_PRESETS, type CameraPreset } from './modelView'
 import { useEditTools, type EditTool } from './editTools'
 
-export type DockTool = 'site' | 'massing' | 'views' | 'sun' | 'analysis' | 'floors' | 'assistant'
+export type DockTool = 'site' | 'massing' | 'views' | 'sun' | 'analysis' | 'floors' | 'comments' | 'assistant'
 type DockPopover = DockTool | 'more'
 
 const glow = (rgb: string) =>
@@ -46,6 +46,7 @@ const TOOLS: { id: DockTool; label: string; icon: ReactNode }[] = [
   { id: 'sun', label: 'Sun', icon: <Sun className={icon} /> },
   { id: 'analysis', label: 'Analysis', icon: <SunMedium className={icon} /> },
   { id: 'floors', label: 'Floors', icon: <Layers className={icon} /> },
+  { id: 'comments', label: 'Comments', icon: <MessageSquare className={icon} /> },
   { id: 'assistant', label: 'Assistant', icon: <Sparkles className={icon} /> },
 ]
 

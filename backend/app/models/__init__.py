@@ -7,6 +7,7 @@ from app.models.billing import (  # noqa: F401
     Subscription,
     UsageCounter,
 )
+from app.models.comment import Comment  # noqa: F401
 from app.models.design import Design  # noqa: F401
 from app.models.design_version import DesignVersion  # noqa: F401
 from app.models.export_record import ExportRecord  # noqa: F401
@@ -23,6 +24,7 @@ __all__ = [
     "TeamMember",
     "Project",
     "ActivityLog",
+    "Comment",
     "Design",
     "DesignVersion",
     "ExportRecord",

@@ -70,6 +70,11 @@ class RoomResponse(BaseModel):
 
 
 class GenerateMetadata(BaseModel):
+    # Keep keys this model does not list (saved views, site, masses, the
+    # user's wall/door choices...): dropping them here lost them on every
+    # load from a saved design, share link or restored version.
+    model_config = {"extra": "allow"}
+
     pipeline: str | None = None
     prompt: str | None = None
     building_type: str | None = None

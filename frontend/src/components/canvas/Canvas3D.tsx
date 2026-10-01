@@ -31,6 +31,10 @@ import { zoningIssues } from '../../site/massing'
 import { SunPanel } from '../../analysis/SunPanel'
 import { AnalysisPanel } from '../../analysis/AnalysisPanel'
 import { SunHoursLayer } from '../../analysis/SunHoursLayer'
+import { useParams } from 'react-router-dom'
+import { CommentLayer } from '../../collab/CommentLayer'
+import { CommentsPanel } from '../../collab/CommentsPanel'
+import { useComments } from '../../collab/commentsStore'
 
 // Props are stable per room, so metadata or UI-state changes in this
 // component no longer re-render every room.
@@ -51,9 +55,11 @@ interface Canvas3DProps {
   initialPreset?: Exclude<CameraPreset, 'top'>
   /** False while something (e.g. the brief editor) covers the canvas. */
   dock?: boolean
+  /** Saved view to open at (a share link's #view). */
+  initialViewId?: string
 }
 
-export function Canvas3D({ className, readOnly = false, modelStage = false, briefBackground = false, initialPreset = 'perspective', dock = true }: Canvas3DProps) {
+export function Canvas3D({ className, readOnly = false, modelStage = false, briefBackground = false, initialPreset = 'perspective', dock = true, initialViewId }: Canvas3DProps) {
   const orbitRef = useRef<{ enabled: boolean }>(null)
   const rooms = useCanvasStore((s) => s.rooms)
   const selectedFloor = useCanvasStore((s) => s.selectedFloor)
@@ -90,6 +96,16 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
     state.setSelectedFloor(floor)
     setPendingRestore({ view, floor })
   }
+  const openedView = useRef(false)
+  useEffect(() => {
+    if (!initialViewId || openedView.current) return
+    const views = parseSavedViews({ savedViews: useCanvasStore.getState().layoutMetadata.savedViews })
+    const view = views.find((candidate) => candidate.id === initialViewId)
+    if (!view) return
+    openedView.current = true
+    restoreView(view)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when the plan with its views is in
+  }, [initialViewId, hasSavedViews])
   // Architectural site presentation for the real 3D view (not the hidden
   // capture canvas behind the plan lenses, nor the empty-brief backdrop).
   const studio = viewMode === '3d' && !briefBackground
@@ -99,6 +115,12 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
   // in Persp on laptop GPUs, and a remembered "on" made Persp feel slow for
   // good. Dropped automatically if frames slow down.
   const [aoWanted, chooseAo] = useState(false)
+  // Comments belong to a saved project (not the public share page).
+  const projectId = useParams<{ id: string }>().id
+  const comments = Boolean(projectId) && studio && !readOnly
+  useEffect(() => {
+    if (comments && projectId) void useComments.getState().load(projectId)
+  }, [comments, projectId])
   const aoOn = studio && preset === 'perspective' && aoWanted
   // Top shows one level; "all" means the lowest, as the 2D plan did.
   const sortedFloors = [...floors].sort((a, b) => a.level - b.level)
@@ -249,6 +271,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
             y={(planFloor?.elevation ?? 0) + floorHeight + 0.4}
           />
         )}
+        {comments && <CommentLayer />}
         {studio && <SunHoursLayer />}
         {studio && <MassLayer orbitRef={orbitRef} readOnly={readOnly} topView={topView} focusedMassId={focusedMassId} />}
         {studio && (
@@ -317,6 +340,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
               </SunPanel>
             ),
             analysis: <AnalysisPanel />,
+            comments: comments && <CommentsPanel />,
             floors: multiFloor && (
               <div role="group" aria-label="Other floors" className={DOCK_CARD}>
                 <span className="font-semibold text-ink">Other floors</span>

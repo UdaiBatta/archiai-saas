@@ -247,3 +247,21 @@ async def test_draft_layout_json_persists_exactly(client: AsyncClient):
         )
         assert draft_version is not None
         assert draft_version.layout_json == draft
+
+
+async def test_saved_layout_keeps_editor_metadata_on_reload(client: AsyncClient):
+    token = await _register_and_token(client, "keep-meta@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    layout = await _create_design(client, token, "keep-meta")
+    design_id = layout.pop("designId")
+    layout.pop("designVersionId", None)
+    view = {"id": "v1", "name": "Street", "preset": "axo"}
+    layout["metadata"] = {**layout["metadata"], "savedViews": [view], "site": {"boundary": [[0, 0]]}}
+
+    saved = await client.put(f"/api/design/{design_id}", json={"layout": layout}, headers=headers)
+    assert saved.json()["metadata"]["savedViews"] == [view]
+
+    project_id = (await client.get("/api/projects", headers=headers)).json()[0]["id"]
+    latest = await client.get(f"/api/design/project/{project_id}/latest", headers=headers)
+    assert latest.json()["metadata"]["savedViews"] == [view]
+    assert latest.json()["metadata"]["site"] == {"boundary": [[0, 0]]}
