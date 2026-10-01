@@ -1,5 +1,8 @@
 import { useState } from 'react'
 
+import { parseSavedViews } from '../canvas/savedViews'
+import { useCanvasStore } from '../../store/canvasStore'
+
 import projectService, { ProjectShare } from '../../services/project.service'
 import { getApiErrorMessage } from '../../services/apiError'
 import { Button } from '../ui/Button'
@@ -22,10 +25,15 @@ export function ShareProjectDialog({
   const [revoking, setRevoking] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [viewId, setViewId] = useState('')
+  const savedViews = useCanvasStore((s) => s.layoutMetadata.savedViews)
 
   if (!open) return null
 
-  const publicUrl = share ? new URL(share.share_url, window.location.origin).toString() : null
+  const views = parseSavedViews({ savedViews })
+  const publicUrl = share
+    ? new URL(share.share_url, window.location.origin).toString() + (viewId ? `#${encodeURIComponent(viewId)}` : '')
+    : null
 
   const createShare = async () => {
     setCreating(true)
@@ -93,6 +101,19 @@ export function ShareProjectDialog({
 
         {publicUrl ? (
           <div className="space-y-3">
+            {views.length > 0 && (
+              <label className="flex items-center justify-between gap-3 text-sm text-muted">
+                Opens at
+                <select
+                  value={viewId}
+                  onChange={(event) => setViewId(event.target.value)}
+                  className="min-w-0 flex-1 rounded border border-ink/15 bg-surface px-2 py-1.5 text-sm text-ink"
+                >
+                  <option value="">Default view</option>
+                  {views.map((view) => <option key={view.id} value={view.id}>{view.name}</option>)}
+                </select>
+              </label>
+            )}
             <input
               aria-label="Share link"
               readOnly

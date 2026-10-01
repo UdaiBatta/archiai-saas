@@ -86,10 +86,11 @@ _Last updated: 2026-10-01_
 - [ ] Validate sun hours against an external tool (Ladybug) on three sites
 - [ ] View analysis per window
 
-## P6: Collaboration
+## P6: Collaboration — PR (p6-collab)
 
-- [ ] Comments pinned to 3D points, rooms and units
-- [ ] View-only share links with a saved camera
+- [x] Comments pinned to 3D points and rooms: threads with replies, resolve, author-only delete (Comments in the dock)
+- [x] View-only share links with a saved camera (Share ▸ Opens at)
+- [ ] Comments pinned to housing units
 - [ ] Boards: live model frames, metrics cards, notes
 - [ ] Real-time multiplayer
 

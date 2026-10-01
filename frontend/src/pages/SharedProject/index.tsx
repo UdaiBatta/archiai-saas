@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useLocation, useParams } from 'react-router-dom'
 
 import { Canvas3D } from '../../components/canvas/Canvas3D'
 import projectService, { SharedProject } from '../../services/project.service'
@@ -8,6 +8,8 @@ import { useCanvasStore } from '../../store/canvasStore'
 
 export default function SharedProjectPage() {
   const { token } = useParams<{ token: string }>()
+  // A link made from Share ▸ Opens at ends in #<saved view id>.
+  const viewId = decodeURIComponent(useLocation().hash.slice(1)) || undefined
   const [sharedProject, setSharedProject] = useState<SharedProject | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -77,7 +79,7 @@ export default function SharedProjectPage() {
 
       <section className="min-h-0 flex-1">
         {sharedProject.layout ? (
-          <Canvas3D className="h-full" readOnly />
+          <Canvas3D className="h-full" readOnly initialViewId={viewId} />
         ) : (
           <div className="flex h-full items-center justify-center text-sm text-muted-light">
             This project does not have a saved layout yet.
