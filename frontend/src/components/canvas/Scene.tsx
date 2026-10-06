@@ -221,6 +221,7 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
           showPlot={!siteModel}
           northAngle={orientationNorth}
           fadeDistance={shadow.radius * 8}
+          ortho={preset !== 'perspective'}
         />
       )}
 
@@ -340,7 +341,9 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
         }}
       >
         <planeGeometry args={[200, 200]} />
-        <meshBasicMaterial transparent opacity={0} />
+        {/* Catches clicks only: it must not write depth, or the grid and site
+            lines just below it vanish whenever it sorts before them (Persp/Axo). */}
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} colorWrite={false} />
       </mesh>
 
       {/* Tape measure — points, connecting line, and a distance label. */}
@@ -395,12 +398,16 @@ function SiteGround({
   showPlot,
   northAngle,
   fadeDistance,
+  ortho,
 }: {
   plot: { x: number; z: number; w: number; d: number }
   /** Off once a site is drawn: the site layer draws the real boundary. */
   showPlot: boolean
   northAngle: number
   fadeDistance: number
+  /** Axo/Top: the camera sits far off, so fog and the grid's camera-based
+   * fade would wash the ground out to the sky colour. */
+  ortho: boolean
 }) {
   const cx = plot.x + plot.w / 2
   const cz = plot.z + plot.d / 2
@@ -424,7 +431,7 @@ function SiteGround({
   return (
     <>
       {/* Fog must attach to the scene itself, so this component returns a fragment. */}
-      <fog attach="fog" args={[MODEL_COLORS.sky, fadeDistance * 0.9, fadeDistance * 2.2]} />
+      {!ortho && <fog attach="fog" args={[MODEL_COLORS.sky, fadeDistance * 0.9, fadeDistance * 2.2]} />}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[cx, GROUND_Y, cz]} receiveShadow raycast={() => null}>
         <planeGeometry args={[fadeDistance * 5, fadeDistance * 5]} />
         <meshStandardMaterial color={MODEL_COLORS.ground} roughness={1} />
@@ -435,9 +442,12 @@ function SiteGround({
           <meshStandardMaterial color={MODEL_COLORS.plot} roughness={1} />
         </mesh>
       )}
+      {/* A fixed patch centred on the plot: drei's infiniteGrid centres its
+          patch under the camera, which in Axo sits far off to one side, so
+          the grid missed the building entirely. */}
       <Grid
         position={[cx, GROUND_Y + 0.03, cz]}
-        args={[1, 1]}
+        args={[fadeDistance * 2, fadeDistance * 2]}
         cellSize={1}
         sectionSize={5}
         cellThickness={0.6}
@@ -446,7 +456,7 @@ function SiteGround({
         sectionColor={MODEL_COLORS.gridSection}
         fadeDistance={fadeDistance}
         fadeStrength={1.5}
-        infiniteGrid
+        fadeFrom={ortho ? 0 : 1}
       />
       {showPlot && (
         <Line
