@@ -7,6 +7,7 @@ import {
   replaceDerivedCanvasObjects,
 } from '../services/mvpLayoutAdapter'
 import { useCanvasStore, type Room } from '../store/canvasStore'
+import { isEngineWall } from '../store/componentRegistry'
 import type { Connection, Facing, PlanZoneSpan, RequirementsSpec } from '../types/contracts'
 
 const DEFAULT_DEBOUNCE_MS = 300
@@ -30,13 +31,27 @@ function pairOf(wall: Room | undefined): string | null {
   return Array.isArray(pair) && pair.length === 2 ? [...pair].map(String).sort().join('|') : null
 }
 
+/** A rebuilt wall on the same line as `wall`, overlapping its middle. */
+function sameLineWall(wall: Room, after: Room[]): string | null {
+  const alongX = wall.size.w >= wall.size.d
+  const match = after.find((o) => {
+    if (!isEngineWall(o) || (o.size.w >= o.size.d) !== alongX) return false
+    const [at, mid, half] = alongX ? [o.position.z, o.position.x, o.size.w / 2] : [o.position.x, o.position.z, o.size.d / 2]
+    const [wallAt, wallMid] = alongX ? [wall.position.z, wall.position.x] : [wall.position.x, wall.position.z]
+    return Math.abs(at - wallAt) < 0.15 && Math.abs(mid - wallMid) <= half
+  })
+  return match?.id ?? null
+}
+
 /**
  * Keep the selection across a rebuild. Derived doors can come back with new
- * ids; a selected door is followed to the door between the same two rooms.
+ * ids; a selected door is followed to the door between the same two rooms,
+ * a selected wall to the wall now on the same line.
  */
 export function followSelection(before: Room[], after: Room[], selectedId: string | null): string | null {
   if (!selectedId || after.some((object) => object.id === selectedId)) return selectedId
   const door = before.find((object) => object.id === selectedId)
+  if (door && isEngineWall(door)) return sameLineWall(door, after)
   if (door?.objectType !== 'door') return null
   const pair = pairOf(before.find((object) => object.id === door.hostWallId))
   if (!pair) return null
@@ -122,7 +137,10 @@ export function useMvpQualityValidation({
       // A freshly generated plan is already in sync. One saved without edge
       // data (older saves) is not: re-derive now, not on the first edit, or
       // the access graph reads it as a house with no doors.
-      if (hasEdges) {
+      // Walls saved before they carried `derived: 'engine'` are re-derived
+      // too, or they could not be deleted/moved as wall lines.
+      const wallsTagged = objects.every((object) => object.objectType !== 'wall' || object.derived === 'engine')
+      if (hasEdges && wallsTagged) {
         previousFingerprint.current = fingerprint
         return
       }

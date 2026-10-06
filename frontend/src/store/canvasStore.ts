@@ -14,6 +14,7 @@ import type { InteractionMode, PointerIntent } from './interactionModel'
 import { quarterTurnPlanSize } from '../utils/quarterTurn'
 import { snapDoorToWall, upsertConnection } from './connections'
 import { snapToNeighbours } from './edgeSnap'
+import { moveWallRun, wallRun } from './wallLines'
 import type { Connection, ConnectionKind } from '../types/contracts'
 
 export type { CanvasObjectType } from './componentRegistry'
@@ -175,6 +176,9 @@ interface CanvasState {
   updateRoom: (id: string, patch: Partial<Omit<Room, 'id'>>, options?: UpdateOptions) => void
   /** Choose how two adjacent rooms meet: solid wall, door, or open. */
   setConnection: (roomA: string, roomB: string, kind: ConnectionKind) => void
+  /** Move a wall line (see wallLines.ts) by `delta` metres from `base`
+   * (the rooms when the drag started). `commit` logs it as one undo step. */
+  moveWallLine: (wallId: string, delta: number, options?: { base?: Room[]; commit?: boolean; historySnapshot?: CanvasHistorySnapshot }) => void
   /** Replace the plan's rooms and derived walls/doors/windows with `layout`
    * (e.g. an accepted assistant edit) as ONE undoable step. Furniture and
    * other non-plan objects, room colours and floor names are kept. */
@@ -781,6 +785,34 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         activityLog: logEntry ? [logEntry, ...state.activityLog] : state.activityLog,
         ...(shouldLog ? pushHistory(state, options?.historySnapshot) : {}),
         ...(shouldLog ? markUnsaved() : {}),
+      }
+    }),
+  moveWallLine: (wallId, delta, options) =>
+    set((state) => {
+      const base = options?.base ?? state.rooms
+      const run = wallRun(base, wallId)
+      if (!run) return state
+      const rooms = moveWallRun(base, run, delta)
+      if (!options?.commit) return { rooms }
+      if (rooms === base) return { rooms }
+      const wall = base.find((o) => o.id === wallId)
+      return {
+        rooms,
+        activityLog: [
+          {
+            id: nextId('activity'),
+            action: 'object.resized' as CanvasEditAction,
+            objectId: wallId,
+            objectLabel: `${wall?.label ?? 'Wall'} (${run.edges.length} rooms)`,
+            previousValue: null,
+            newValue: null,
+            createdAt: new Date().toISOString(),
+          },
+          ...state.activityLog,
+        ],
+        // Undo goes back to before the drag, not to its last preview.
+        ...pushHistory(state, options.historySnapshot ?? snapshotOf({ ...state, rooms: base })),
+        ...markUnsaved(),
       }
     }),
   setSavedViews: (views) =>
