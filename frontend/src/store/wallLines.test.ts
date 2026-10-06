@@ -69,3 +69,24 @@ describe('store moveWallLine', () => {
     expect(useCanvasStore.getState().rooms.find((r) => r.id === 'a')!.size.w).toBe(4)
   })
 })
+
+describe('wall lines with a long room on the line', () => {
+  // Long room L on the right (z 0..12); on the left, a (z 0..4) has a wall to
+  // L, b (z 4..12) is open to L (no wall piece there).
+  const plan = [
+    room('L', 4, 8, 0, 12), room('a', 0, 4, 0, 4), room('b', 0, 4, 4, 12),
+    wall('w1', 4, 0, 4),
+  ]
+
+  it('takes every room edge on the line that the moved rooms touch, so nothing comes apart', () => {
+    const run = wallRun(plan, 'w1')!
+    expect(run).toMatchObject({ from: 0, to: 12 })
+    expect(run.edges.map((e) => e.id).sort()).toEqual(['L', 'a', 'b'])
+    const moved = moveWallRun(plan, run, 1)
+    const right = (id: string) => { const r = moved.find((o) => o.id === id)!; return r.position.x + r.size.w / 2 }
+    const left = (id: string) => { const r = moved.find((o) => o.id === id)!; return r.position.x - r.size.w / 2 }
+    expect(right('a')).toBe(5)
+    expect(right('b')).toBe(5)
+    expect(left('L')).toBe(5)
+  })
+})

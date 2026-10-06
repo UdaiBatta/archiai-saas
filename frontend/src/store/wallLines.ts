@@ -60,15 +60,31 @@ export function wallRun(objects: Room[], wallId: string): WallRun | null {
     }
   }
 
-  const edges: WallRun['edges'] = []
+  // Grow through the rooms on the line too: a room whose edge is on it moves
+  // as a whole, so every other room edge on the line along that room (open
+  // connections have no wall piece) must move with it, or they come apart.
+  const onLine: { id: string; side: 'min' | 'max'; lo: number; hi: number }[] = []
   for (const room of objects) {
     if (room.objectType !== 'room' || room.polygonVertices || (room.floorLevel ?? 0) !== level) continue
     const b = bounds(room)
     const [lo, hi, a0, a1] = line.axis === 'x' ? [b.z0, b.z1, b.x0, b.x1] : [b.x0, b.x1, b.z0, b.z1]
-    if (Math.min(hi, to) - Math.max(lo, from) < TOUCH) continue
-    if (Math.abs(a0 - line.at) < ON_LINE) edges.push({ id: room.id, side: 'min' })
-    else if (Math.abs(a1 - line.at) < ON_LINE) edges.push({ id: room.id, side: 'max' })
+    if (Math.abs(a0 - line.at) < ON_LINE) onLine.push({ id: room.id, side: 'min', lo, hi })
+    else if (Math.abs(a1 - line.at) < ON_LINE) onLine.push({ id: room.id, side: 'max', lo, hi })
   }
+  const taken = new Set<string>()
+  for (let grew = true; grew; ) {
+    grew = false
+    for (const r of onLine) {
+      if (taken.has(r.id) || Math.min(r.hi, to) - Math.max(r.lo, from) < TOUCH) continue
+      taken.add(r.id)
+      from = Math.min(from, r.lo)
+      to = Math.max(to, r.hi)
+      grew = true
+    }
+  }
+  // Wall pieces now inside the grown span move with the line as well.
+  for (const w of candidates) if (w.from < to - TOUCH && w.to > from + TOUCH) ids.add(w.id)
+  const edges: WallRun['edges'] = onLine.filter((r) => taken.has(r.id)).map(({ id, side }) => ({ id, side }))
   return { axis: line.axis, at: line.at, from, to, wallIds: [...ids], edges }
 }
 
