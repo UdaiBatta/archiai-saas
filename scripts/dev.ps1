@@ -100,6 +100,10 @@ function Stop-Stack {
   # Anything still holding the ports (e.g. an orphaned worker).
   Stop-Port $BackendPort
   Stop-Port $FrontendPort
+  # The windows a previous start opened, so restarts do not pile them up.
+  Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" |
+    Where-Object { $_.CommandLine -like '*-NoExit*' -and ($_.CommandLine -like '*uvicorn app.main*' -or $_.CommandLine -like '*npx vite --port*') } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 }
 
 function Write-Status {
