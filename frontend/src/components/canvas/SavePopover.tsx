@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { SaveStatus, useCanvasStore } from '../../store/canvasStore'
+import { useCanvasStore } from '../../store/canvasStore'
+import { persistenceStatus, type SaveTone } from '../../store/saveState'
 import { useEscapeToClose } from '../../hooks/useEscapeToClose'
 
 interface SavePopoverProps {
@@ -15,18 +16,10 @@ interface SavePopoverProps {
   onSave: () => void
 }
 
-function statusLabel(status: SaveStatus, lastSavedAt: string | null) {
-  if (status === 'saving') return 'Saving…'
-  if (status === 'unsaved') return 'Unsaved'
-  if (status === 'error') return 'Save error'
-  if (!lastSavedAt) return 'Saved'
-  return `Saved ${new Date(lastSavedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-}
-
-const STATUS_DOT: Record<SaveStatus, string> = {
-  saved: 'bg-ok/100',
-  saving: 'bg-warn/100',
-  unsaved: 'bg-warn',
+const STATUS_DOT: Record<SaveTone, string> = {
+  ok: 'bg-ok/100',
+  busy: 'bg-warn/100',
+  pending: 'bg-warn',
   error: 'bg-danger/100',
 }
 
@@ -45,6 +38,9 @@ export function SavePopover({
   useEscapeToClose(open, () => setOpen(false))
   const saveStatus = useCanvasStore((s) => s.saveStatus)
   const lastSavedAt = useCanvasStore((s) => s.lastSavedAt)
+  const draftStatus = useCanvasStore((s) => s.draftStatus)
+  const lastDraftSavedAt = useCanvasStore((s) => s.lastDraftSavedAt)
+  const persistence = persistenceStatus({ saveStatus, lastSavedAt, draftStatus, lastDraftSavedAt })
   // An empty project reports the store's default 'saved' — misleading before
   // the first generation. Show the honest state until a layout exists.
   const notGenerated = !hasLayout && !lastSavedAt
@@ -56,14 +52,14 @@ export function SavePopover({
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
-        aria-label={notGenerated ? 'Not generated yet' : statusLabel(saveStatus, lastSavedAt)}
+        aria-label={notGenerated ? 'Not generated yet' : persistence.label}
         className="flex items-center gap-2 rounded-lg border border-ink/10 bg-graphite-800/70 px-3 py-1.5 text-xs font-semibold text-ink hover:bg-graphite-800/90"
       >
         <span
           aria-hidden="true"
-          className={`h-2 w-2 rounded-full ${notGenerated ? 'border border-muted-light bg-transparent' : STATUS_DOT[saveStatus]}`}
+          className={`h-2 w-2 rounded-full ${notGenerated ? 'border border-muted-light bg-transparent' : STATUS_DOT[persistence.tone]}`}
         />
-        <span className="max-w-12 truncate sm:max-w-none">{notGenerated ? 'Not generated yet' : statusLabel(saveStatus, lastSavedAt)}</span>
+        <span className="max-w-12 truncate sm:max-w-none">{notGenerated ? 'Not generated yet' : persistence.label}</span>
       </button>
 
       {open && (

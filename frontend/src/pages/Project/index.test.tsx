@@ -708,21 +708,7 @@ describe('ProjectPage history drawer', () => {
   })
 })
 
-describe('ProjectPage draft recovery banner', () => {
-  it('appears when a recoverable draft exists', async () => {
-    vi.mocked(api.get).mockImplementation(async (url: string) => {
-      if (url === '/api/design/project/p1/latest') return { data: SAVED_DESIGN_FIXTURE }
-      if (url === '/api/design/d1/draft') return { data: DRAFT_FIXTURE }
-      throw new Error('unexpected URL ' + url)
-    })
-
-    renderProjectPage()
-
-    expect(
-      await screen.findByText('Unsaved draft found. You can recover your last auto-saved changes.'),
-    ).toBeInTheDocument()
-  })
-
+describe('ProjectPage autosave on load', () => {
   it('does not appear when no draft exists', async () => {
     vi.mocked(api.get).mockImplementation(async (url: string) => {
       if (url === '/api/design/project/p1/latest') return { data: SAVED_DESIGN_FIXTURE }
@@ -744,7 +730,7 @@ describe('ProjectPage draft recovery banner', () => {
     )
   })
 
-  it('loads a recovered draft as unsaved canvas work without manually saving it', async () => {
+  it('opens on the newer autosave, shown as auto-saved, without a recover prompt', async () => {
     vi.mocked(api.get).mockImplementation(async (url: string) => {
       if (url === '/api/design/project/p1/latest') return { data: SAVED_DESIGN_FIXTURE }
       if (url === '/api/design/d1/draft') return { data: DRAFT_FIXTURE }
@@ -752,38 +738,17 @@ describe('ProjectPage draft recovery banner', () => {
     })
 
     renderProjectPage()
-    const user = userEvent.setup()
-
-    await user.click(await screen.findByRole('button', { name: 'Recover draft' }))
 
     await waitFor(() => {
       const state = useCanvasStore.getState()
       expect(state.rooms[0].label).toBe('Recovered Living Room')
-      expect(state.rooms[0].position.x).toBe(4)
-      expect(state.hasUnsavedChanges).toBe(true)
-      expect(state.draftStatus).toBe('dirty')
+      expect(state.draftStatus).toBe('saved')
       expect(state.saveStatus).toBe('unsaved')
       expect(state.latestDraftVersionId).toBe('draft-v1')
     })
     expect(api.put).not.toHaveBeenCalled()
     expect(screen.queryByRole('button', { name: 'Recover draft' })).not.toBeInTheDocument()
-  })
-
-  it('dismisses the recovery banner without loading the draft', async () => {
-    vi.mocked(api.get).mockImplementation(async (url: string) => {
-      if (url === '/api/design/project/p1/latest') return { data: SAVED_DESIGN_FIXTURE }
-      if (url === '/api/design/d1/draft') return { data: DRAFT_FIXTURE }
-      throw new Error('unexpected URL ' + url)
-    })
-
-    renderProjectPage()
-    const user = userEvent.setup()
-
-    await user.click(await screen.findByRole('button', { name: 'Dismiss' }))
-
-    expect(screen.queryByRole('button', { name: 'Recover draft' })).not.toBeInTheDocument()
-    expect(useCanvasStore.getState().rooms[0].label).toBe('Living Room')
-    expect(useCanvasStore.getState().recoveredDraftAvailable).toBe(false)
+    expect((await screen.findAllByText(/^Auto-saved/)).length).toBeGreaterThan(0)
   })
 
   it('handles a no-draft 404 silently without showing a fatal page error', async () => {
