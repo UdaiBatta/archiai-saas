@@ -58,3 +58,36 @@ describe('Inspector room rotation', () => {
     expect(screen.getByText('Rooms stay axis-aligned and rotate in 90-degree steps.')).toBeInTheDocument()
   })
 })
+
+describe('Inspector room use', () => {
+  const setRoom = (patch: Partial<Room>) =>
+    useCanvasStore.setState({ rooms: [{ ...ROOM, label: 'Room', roomType: 'room', ...patch }] })
+
+  it('sets the use and renames a room that still has its default name', () => {
+    setRoom({})
+    render(<InspectorHarness />)
+    fireEvent.change(screen.getByLabelText('Room use'), { target: { value: 'kitchen' } })
+    expect(useCanvasStore.getState().rooms[0]).toMatchObject({ roomType: 'kitchen', label: 'Kitchen' })
+    fireEvent.change(screen.getByLabelText('Room use'), { target: { value: 'entry' } })
+    expect(useCanvasStore.getState().rooms[0]).toMatchObject({ roomType: 'entry', label: 'Entry' })
+  })
+
+  it('keeps a name the user typed', () => {
+    setRoom({ label: "Mum's room" })
+    render(<InspectorHarness />)
+    fireEvent.change(screen.getByLabelText('Room use'), { target: { value: 'bedroom' } })
+    expect(useCanvasStore.getState().rooms[0]).toMatchObject({ roomType: 'bedroom', label: "Mum's room" })
+  })
+
+  it('keeps an engine room type that is not in the short list', () => {
+    setRoom({ label: 'Lobby', roomType: 'lobby' })
+    render(<InspectorHarness />)
+    expect(screen.getByLabelText('Room use')).toHaveValue('lobby')
+  })
+
+  it('is not offered for walls and doors', () => {
+    setRoom({ objectType: 'door', roomType: 'door' })
+    render(<InspectorHarness />)
+    expect(screen.queryByLabelText('Room use')).not.toBeInTheDocument()
+  })
+})

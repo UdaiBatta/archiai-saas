@@ -7,7 +7,7 @@ Written 2026-10-06 against commit `8c0837e` (main) by an advisor audit (editor-f
 | # | Plan | Area | Effort | Depends on | Status |
 |---|------|------|--------|------------|--------|
 | 003 | [Stop stale `vite.config.js` / ignore local artefacts](003-stop-stale-build-artefacts.md) | DX | S | — | DONE |
-| 001 | [Room use picker for hand-placed rooms](001-room-use-picker.md) | Usability | M | — | TODO |
+| 001 | [Room use picker for hand-placed rooms](001-room-use-picker.md) | Usability | M | — | DONE |
 | 002 | [Explain problems in place; fix misleading "Create a 3D model" CTA](002-explain-problems-in-place.md) | Usability | S–M | 001 (soft) | TODO |
 | 004 | [One-command local dev start/stop/status](004-one-command-dev-start.md) | DX | S–M | 003 (soft) | TODO |
 
