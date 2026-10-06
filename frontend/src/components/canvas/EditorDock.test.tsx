@@ -21,8 +21,12 @@ describe('EditorDock', () => {
     expect(within(view).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['Perspective', 'Axonometric', 'Top plan'])
     expect(within(view).getByRole('button', { name: 'Perspective' })).toHaveAttribute('aria-pressed', 'true')
     expect(within(dock).getByRole('group', { name: 'Lenses' })).toBeInTheDocument()
-    const toolGroup = within(dock).getByRole('group', { name: 'Tools' })
-    expect(within(toolGroup).getAllByRole('button')).toHaveLength(4)
+    const labels = (name: string) => within(within(dock).getByRole('group', { name })).getAllByRole('button').map((b) => b.getAttribute('aria-label'))
+    expect(labels('Site')).toEqual(['Site'])
+    expect(labels('Study')).toEqual(['Sun'])
+    expect(labels('Share')).toEqual(['Views', 'Floors'])
+    // The active view expands into a labelled pill.
+    expect(within(view).getByRole('button', { name: 'Perspective' })).toHaveTextContent('Perspective')
   })
 
   it('selects the Top plan view', async () => {

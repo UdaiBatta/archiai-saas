@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react'
-import { Armchair, Ellipsis, MousePointer2, Redo2, Ruler, SquarePlus, Undo2 } from 'lucide-react'
+import { Armchair, MousePointer2, Redo2, Ruler, Shapes, SquarePlus, Undo2 } from 'lucide-react'
 import { useCanvasStore } from '../../store/canvasStore'
 import {
   BEGINNER_COMPONENTS,
@@ -153,6 +153,7 @@ export function useEditTools({ modelStage = false, closeMenu }: { modelStage?: b
       },
     },
     ...BEGINNER_COMPONENTS.filter((definition) => modelStage ? definition.type === 'furniture' : definition.type === 'room').map(componentTool),
+    { id: 'more', label: 'Add object', icon: <Shapes className={icon} />, menu: true, onSelect: () => {} },
     {
       id: 'measure',
       label: 'Measure',
@@ -166,7 +167,6 @@ export function useEditTools({ modelStage = false, closeMenu }: { modelStage?: b
         closeMenu()
       },
     },
-    { id: 'more', label: 'More', icon: <Ellipsis className={icon} />, menu: true, onSelect: () => {} },
   ]
   const history: EditTool[] = [
     { id: 'undo', label: 'Undo', shortcut: 'Ctrl+Z', icon: <Undo2 className={icon} />, disabled: !canUndo, onSelect: () => undo() },

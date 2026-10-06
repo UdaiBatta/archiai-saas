@@ -76,13 +76,13 @@ describe('Dock edit tools: history', () => {
 })
 
 describe('Dock edit tools', () => {
-  it('leads with the Edit group: Select, Room, Measure, More', () => {
+  it('leads with the Edit group: Select, Room, Add object, Measure', () => {
     render(<Dock />)
     const dock = screen.getByRole('navigation', { name: 'Editor dock' })
     const groups = within(dock).getAllByRole('group').map((group) => group.getAttribute('aria-label'))
     expect(groups).toEqual(['Edit', 'History', 'View', 'Lenses'])
     const edit = within(dock).getByRole('group', { name: 'Edit' })
-    expect(within(edit).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['Select', 'Room', 'Measure', 'More'])
+    expect(within(edit).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['Select', 'Room', 'Add object', 'Measure'])
     expect(screen.getByRole('button', { name: 'Select' })).toHaveAttribute('aria-pressed', 'true')
     const measure = screen.getByRole('button', { name: 'Measure' })
     expect(measure).toHaveAttribute('aria-keyshortcuts', 'Alt')
@@ -107,11 +107,11 @@ describe('Dock edit tools', () => {
     expect(useCanvasStore.getState().measureMode).toBe(false)
   })
 
-  it('opens the add-object menu from More, arms a placement and closes it', async () => {
+  it('opens the add-object menu, arms a placement and closes it', async () => {
     const user = userEvent.setup()
     useCanvasStore.setState({ viewMode: 'zoning' })
     render(<Dock />)
-    await user.click(screen.getByRole('button', { name: 'More' }))
+    await user.click(screen.getByRole('button', { name: 'Add object' }))
     const menu = screen.getByRole('dialog', { name: 'Add object' })
     const first = within(menu).getAllByRole('button')[0]
     expect(first).toHaveFocus()
@@ -132,7 +132,7 @@ describe('Dock edit tools', () => {
 
   it('has no edit or history tools when read-only', () => {
     render(<Dock readOnly />)
-    for (const name of ['Select', 'Room', 'Measure', 'More', 'Undo', 'Redo']) {
+    for (const name of ['Select', 'Room', 'Add object', 'Measure', 'Undo', 'Redo']) {
       expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
     }
   })

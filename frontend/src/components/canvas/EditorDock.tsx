@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { Axis3d, Box, Building2, Camera, Layers, LayoutGrid, Map as MapIcon, MessageSquare, Network, Sparkles, SquareDashed, Sun, SunMedium } from 'lucide-react'
-import { HoverGradientNavBar, type HoverGradientNavGroup, type HoverGradientNavItem } from '@/components/ui/hover-gradient-nav-bar'
+import { Axis3d, BarChart3, Box, Building2, Camera, Layers, LayoutGrid, Map as MapIcon, MessageSquare, Network, Sparkles, SquareDashed, Sun } from 'lucide-react'
+import { Toolbar, type ToolbarGroup, type ToolbarItem } from '@/components/ui/toolbar'
 import { useCanvasStore } from '../../store/canvasStore'
 import { CAMERA_PRESETS, type CameraPreset } from './modelView'
 import { useEditTools, type EditTool } from './editTools'
@@ -8,12 +8,6 @@ import { useEditTools, type EditTool } from './editTools'
 export type DockTool = 'site' | 'massing' | 'views' | 'sun' | 'analysis' | 'floors' | 'comments' | 'assistant'
 type DockPopover = DockTool | 'more'
 
-const glow = (rgb: string) =>
-  `radial-gradient(circle, rgba(${rgb},0.18) 0%, rgba(${rgb},0.07) 50%, rgba(${rgb},0) 100%)`
-const EDIT_LOOK = { gradient: glow('245,245,246'), iconColor: 'group-hover:text-ink' }
-const VIEW_LOOK = { gradient: glow('255,59,31'), iconColor: 'group-hover:text-accent-bright' }
-const LENS_LOOK = { gradient: glow('201,169,110'), iconColor: 'group-hover:text-warn' }
-const TOOL_LOOK = { gradient: glow('143,174,148'), iconColor: 'group-hover:text-ok' }
 const icon = 'h-[18px] w-[18px]'
 
 /** A tool with open issues: red dot on the icon, the count in its label. */
@@ -42,12 +36,19 @@ const LENSES = [
 const TOOLS: { id: DockTool; label: string; icon: ReactNode }[] = [
   { id: 'site', label: 'Site', icon: <MapIcon className={icon} /> },
   { id: 'massing', label: 'Massing', icon: <Building2 className={icon} /> },
-  { id: 'views', label: 'Views', icon: <Camera className={icon} /> },
   { id: 'sun', label: 'Sun', icon: <Sun className={icon} /> },
-  { id: 'analysis', label: 'Analysis', icon: <SunMedium className={icon} /> },
-  { id: 'floors', label: 'Floors', icon: <Layers className={icon} /> },
+  { id: 'analysis', label: 'Analysis', icon: <BarChart3 className={icon} /> },
+  { id: 'views', label: 'Views', icon: <Camera className={icon} /> },
   { id: 'comments', label: 'Comments', icon: <MessageSquare className={icon} /> },
+  { id: 'floors', label: 'Floors', icon: <Layers className={icon} /> },
   { id: 'assistant', label: 'Assistant', icon: <Sparkles className={icon} /> },
+]
+/** Where each tool sits: site work, studies, sharing/presenting, AI last. */
+const TOOL_GROUPS: { id: string; label: string; tools: DockTool[] }[] = [
+  { id: 'site', label: 'Site', tools: ['site', 'massing'] },
+  { id: 'study', label: 'Study', tools: ['sun', 'analysis'] },
+  { id: 'share', label: 'Share', tools: ['views', 'comments', 'floors'] },
+  { id: 'ai', label: 'AI', tools: ['assistant'] },
 ]
 
 /** Card style for popover content that has no panel chrome of its own. */
@@ -87,9 +88,9 @@ export function EditorDock({ preset, onPreset, tools = {}, alerts, readOnly = fa
   const popovers: Partial<Record<DockPopover, ReactNode>> = { ...tools, more: addMenu }
   const popoverLabel = openTool === 'more' ? 'Add object' : available.find((tool) => tool.id === openTool)?.label
   const toggle = (id: DockPopover) => (openTool === id ? close(true) : setOpen(id))
-  const editItem = (tool: EditTool): HoverGradientNavItem => ({
-    ...EDIT_LOOK,
+  const editItem = (tool: EditTool): ToolbarItem => ({
     ...tool,
+    showLabel: true,
     ...(tool.menu ? { active: openTool === tool.id, expanded: openTool === tool.id, onSelect: () => toggle('more') } : {}),
   })
 
@@ -119,19 +120,19 @@ export function EditorDock({ preset, onPreset, tools = {}, alerts, readOnly = fa
     }
   }
 
-  const groups: HoverGradientNavGroup[] = readOnly ? [] : [
+  const groups: ToolbarGroup[] = readOnly ? [] : [
     { id: 'edit', label: 'Edit', items: edit.map(editItem) },
-    { id: 'history', label: 'History', items: history.map(editItem) },
+    { id: 'history', label: 'History', items: history.map((tool) => ({ ...tool, showLabel: false })) },
   ]
   groups.push(
     {
       id: 'view',
       label: 'View',
-      items: CAMERA_PRESETS.map(({ value }): HoverGradientNavItem => ({
+      items: CAMERA_PRESETS.map(({ value }): ToolbarItem => ({
         id: value,
         ...PRESET_ITEMS[value],
-        ...VIEW_LOOK,
         active: preset === value,
+        showLabel: true,
         onSelect: () => onPreset(value),
       })),
     },
@@ -142,21 +143,23 @@ export function EditorDock({ preset, onPreset, tools = {}, alerts, readOnly = fa
       label: 'Lenses',
       items: LENSES.map((lens) => ({
         ...lens,
-        ...LENS_LOOK,
         active: viewMode === lens.id,
+        showLabel: true,
         onSelect: () => setViewMode(lens.id),
       })),
     })
   }
-  if (available.length) {
+  for (const group of TOOL_GROUPS) {
+    const items = available.filter((tool) => group.tools.includes(tool.id))
+    if (!items.length) continue
     groups.push({
-      id: 'tools',
-      label: 'Tools',
-      items: available.map((tool) => ({
+      id: group.id,
+      label: group.label,
+      items: items.map((tool) => ({
         ...tool,
         ...alerted(tool, alerts?.[tool.id] ?? 0),
-        ...TOOL_LOOK,
         active: openTool === tool.id,
+        showLabel: true,
         expanded: openTool === tool.id,
         onSelect: () => toggle(tool.id),
       })),
@@ -180,7 +183,7 @@ export function EditorDock({ preset, onPreset, tools = {}, alerts, readOnly = fa
           {popovers[openTool]}
         </div>
       )}
-      <HoverGradientNavBar aria-label="Editor dock" groups={groups} className="w-full" />
+      <Toolbar aria-label="Editor dock" groups={groups} className="w-full" />
     </div>
   )
 }
