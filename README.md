@@ -66,6 +66,27 @@ Never commit `.env` or real credentials. Keep Jev's `TYPESAFE_API_KEY` in `backe
 
 ## Run Locally
 
+### Quick start (Windows)
+
+One-time setup:
+
+```powershell
+cd backend
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+Copy-Item ..\.env.example .env   # then fill in DATABASE_URL and SECRET_KEY
+cd ..\frontend
+npm ci
+```
+
+Then, from the repository root, start (or restart) everything:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/dev.ps1
+```
+
+It stops any previous backend/frontend (a leftover reload worker otherwise keeps serving old code), runs migrations, and opens the backend (http://localhost:8000) and frontend (http://localhost:5173) in their own windows. `-Action status` and `-Action stop` check or stop them. To let it start a local Postgres too, set `ARCHIAI_PGDATA` (see [scripts/README.md](scripts/README.md)). The step-by-step instructions below do the same by hand.
+
 ### 1. Start PostgreSQL
 
 Use an existing local PostgreSQL server on `localhost:5432`, or start only the Docker database:
@@ -85,14 +106,13 @@ DATABASE_URL=postgresql+asyncpg://your_postgres_user:your_postgres_password@loca
 From the repository root:
 
 ```powershell
-py -3.11 -m venv .venv311
-.\.venv311\Scripts\python.exe -m pip install --upgrade pip
-.\.venv311\Scripts\python.exe -m pip install -r backend\requirements.txt
-
 cd backend
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 Copy-Item ..\.env.example .env
-..\.venv311\Scripts\python.exe -m alembic upgrade head
-..\.venv311\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+.\.venv\Scripts\python.exe -m alembic upgrade head
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 Verify:
@@ -193,12 +213,12 @@ The current frontend container runs the Vite development server. A production de
 
 ```powershell
 cd backend
-..\.venv311\Scripts\python.exe -m alembic heads
-..\.venv311\Scripts\python.exe -m alembic current
-..\.venv311\Scripts\python.exe -m alembic upgrade head
+.\.venv\Scripts\python.exe -m alembic heads
+.\.venv\Scripts\python.exe -m alembic current
+.\.venv\Scripts\python.exe -m alembic upgrade head
 ```
 
-Sprint 12 adds migration `011` for export audit records and project share links.
+The current head is `017` (comments pinned to the model).
 
 ## Run Checks
 

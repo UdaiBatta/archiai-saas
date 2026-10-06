@@ -35,6 +35,7 @@ one that exists.
 ## Rules
 
 - Never commit secrets; `.env` is gitignored, document keys in `.env.example`.
+- Start/restart the local stack with `scripts/dev.ps1` (`-Action status|stop`); it stops stale reload workers first.
 - Never push to `main`; use a branch.
 - A change that replaces something deletes the old thing in the same change.
 - Tests alongside code. Both suites must stay green:
