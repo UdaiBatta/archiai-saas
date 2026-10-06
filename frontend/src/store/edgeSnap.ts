@@ -77,3 +77,58 @@ export function snapToNeighbours<T extends Box>(next: T, previous: Box, others: 
     size: { ...next.size, w: local.w, d: local.d },
   }
 }
+
+/** A room close to another but not sharing an edge with it. */
+export interface NearMiss {
+  id: string
+  /** Positive: a gap between the facing edges; negative: they overlap. */
+  gap: number
+  axis: 'x' | 'z'
+  /** Which edge of the room faces the other one. */
+  side: 'min' | 'max'
+}
+
+/** Facing edges this far apart (or overlapping this much) still count as neighbours. */
+export const NEAR_MISS = 1.5
+/** Rooms must run alongside each other at least this far to be neighbours. */
+const ALONGSIDE = 0.3
+
+/**
+ * Rooms that sit next to `room` without touching it exactly: a small gap or
+ * an overlap. The engine only connects edges that touch, so these show up
+ * as "not joined" rather than as neighbours.
+ */
+export function nearMisses<T extends Box & { id: string }>(room: T, others: T[]): NearMiss[] {
+  const a = spans(room)
+  const out: NearMiss[] = []
+  for (const other of others) {
+    if (other.id === room.id) continue
+    const b = spans(other)
+    let best: NearMiss | null = null
+    for (const axis of ['x', 'z'] as const) {
+      const cross = axis === 'x' ? 'z' : 'x'
+      if (Math.min(a[cross][1], b[cross][1]) - Math.max(a[cross][0], b[cross][0]) < ALONGSIDE) continue
+      const before = (a[axis][0] + a[axis][1]) / 2 <= (b[axis][0] + b[axis][1]) / 2
+      const gap = before ? b[axis][0] - a[axis][1] : a[axis][0] - b[axis][1]
+      if (Math.abs(gap) < 1e-3 || gap > NEAR_MISS || gap < -NEAR_MISS) continue
+      if (!best || Math.abs(gap) < Math.abs(best.gap)) best = { id: other.id, gap, axis, side: before ? 'max' : 'min' }
+    }
+    if (best) out.push(best)
+  }
+  return out
+}
+
+/** `room` with its facing edge moved onto the other room's edge (the far side stays). */
+export function joinedTo<T extends Box>(room: T, miss: NearMiss): T | null {
+  const s = spans(room)
+  const edge: Span = miss.side === 'max' ? [s[miss.axis][0], s[miss.axis][1] + miss.gap] : [s[miss.axis][0] - miss.gap, s[miss.axis][1]]
+  if (edge[1] - edge[0] < 1) return null
+  const out = { x: [...s.x] as Span, z: [...s.z] as Span }
+  out[miss.axis] = edge
+  const local = quarterTurnPlanSize({ w: out.x[1] - out.x[0], d: out.z[1] - out.z[0] }, room.rotation.y)
+  return {
+    ...room,
+    position: { ...room.position, x: (out.x[0] + out.x[1]) / 2, z: (out.z[0] + out.z[1]) / 2 },
+    size: { ...room.size, w: local.w, d: local.d },
+  }
+}
