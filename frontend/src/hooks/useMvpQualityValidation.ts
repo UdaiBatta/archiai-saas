@@ -6,7 +6,7 @@ import {
   edgesFromLayout,
   replaceDerivedCanvasObjects,
 } from '../services/mvpLayoutAdapter'
-import { useCanvasStore } from '../store/canvasStore'
+import { useCanvasStore, type Room } from '../store/canvasStore'
 import type { Connection, Facing, PlanZoneSpan, RequirementsSpec } from '../types/contracts'
 
 const DEFAULT_DEBOUNCE_MS = 300
@@ -22,6 +22,26 @@ function parseRequirements(value: unknown): RequirementsSpec | null {
   if (!Array.isArray(value.avoid_adjacency) || !Array.isArray(value.missing_info)) return null
   if (!isRecord(value.plot)) return null
   return value as unknown as RequirementsSpec
+}
+
+/** Two rooms a wall stands between, order-free; null for outer walls. */
+function pairOf(wall: Room | undefined): string | null {
+  const pair = wall?.betweenRooms ?? wall?.separates
+  return Array.isArray(pair) && pair.length === 2 ? [...pair].map(String).sort().join('|') : null
+}
+
+/**
+ * Keep the selection across a rebuild. Derived doors can come back with new
+ * ids; a selected door is followed to the door between the same two rooms.
+ */
+export function followSelection(before: Room[], after: Room[], selectedId: string | null): string | null {
+  if (!selectedId || after.some((object) => object.id === selectedId)) return selectedId
+  const door = before.find((object) => object.id === selectedId)
+  if (door?.objectType !== 'door') return null
+  const pair = pairOf(before.find((object) => object.id === door.hostWallId))
+  if (!pair) return null
+  const wallIds = new Set(after.filter((object) => object.objectType === 'wall' && pairOf(object) === pair).map((wall) => wall.id))
+  return after.find((object) => object.objectType === 'door' && wallIds.has(String(object.hostWallId)))?.id ?? null
 }
 
 function parseConnections(value: unknown): Connection[] {
@@ -144,11 +164,7 @@ export function useMvpQualityValidation({
             previousFingerprint.current = geometryFingerprint(rooms, syncedConnections)
             return {
               rooms,
-              selectedId:
-                state.selectedId &&
-                !rooms.some((object) => object.id === state.selectedId)
-                  ? null
-                  : state.selectedId,
+              selectedId: followSelection(state.rooms, rooms, state.selectedId),
               // Quality and rebuilt walls/doors are derived state: preserve
               // edit history, activity, and the current dirty/save status.
               layoutMetadata: {

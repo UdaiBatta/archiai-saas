@@ -3,6 +3,7 @@ import { COMPONENT_DEFINITIONS, componentTypeToRoomType, capabilitiesOf } from '
 import { formatArea, formatMeters, roomArea, roomPerimeter } from '../../utils/format'
 import { canonicalQuarterTurn } from '../../utils/quarterTurn'
 import { ROOM_USES, isDefaultLabel, roomUseLabel } from './roomUses'
+import { DoorPosition } from './DoorPosition'
 
 interface InspectorPropertiesProps {
   room: Room
@@ -119,6 +120,8 @@ export function InspectorProperties({ room }: InspectorPropertiesProps) {
           </div>
         </div>
       </section>
+
+      {room.objectType === 'door' && typeof room.hostWallId === 'string' && <DoorPosition door={room} />}
 
       <details className="group rounded-lg border border-ink/10 bg-[#232425]/55">
         <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2.5 text-[11px] font-semibold text-muted hover:text-ink">

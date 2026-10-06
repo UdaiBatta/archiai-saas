@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { useCanvasStore } from '../../store/canvasStore'
+import { doorBetween } from '../../store/connections'
 import type { Connection, ConnectionKind, RoomEdge } from '../../types/contracts'
 import { effectiveEdges } from './roomGraphModel'
 
@@ -64,7 +65,22 @@ export function RoomConnections({ roomId, onlyWith, disabled = false }: { roomId
             onMouseEnter={() => hover(otherId)}
             className="-mx-1.5 flex items-center justify-between gap-2 rounded-md px-1.5 py-0.5 hover:bg-ink/5"
           >
-            <span className="min-w-0 truncate text-xs text-muted">{onlyWith ? `${ownLabel} ↔ ${label}` : label}</span>
+            <span className="flex min-w-0 items-baseline gap-1.5">
+              <span className="min-w-0 truncate text-xs text-muted">{onlyWith ? `${ownLabel} ↔ ${label}` : label}</span>
+              {kind === 'door' && (
+                <button
+                  type="button"
+                  title="Select the door to slide it along the wall"
+                  onClick={() => {
+                    const door = doorBetween(useCanvasStore.getState().rooms, roomId, otherId)
+                    if (door) useCanvasStore.getState().selectRoom(door.id)
+                  }}
+                  className="shrink-0 text-[10px] text-muted-light underline-offset-2 hover:text-ink hover:underline"
+                >
+                  Move door
+                </button>
+              )}
+            </span>
             <div role="radiogroup" aria-label={`Connection to ${label}`} className="flex shrink-0 overflow-hidden rounded-md border border-ink/10">
               {KINDS.map((option) => (
                 <button
