@@ -165,7 +165,7 @@ export function MassingPanel({ readOnly, topView, plot, docked = false }: { read
                     type="button"
                     className={`${btn} hover:border-danger/60 hover:text-danger`}
                     onClick={() => {
-                      setMasses(masses.filter((m) => m.id !== selected.id))
+                      useCanvasStore.getState().deleteMass(selected.id)
                       select(null)
                     }}
                   >
