@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from 'react'
 import { DOCK_CARD } from '../components/canvas/EditorDock'
+import { HoursSlider } from '../components/ui/matte-hours-slider'
 import { daylightHours, formatHour, sunAt } from '../components/canvas/sunModel'
 import { setSunLocation, useSunContext, useSunUi } from './sunStore'
 
@@ -56,18 +57,17 @@ export function SunPanel({ hour, onHour, children }: { hour: number; onHour: (ho
 
   return (
     <div className={DOCK_CARD}>
-      <span className="font-semibold text-ink">Sun · {formatHour(value)} solar time</span>
-      <span className="text-muted-light">{sunAt(value, where).label}</span>
-      <input
-        type="range"
-        aria-label="Time of day"
-        min={min}
-        max={max}
+      <HoursSlider
+        label="Sun · solar time"
+        value={[value]}
+        onChange={([next]) => onHour(next)}
         step={0.25}
-        value={value}
-        onChange={(event) => onHour(Number(event.target.value))}
-        className="accent-accent"
+        window={[min, max]}
+        format={formatHour}
+        thumbLabels={['Time of day']}
+        className="w-64"
       />
+      <span className="text-muted-light">{sunAt(value, where).label}</span>
       <span className="text-muted-light">
         Sunrise {formatHour(sunrise)} · sunset {formatHour(sunset)}
       </span>
