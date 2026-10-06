@@ -681,7 +681,7 @@ export function RightPanel({ onCreateModel, open = true, onClose }: { onCreateMo
             onClick={onCreateModel}
             className="w-full rounded-lg bg-accent px-3 py-2 text-sm font-bold text-graphite-950 shadow-[0_4px_16px_-4px_rgba(255,59,31,0.45)] hover:bg-accent-bright"
           >
-            Create a 3D model →
+            Furniture & details →
           </button>
           <p className="mt-1.5 text-center text-[10px] text-muted-light">
             Continue with walls, openings and furniture.

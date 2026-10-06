@@ -231,7 +231,7 @@ describe('ProjectPage canvas views', () => {
     act(() => useCanvasStore.getState().updateRoom(INITIAL_ROOMS[0].id, { label: 'Revised living room' }))
     const before = useCanvasStore.getState().serializeLayout()
     const history = useCanvasStore.getState().past
-    await user.click(screen.getByRole('button', { name: 'Create a 3D model →' }))
+    await user.click(screen.getByRole('button', { name: 'Furniture & details →' }))
     expect(screen.getByText('Model & furniture')).toBeInTheDocument()
     expect(screen.queryByLabelText('Layout prompt')).not.toBeInTheDocument()
     expect(useCanvasStore.getState().serializeLayout()).toEqual(before)
