@@ -7,6 +7,7 @@ import {
   type CanvasObjectType,
   type ComponentDefinition,
 } from '../../store/componentRegistry'
+import { dragToPlace } from './PlacementGhost'
 
 const ICONS: Record<string, JSX.Element> = {
   room: (
@@ -180,6 +181,8 @@ export function useEditTools({ modelStage = false, closeMenu }: { modelStage?: b
           type="button"
           aria-pressed={placementMode === definition.type}
           onClick={() => armPlacement(definition.type)}
+          {...dragToPlace(definition.type, closeMenu)}
+          title={`Click, then click in the view, or drag ${definition.label.toLowerCase()} onto the plan`}
           className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-medium text-ink/80 hover:bg-ink/10 hover:text-ink focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent"
         >
           <ComponentIcon type={definition.type} />

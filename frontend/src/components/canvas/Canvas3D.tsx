@@ -9,6 +9,7 @@ import { MergedModel } from './MergedModel'
 import { isMergeable } from './mergedGeometry'
 import { TopPlanOverlay } from './TopPlanOverlay'
 import { NeighbourHighlights } from './NeighbourHighlights'
+import { PlacementGhost } from './PlacementGhost'
 import { TopPlanKeyboardLayer } from './TopPlanKeyboardLayer'
 import { PauseWhileMoving, PerfReadout, SHOW_PERF } from './RenderBudget'
 import { useCanvasStore } from '../../store/canvasStore'
@@ -271,6 +272,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
             y={(planFloor?.elevation ?? 0) + floorHeight + 0.4}
           />
         )}
+        {!readOnly && <PlacementGhost />}
         {comments && <CommentLayer />}
         {studio && <SunHoursLayer />}
         {studio && <MassLayer orbitRef={orbitRef} readOnly={readOnly} topView={topView} focusedMassId={focusedMassId} />}
