@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from httpx import AsyncClient
 
 
@@ -48,3 +50,25 @@ async def test_comments_are_private_to_the_project(client: AsyncClient):
     assert (await client.post(url, json={"body": "Hi"}, headers=stranger)).status_code == 403
     assert (await client.delete(f"{url}/{pin['id']}", headers=stranger)).status_code == 403
     assert (await client.post(url, json={"body": "   "}, headers=owner)).status_code == 422
+
+
+async def test_replies_list_after_their_thread_even_with_the_same_timestamp(client: AsyncClient):
+    owner = await _user(client, "c-owner3@example.com")
+    project = await _project(client, owner)
+    url = f"/api/projects/{project}/comments"
+    root = (await client.post(url, json={"body": "First"}, headers=owner)).json()
+    for i in range(5):
+        await client.post(url, json={"body": f"Reply {i}", "parent_id": root["id"]}, headers=owner)
+
+    # Force one shared timestamp, as a fast database clock or SQLite second
+    # resolution would: only the tie-break orders them now.
+    from sqlalchemy import update
+    from app.models.comment import Comment
+    from app.tests.conftest import TestSessionLocal
+    async with TestSessionLocal() as db:
+        await db.execute(update(Comment).values(created_at=datetime(2026, 1, 1, tzinfo=timezone.utc)))
+        await db.commit()
+
+    listed = (await client.get(url, headers=owner)).json()
+    assert listed[0]["body"] == "First"
+    assert all(c["parent_id"] == root["id"] for c in listed[1:])

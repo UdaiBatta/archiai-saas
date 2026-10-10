@@ -49,7 +49,9 @@ async def list_comments(
         select(Comment, User)
         .join(User, User.id == Comment.user_id)
         .where(Comment.project_id == project_id)
-        .order_by(Comment.created_at, Comment.id)
+        # Oldest first; on a tie (same clock tick) a thread's first comment
+        # comes before its replies, then id keeps the order stable.
+        .order_by(Comment.created_at, Comment.parent_id.is_not(None), Comment.id)
     )
     return [_out(comment, author) for comment, author in rows.all()]
 
