@@ -4,19 +4,7 @@ import { COMPONENT_REGISTRY } from '../../store/componentRegistry'
 import { formatDims } from '../../utils/format'
 import { parseProgramValidation } from './programValidationModel'
 import { parseMvpQuality } from './qualityModel'
-
-function saveStatusLabel(status: string, lastSavedAt: string | null) {
-  if (status === 'saving') return 'Saving...'
-  if (status === 'error') return 'Save failed'
-  if (status === 'unsaved') return 'Unsaved changes'
-  if (lastSavedAt) {
-    const time = new Date(lastSavedAt)
-    if (!Number.isNaN(time.getTime())) {
-      return `Saved ${time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-    }
-  }
-  return 'Saved'
-}
+import { persistenceStatus } from '../../store/saveState'
 
 function Segment({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
@@ -39,6 +27,8 @@ export function BottomStatusBar() {
   const viewMode = useCanvasStore((s) => s.viewMode)
   const saveStatus = useCanvasStore((s) => s.saveStatus)
   const lastSavedAt = useCanvasStore((s) => s.lastSavedAt)
+  const draftStatus = useCanvasStore((s) => s.draftStatus)
+  const lastDraftSavedAt = useCanvasStore((s) => s.lastDraftSavedAt)
   const insights = useCanvasStore((s) => s.generationInsights)
   const layoutMetadata = useCanvasStore((s) => s.layoutMetadata)
   const validation = useMemo(
@@ -61,11 +51,8 @@ export function BottomStatusBar() {
   )
   const netArea = spaceRooms.reduce((sum, room) => sum + room.size.w * room.size.d, 0)
   const selected = rooms.find((room) => room.id === selectedId) ?? null
-  const saveTone = saveStatus === 'error'
-    ? 'text-danger'
-    : saveStatus === 'unsaved'
-      ? 'text-warn'
-      : 'text-muted'
+  const persistence = persistenceStatus({ saveStatus, lastSavedAt, draftStatus, lastDraftSavedAt })
+  const saveTone = { error: 'text-danger', pending: 'text-warn', busy: 'text-warn', ok: 'text-muted' }[persistence.tone]
 
   return (
     <div className="absolute inset-x-0 bottom-0 z-30 flex h-10 items-center justify-between overflow-hidden border-t border-ink/10 bg-[#18191a]/95 font-mono text-[9px] text-muted backdrop-blur">
@@ -130,7 +117,7 @@ export function BottomStatusBar() {
           Units: <span className="ml-1 text-ink">Meters</span>
         </Segment>
         <div className={`px-4 ${saveTone}`}>
-          {saveStatusLabel(saveStatus, lastSavedAt)}
+          {persistence.label}
           <span className="sr-only"> / {viewMode}</span>
         </div>
       </div>

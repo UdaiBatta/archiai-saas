@@ -15,7 +15,6 @@ import { SelectionGizmo } from '../../components/canvas/SelectionGizmo'
 import { WorkspacePanel } from '../../components/canvas/WorkspacePanel'
 import { CommandBar } from '../../components/canvas/CommandBar'
 import { BriefReviewPanel } from '../../components/canvas/BriefReviewPanel'
-import { DraftToast } from '../../components/canvas/DraftToast'
 import {
   DesignDraftResponse,
   fetchDesignDraft,
@@ -267,7 +266,6 @@ export default function ProjectPage() {
   const [duplicating, setDuplicating] = useState(false)
   const [duplicateError, setDuplicateError] = useState<string | null>(null)
   const generateAbortRef = useRef<AbortController | null>(null)
-  const [draftToRecover, setDraftToRecover] = useState<DesignDraftResponse | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [activityOpen, setActivityOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
@@ -403,7 +401,6 @@ export default function ProjectPage() {
       useCanvasStore.getState().setViewMode('floor_plan')
       setSearchParams((current) => { const next = new URLSearchParams(current); next.delete('stage'); next.set('view', '2d'); return next }, { replace: true })
       refreshThumbnailAfterGenerate()
-      setDraftToRecover(null)
       setRecoveredDraftAvailable(false)
       setBriefReview(null)
       setReviewPrompt('')
@@ -506,7 +503,6 @@ export default function ProjectPage() {
         thumbnailUrl,
       })
       loadLayout(result)
-      setDraftToRecover(null)
       setRecoveredDraftAvailable(false)
       setVersionName('')
       setChangeSummary('')
@@ -539,15 +535,22 @@ export default function ProjectPage() {
           const latestDesign = await getLatestProjectDesign(projectId)
           if (active) {
             loadLayout(latestDesign)
-            setDraftToRecover(null)
             setRecoveredDraftAvailable(false)
           }
           if (latestDesign.designId) {
             try {
               const draft = await fetchDesignDraft(latestDesign.designId)
+              // Autosave is the user's latest work: open on it, no "recover?"
+              // prompt. The status shows it as auto-saved, not a named save.
               if (active && draft && hasRecoverableDraft(latestDesign, draft)) {
-                setDraftToRecover(draft)
-                setRecoveredDraftAvailable(true)
+                loadLayout(draft)
+                useCanvasStore.setState({
+                  saveStatus: 'unsaved',
+                  hasUnsavedChanges: false,
+                  draftStatus: 'saved',
+                  lastDraftSavedAt: draft.updatedAt ?? draft.createdAt,
+                  latestDraftVersionId: draft.id,
+                })
               }
             } catch (draftErr) {
               console.warn('Failed to load auto-save draft', draftErr)
@@ -722,24 +725,6 @@ export default function ProjectPage() {
     }
   }
 
-  const handleRecoverDraft = () => {
-    if (!draftToRecover) return
-    loadLayout(draftToRecover)
-    useCanvasStore.getState().markDirty()
-    useCanvasStore.setState({
-      lastDraftSavedAt: draftToRecover.updatedAt ?? draftToRecover.createdAt,
-      latestDraftVersionId: draftToRecover.id,
-      recoveredDraftAvailable: false,
-    })
-    setDraftToRecover(null)
-    setLayoutSaveError(null)
-  }
-
-  const handleDismissDraft = () => {
-    setDraftToRecover(null)
-    setRecoveredDraftAvailable(false)
-  }
-
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -852,12 +837,6 @@ export default function ProjectPage() {
               exportError={exportError}
               duplicateError={duplicateError}
               deleteError={deleteError}
-            />
-
-            <DraftToast
-              visible={Boolean(draftToRecover)}
-              onRecover={handleRecoverDraft}
-              onDismiss={handleDismissDraft}
             />
 
             {briefReview && (

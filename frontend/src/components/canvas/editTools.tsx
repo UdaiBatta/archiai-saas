@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react'
-import { Armchair, Ellipsis, MousePointer2, Redo2, Ruler, SquarePlus, Undo2 } from 'lucide-react'
+import { Armchair, MousePointer2, Redo2, Ruler, Shapes, SquarePlus, Undo2 } from 'lucide-react'
 import { useCanvasStore } from '../../store/canvasStore'
 import {
   BEGINNER_COMPONENTS,
@@ -7,6 +7,7 @@ import {
   type CanvasObjectType,
   type ComponentDefinition,
 } from '../../store/componentRegistry'
+import { dragToPlace } from './PlacementGhost'
 
 const ICONS: Record<string, JSX.Element> = {
   room: (
@@ -152,6 +153,7 @@ export function useEditTools({ modelStage = false, closeMenu }: { modelStage?: b
       },
     },
     ...BEGINNER_COMPONENTS.filter((definition) => modelStage ? definition.type === 'furniture' : definition.type === 'room').map(componentTool),
+    { id: 'more', label: 'Add object', icon: <Shapes className={icon} />, menu: true, onSelect: () => {} },
     {
       id: 'measure',
       label: 'Measure',
@@ -165,7 +167,6 @@ export function useEditTools({ modelStage = false, closeMenu }: { modelStage?: b
         closeMenu()
       },
     },
-    { id: 'more', label: 'More', icon: <Ellipsis className={icon} />, menu: true, onSelect: () => {} },
   ]
   const history: EditTool[] = [
     { id: 'undo', label: 'Undo', shortcut: 'Ctrl+Z', icon: <Undo2 className={icon} />, disabled: !canUndo, onSelect: () => undo() },
@@ -180,6 +181,8 @@ export function useEditTools({ modelStage = false, closeMenu }: { modelStage?: b
           type="button"
           aria-pressed={placementMode === definition.type}
           onClick={() => armPlacement(definition.type)}
+          {...dragToPlace(definition.type, closeMenu)}
+          title={`Click, then click in the view, or drag ${definition.label.toLowerCase()} onto the plan`}
           className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-medium text-ink/80 hover:bg-ink/10 hover:text-ink focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent"
         >
           <ComponentIcon type={definition.type} />

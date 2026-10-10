@@ -5,6 +5,7 @@ import { InspectorProperties } from './Inspector'
 import { RoomConnections } from './RoomConnections'
 import { QualityPanel } from './QualityPanel'
 import { ProblemsSummary } from './ProblemsSummary'
+import { dragToPlace } from './PlacementGhost'
 import { parseMvpQuality } from './qualityModel'
 import { ZONE_META, ZONE_ORDER, displayRoomColor } from './editorPalette'
 import { zoneForRoom } from './zoneModel'
@@ -150,7 +151,7 @@ export function WorkspacePanel({ modelStage, reviewChanges, onReviewChanges, onC
               </section>
             ))}
             {!visible.length && <p className="px-2 py-4 text-xs text-muted-light">{listed.length ? 'No matching items.' : modelStage ? 'No furniture placed yet.' : 'No rooms on this level yet.'}</p>}
-            {!modelStage && <button type="button" disabled={busy} onClick={() => setPlacementMode(placementMode === 'room' ? null : 'room')} className="mt-3 w-full rounded-lg border border-dashed border-ink/15 px-3 py-2 text-xs text-muted transition-colors hover:border-ink/30 hover:text-ink">{placementMode === 'room' ? 'Cancel room placement' : '+ Add a room'}</button>}
+            {!modelStage && <button type="button" disabled={busy} onClick={() => setPlacementMode(placementMode === 'room' ? null : 'room')} {...dragToPlace('room')} title="Click, then click on the plot, or drag onto the plot" className="mt-3 w-full rounded-lg border border-dashed border-ink/15 px-3 py-2 text-xs text-muted transition-colors hover:border-ink/30 hover:text-ink">{placementMode === 'room' ? 'Cancel room placement' : '+ Add a room'}</button>}
           </>
         )}
         {quality && <details open={quality.hard_violations.length > 0 || undefined} className="mt-4 border-t border-ink/10 pt-3"><summary className="cursor-pointer text-xs text-muted">Layout checks</summary><div className="mt-3"><QualityPanel quality={quality} /></div></details>}
@@ -174,7 +175,7 @@ export function WorkspacePanel({ modelStage, reviewChanges, onReviewChanges, onC
               {furnishing ? 'Furnishing…' : 'Furnish rooms'}
             </button>
           )}
-          <button type="button" data-testid="create-3d-model" disabled={busy} onClick={modelStage ? () => setPlacementMode(placementMode === 'furniture' ? null : 'furniture') : onCreateModel} className="flex-1 rounded-lg bg-accent px-3 py-2.5 text-xs font-semibold text-graphite-950 hover:bg-accent-bright disabled:opacity-50">
+          <button type="button" data-testid="create-3d-model" disabled={busy} onClick={modelStage ? () => setPlacementMode(placementMode === 'furniture' ? null : 'furniture') : onCreateModel} {...(modelStage ? dragToPlace('furniture') : {})} className="flex-1 rounded-lg bg-accent px-3 py-2.5 text-xs font-semibold text-graphite-950 hover:bg-accent-bright disabled:opacity-50">
             {modelStage ? placementMode === 'furniture' ? 'Cancel placement' : '+ Add furniture' : 'Furniture & details →'}
           </button>
         </div>
