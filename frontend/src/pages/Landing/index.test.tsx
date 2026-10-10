@@ -34,12 +34,14 @@ describe('Landing page', () => {
   it('leads with what the product does and one main action', () => {
     renderLanding()
     expect(
-      screen.getByRole('heading', { level: 1, name: 'You design. It checks. AI helps.' }),
+      screen.getByRole('heading', { level: 1, name: 'Design it. We check it.' }),
     ).toBeInTheDocument()
     // Editor-first: no promise of a plan generated from a written brief.
     expect(screen.queryByText(/write the brief|your own brief|get the plan/i)).not.toBeInTheDocument()
     expect(screen.getByText('Ask AI to improve it')).toBeInTheDocument()
-    expect(screen.getAllByRole('link', { name: 'Start designing — free' })[0]).toHaveAttribute('href', '/register')
+    expect(screen.getByText('No credit card required.')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'In the product' })).getByText('Undoable AI edits')).toBeInTheDocument()
+    expect(screen.getAllByRole('link', { name: 'Start designing free' })[0]).toHaveAttribute('href', '/register')
     // No editor chrome on marketing pages.
     expect(screen.queryByRole('tab', { name: '2D Plan' })).not.toBeInTheDocument()
   })
@@ -70,7 +72,7 @@ describe('Landing page', () => {
   it('sends a signed-in visitor to their dashboard instead of sign-up', () => {
     useAuthStore.setState({ isAuthenticated: true })
     renderLanding()
-    expect(screen.getAllByRole('link', { name: 'Start designing — free' })[0]).toHaveAttribute('href', '/projects')
+    expect(screen.getAllByRole('link', { name: 'Start designing free' })[0]).toHaveAttribute('href', '/projects')
     expect(screen.getByRole('link', { name: 'Your projects' })).toHaveAttribute('href', '/projects')
   })
 

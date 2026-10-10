@@ -31,16 +31,6 @@ const STEPS = [
   },
 ]
 
-/** A hand-drawn arrow accent. */
-function HandArrow({ className = '' }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 100 100" className={className} fill="none" stroke="currentColor" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M90 12 C 80 60 58 82 36 62 C 18 44 38 22 58 32 C 76 42 68 72 46 84" />
-      <path d="M62 80 L46 84 L50 68" />
-    </svg>
-  )
-}
-
 /** A card of real checks floating over the hero's dot field. */
 function FloatingCard({ className, label, lines, footer }: { className: string; label: string; lines: string[]; footer?: string }) {
   return (
@@ -121,78 +111,72 @@ export default function Landing() {
         {/* Hero */}
         {/* Pulled up under the see-through navbar so the field runs to the top. */}
         <section className="relative isolate -mt-16 overflow-hidden border-b border-ink/10 pt-16">
-          <AsciiField className="absolute inset-0 -z-10" />
+          <AsciiField className="absolute inset-0 -z-10 opacity-20 lg:opacity-40" />
           <div
             aria-hidden="true"
             className="absolute inset-0 -z-10 bg-[linear-gradient(to_right,rgba(245,245,246,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(245,245,246,0.05)_1px,transparent_1px)] bg-[size:4rem_4rem]"
           />
-          <div className="relative mx-auto flex min-h-[min(calc(100svh-3.5rem),56rem)] w-full max-w-6xl flex-col justify-center px-4 py-16 sm:px-6">
+          <div className="relative mx-auto flex min-h-[min(calc(100svh-7rem),44rem)] w-full max-w-6xl flex-col justify-center px-4 py-16 sm:px-6">
             <p className="font-mono text-xs uppercase tracking-[0.2em] text-ember-soft">
               Site → massing → plans → AutoCAD &amp; Revit
             </p>
             <h1
-              className="mt-6 font-black uppercase leading-[0.88] tracking-tight text-ink"
-              style={{ fontStretch: '125%', fontSize: 'clamp(2.4rem, 6.4vw, 6rem)' }}
+              className="mt-5 max-w-[680px] font-black uppercase leading-[0.95] tracking-tight text-ink"
+              style={{ fontStretch: '125%', fontSize: 'clamp(2.25rem, 5.2vw, 4.75rem)' }}
             >
-              <span className="block text-ember [text-shadow:4px_4px_0_theme(colors.ember.deep),8px_8px_0_rgba(122,26,12,0.55)]">You design. </span>
-              <span className="block pl-[8%] [text-shadow:4px_4px_0_theme(colors.ember.deep),8px_8px_0_rgba(122,26,12,0.55)]">It checks. </span>
-              <span className="block pl-[22%] [text-shadow:4px_4px_0_theme(colors.ember.deep),8px_8px_0_rgba(122,26,12,0.55)]">AI helps.</span>
+              <span className="block">Design it. </span>
+              <span className="block text-ember">We check it.</span>
             </h1>
-            <p className="mt-8 max-w-md text-base leading-relaxed text-graphite-100">
-              A 3D editor for early-stage housing: draw the site, shape the massing against
-              the zoning rules, plan every floor, and export to AutoCAD and Revit. When you
-              want help, ask the AI to review and improve what you made.
+            <p className="mt-6 max-w-[560px] text-base leading-relaxed text-graphite-100">
+              Draw a site, shape the massing, plan every floor, and export DXF and IFC files
+              that open in AutoCAD and Revit, with every rule checked as you work. AI helps
+              when you ask.
             </p>
-            <div className="mt-8 flex flex-wrap items-center gap-3">
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
               <Link
                 to={startTarget}
-                className="rounded-full bg-ember px-6 py-3 text-sm font-bold text-graphite-950 shadow-[0_10px_40px_rgba(255,59,31,0.45)] transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/60"
+                className="rounded-full bg-ember px-6 py-3 text-center text-sm font-bold text-graphite-950 shadow-[0_10px_40px_rgba(255,59,31,0.45)] transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/60"
               >
-                Start designing — free
+                Start designing free
               </Link>
               <Link
                 to="/#example"
-                className="rounded-full border border-ink/30 bg-graphite-950/40 px-6 py-3 text-sm font-semibold text-ink backdrop-blur transition-colors hover:bg-ink/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/60"
+                className="rounded-full text-center border border-ink/30 bg-graphite-950/40 px-6 py-3 text-sm font-semibold text-ink backdrop-blur transition-colors hover:bg-ink/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/60"
               >
                 See a real example
               </Link>
             </div>
+            <p className="mt-3 text-xs text-muted-light">No credit card required.</p>
 
             {/* Real checks from the example, floating over the field. */}
             <div className="pointer-events-none absolute inset-0 hidden lg:block" aria-hidden="true">
               <FloatingCard
-                className="right-[3%] top-[20%] rotate-[4deg]"
+                className="right-[2%] top-[18%] rotate-[3deg]"
                 label="Plan checked"
                 lines={['Balcony opens off the living room', 'Master bath attached', 'Kitchen kept away from baths']}
                 footer={`Quality score ${EXAMPLE.score}/100`}
               />
               <FloatingCard
-                className="bottom-[16%] right-[22%] -rotate-[3deg] [animation-delay:1.5s]"
+                className="bottom-[14%] right-[14%] -rotate-[2deg] [animation-delay:1.5s]"
                 label="Assistant, when asked"
                 lines={['Move the study next to the living room', 'Still passes every rule', 'One step to undo']}
                 footer="Preview · Apply"
               />
-              <HandArrow className="absolute bottom-[31%] right-[42%] h-20 w-20 -rotate-[70deg] text-ember" />
             </div>
 
-            <Link
-              to={startTarget}
-              aria-label="Start designing — free"
-              className="absolute bottom-8 right-6 hidden h-32 w-32 sm:block lg:bottom-12 lg:right-10"
-            >
-              <span className="relative flex h-full w-full rotate-12 items-center justify-center rounded-full bg-ember shadow-[0_12px_40px_rgba(255,59,31,0.5)] transition-transform hover:scale-105">
-                <svg viewBox="0 0 100 100" className="absolute inset-1 motion-safe:animate-spin-slow" aria-hidden="true">
-                  <path id="badge-ring" d="M 50,50 m -37,0 a 37,37 0 1,1 74,0 a 37,37 0 1,1 -74,0" fill="none" />
-                  <text className="fill-graphite-950 text-[11px] font-black uppercase">
-                    <textPath href="#badge-ring" textLength="228" lengthAdjust="spacing">Start designing • free • </textPath>
-                  </text>
-                </svg>
-                <svg viewBox="0 0 24 24" className="h-9 w-9 text-graphite-950" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M7 17L17 7M17 7H8M17 7v9" />
-                </svg>
-              </span>
-            </Link>
           </div>
+        </section>
+
+        {/* What's in it, at a glance */}
+        <section aria-label="In the product" className="border-b border-ink/10">
+          <ul className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-5 font-mono text-[11px] uppercase tracking-[0.14em] text-graphite-200 sm:px-6">
+            {['3D editor', 'Rule checking', 'DXF · IFC · GLB · OBJ export', 'Undoable AI edits'].map((item) => (
+              <li key={item} className="flex items-center gap-2">
+                <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-ember" />
+                {item}
+              </li>
+            ))}
+          </ul>
         </section>
 
         {/* How it works */}
@@ -328,7 +312,7 @@ export default function Landing() {
               to={startTarget}
               className="mt-2 rounded-full bg-ember px-7 py-3.5 text-sm font-bold text-graphite-950 shadow-[0_10px_40px_rgba(255,59,31,0.45)] transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/60"
             >
-              Start designing — free
+              Start designing free
             </Link>
           </div>
         </section>
