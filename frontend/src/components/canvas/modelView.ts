@@ -186,6 +186,14 @@ export const MODEL_COLORS = {
   furnitureDark: '#cbc6bc',
   /** Hard-violation rooms: outline, label and floor tint. */
   invalid: '#c4553f',
+  /** Floor uses on masses (residential stays the white model colour). */
+  useRetail: '#e7c2ae',
+  useOffice: '#cddde9',
+  useAmenity: '#ddd4b0',
+  useParking: '#d4d3ce',
+  /** Surrounding buildings (OpenStreetMap context): quieter than the scheme. */
+  context: '#dcdbd6',
+  contextEdge: '#a9a8a2',
 } as const
 
 /** A room floor keeps its colour identity as a pale, desaturated tint. */

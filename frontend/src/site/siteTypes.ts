@@ -46,6 +46,40 @@ export interface Mass {
   floorHeightM: number
   /** Height of the mass's underside above ground (0 = on the ground). */
   baseM: number
+  /** Use of each floor, ground floor first; missing floors are residential. */
+  uses?: FloorUse[]
+}
+
+/** What a floor of a mass is for (Arcol-style programme per floor). */
+export type FloorUse = 'residential' | 'retail' | 'office' | 'amenity' | 'parking'
+export const FLOOR_USES: FloorUse[] = ['residential', 'retail', 'office', 'amenity', 'parking']
+export const FLOOR_USE_LABEL: Record<FloorUse, string> = {
+  residential: 'Residential', retail: 'Retail', office: 'Office', amenity: 'Amenity', parking: 'Parking',
+}
+
+/** The use of floor `index` (0 = ground) of a mass. */
+export const floorUse = (mass: Pick<Mass, 'uses'>, index: number): FloorUse => mass.uses?.[index] ?? 'residential'
+
+/**
+ * Runs of consecutive floors with the same use, bottom first:
+ * [{ use, from, to }] with 0-based inclusive floor indices.
+ */
+export function useBands(mass: Pick<Mass, 'uses' | 'floors'>): { use: FloorUse; from: number; to: number }[] {
+  const bands: { use: FloorUse; from: number; to: number }[] = []
+  for (let i = 0; i < mass.floors; i++) {
+    const use = floorUse(mass, i)
+    const last = bands[bands.length - 1]
+    if (last && last.use === use) last.to = i
+    else bands.push({ use, from: i, to: i })
+  }
+  return bands
+}
+
+/** The mass with floors `from..to` (inclusive, 0-based) set to `use`. */
+export function withFloorUse(mass: Mass, from: number, to: number, use: FloorUse): Mass {
+  const uses = Array.from({ length: mass.floors }, (_, i) => floorUse(mass, i))
+  for (let i = Math.max(0, from); i <= Math.min(mass.floors - 1, to); i++) uses[i] = use
+  return { ...mass, uses: uses.every((u) => u === 'residential') ? undefined : uses }
 }
 
 export const DEFAULT_FLOOR_HEIGHT_M = 3.2
@@ -116,6 +150,9 @@ export function parseMasses(value: unknown): Mass[] {
       floors: Math.max(1, Math.round(num(mass.floors) ?? 1)),
       floorHeightM: Math.max(2, num(mass.floorHeightM) ?? DEFAULT_FLOOR_HEIGHT_M),
       baseM: Math.max(0, num(mass.baseM) ?? 0),
+      ...(Array.isArray(mass.uses) && mass.uses.length
+        ? { uses: mass.uses.map((u) => (FLOOR_USES.includes(u) ? u : 'residential')) }
+        : {}),
     }]
   })
 }

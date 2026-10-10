@@ -7,6 +7,9 @@ interface SiteUiState {
   /** "Draw site" active (Top view only). */
   drawing: boolean
   showHeightCap: boolean
+  /** Surrounding buildings drawn in 3D (when loaded). */
+  showContext: boolean
+  setShowContext: (show: boolean) => void
   setHoveredEdge: (edge: number | null) => void
   setDrawing: (drawing: boolean) => void
   setShowHeightCap: (show: boolean) => void
@@ -16,6 +19,8 @@ export const useSiteUi = create<SiteUiState>((set) => ({
   hoveredEdge: null,
   drawing: false,
   showHeightCap: true,
+  showContext: true,
+  setShowContext: (showContext) => set({ showContext }),
   setHoveredEdge: (hoveredEdge) => set({ hoveredEdge }),
   setDrawing: (drawing) => set({ drawing }),
   setShowHeightCap: (showHeightCap) => set({ showHeightCap }),

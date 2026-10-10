@@ -7,7 +7,7 @@ import { MODEL_COLORS, mixHex } from '../components/canvas/modelView'
 import { EDITOR_PALETTE } from '../components/canvas/editorPalette'
 import { HANDLE_PX, HandleMark, usePixelsPerMetre } from '../components/canvas/TopPlanOverlay'
 import { buildableEnvelope, polygonArea, type Region } from './siteGeometry'
-import type { Mass, SitePoint } from './siteTypes'
+import { FLOOR_USE_LABEL, floorUse, useBands, type FloorUse, type Mass, type SitePoint } from './siteTypes'
 import {
   centroid,
   floorsForTop,
@@ -41,6 +41,18 @@ interface ActiveDrag {
 const GROUND = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
 const OFFENDING = mixHex(MODEL_COLORS.wall, MODEL_COLORS.invalid, 0.45)
 
+export const USE_COLOR: Record<FloorUse, string> = {
+  residential: MODEL_COLORS.wall,
+  retail: MODEL_COLORS.useRetail,
+  office: MODEL_COLORS.useOffice,
+  amenity: MODEL_COLORS.useAmenity,
+  parking: MODEL_COLORS.useParking,
+}
+
+/** The floor (0 = ground) of `mass` at height `y`. */
+export const floorAt = (mass: Mass, y: number) =>
+  Math.min(mass.floors - 1, Math.max(0, Math.floor((y - mass.baseM) / mass.floorHeightM)))
+
 function ringsToShape(outer: SitePoint[], holes: SitePoint[][] = []) {
   // Shape space (x, -z) extruded along +Z, then rotated -90° about X: +Z -> world up.
   const shape = new THREE.Shape(outer.map((p) => new THREE.Vector2(p.x, -p.z)))
@@ -62,6 +74,7 @@ const regionShapes = (region: Region) =>
 export function MassLayer({ orbitRef, readOnly, topView, focusedMassId = null }: { orbitRef: RefObject<OrbitHandle>; readOnly: boolean; topView: boolean; focusedMassId?: string | null }) {
   const { site, masses } = useSiteAndMasses()
   const selectedMassId = useMassUi((s) => s.selectedMassId)
+  const selectedFloor = useMassUi((s) => s.selectedFloor)
   const select = useMassUi((s) => s.select)
   const roomSelected = useCanvasStore((s) => s.selectedId)
   const gl = useThree((s) => s.gl)
@@ -153,6 +166,9 @@ export function MassLayer({ orbitRef, readOnly, topView, focusedMassId = null }:
   const dragHandlers = { onPointerMove: onDrag, onPointerUp: onDragEnd, onPointerCancel: onDragEnd }
   const selected = masses.find((m) => m.id === selectedMassId)
   const metre = 1 / pxPerMetre
+  const floorLabel = selected && selectedFloor !== null && selectedFloor < selected.floors && !topView
+    ? `L${selectedFloor + 1} · ${FLOOR_USE_LABEL[floorUse(selected, selectedFloor)]} · ${Math.round(polygonArea(selected.footprint))} m²`
+    : null
 
   return (
     <group name="masses" onPointerMissed={() => { if (!dragRef.current) select(null) }}>
@@ -164,6 +180,7 @@ export function MassLayer({ orbitRef, readOnly, topView, focusedMassId = null }:
           key={m.id}
           mass={m}
           selected={m.id === selectedMassId}
+          selectedFloor={m.id === selectedMassId && !topView ? selectedFloor : null}
           focused={topView && focusedMassId === m.id}
           invalid={offending.has(m.id)}
           onPointerDown={
@@ -172,7 +189,8 @@ export function MassLayer({ orbitRef, readOnly, topView, focusedMassId = null }:
               : (event) => {
                   if (event.button !== 0) return
                   event.stopPropagation()
-                  select(m.id)
+                  // A click picks the floor under the pointer (Arcol-style floor editing).
+                  select(m.id, floorAt(m, event.point.y))
                   useCanvasStore.getState().deselectAll()
                 }
           }
@@ -194,6 +212,7 @@ export function MassLayer({ orbitRef, readOnly, topView, focusedMassId = null }:
           <div data-testid="mass-label" className="flex items-center gap-2 whitespace-nowrap rounded-md border border-ink/10 bg-graphite-800/95 px-2 py-1 text-[11px] font-semibold text-ink shadow-sm">
             <span>
               {selected.name} <span className="font-mono font-normal tabular-nums text-muted">· {selected.floors} fl · {massTop(selected).toFixed(1)} m</span>
+              {floorLabel && <span data-testid="mass-floor-label" className="ml-2 rounded bg-accent px-1.5 py-0.5 text-graphite-950">{floorLabel}</span>}
             </span>
             {!readOnly && (
               <button
@@ -256,6 +275,7 @@ export function MassLayer({ orbitRef, readOnly, topView, focusedMassId = null }:
 interface MassBodyProps {
   mass: Mass
   selected: boolean
+  selectedFloor?: number | null
   focused: boolean
   invalid: boolean
   onPointerDown: (event: ThreeEvent<PointerEvent>) => void
@@ -266,8 +286,8 @@ interface MassBodyProps {
   onPointerOut: () => void
 }
 
-function MassBody({ mass, selected, focused, invalid, ...events }: MassBodyProps) {
-  const height = mass.floors * mass.floorHeightM
+function MassBody({ mass, selected, selectedFloor = null, focused, invalid, ...events }: MassBodyProps) {
+  const bands = useMemo(() => useBands(mass), [mass])
   const shape = useMemo(() => ringsToShape(mass.footprint), [mass.footprint])
   // Slab edges at every floor, in world space, as one line-segments buffer.
   const slabs = useMemo(() => {
@@ -286,14 +306,32 @@ function MassBody({ mass, selected, focused, invalid, ...events }: MassBodyProps
   useEffect(() => () => slabs.dispose(), [slabs])
 
   const edge = selected ? EDITOR_PALETTE.selection : invalid ? MODEL_COLORS.invalid : MODEL_COLORS.edge
-  const fill = invalid ? OFFENDING : selected ? MODEL_COLORS.wallSelected : MODEL_COLORS.wall
+  const tint = (use: FloorUse) => invalid ? OFFENDING : selected && use === 'residential' ? MODEL_COLORS.wallSelected : USE_COLOR[use]
+  const ring = (y: number) => [...mass.footprint, mass.footprint[0]].map((p) => [p.x, y, p.z] as [number, number, number])
   return (
     <group>
-      <mesh name={`mass-${mass.id}`} position={[0, mass.baseM, 0]} rotation={[-Math.PI / 2, 0, 0]} castShadow receiveShadow {...events}>
-        <extrudeGeometry args={[shape, { depth: height, bevelEnabled: false }]} />
-        <meshStandardMaterial color={fill} roughness={0.9} metalness={0} />
-        <Edges threshold={20} color={edge} lineWidth={selected ? 2 : 1} />
-      </mesh>
+      {/* One extrusion per run of floors with the same use (programme colours). */}
+      {bands.map((band) => (
+        <mesh
+          key={`${band.from}-${band.use}`}
+          name={band.from === 0 ? `mass-${mass.id}` : `mass-${mass.id}-band-${band.from}`}
+          position={[0, mass.baseM + band.from * mass.floorHeightM, 0]}
+          rotation={[-Math.PI / 2, 0, 0]}
+          castShadow
+          receiveShadow
+          {...events}
+        >
+          <extrudeGeometry args={[shape, { depth: (band.to - band.from + 1) * mass.floorHeightM, bevelEnabled: false }]} />
+          <meshStandardMaterial color={tint(band.use)} roughness={0.9} metalness={0} />
+          <Edges threshold={20} color={edge} lineWidth={selected ? 2 : 1} />
+        </mesh>
+      ))}
+      {selectedFloor !== null && (
+        <>
+          <Line name={`mass-floor-${mass.id}-${selectedFloor}`} points={ring(mass.baseM + selectedFloor * mass.floorHeightM + 0.03)} color={EDITOR_PALETTE.selection} lineWidth={3} />
+          <Line points={ring(mass.baseM + (selectedFloor + 1) * mass.floorHeightM - 0.03)} color={EDITOR_PALETTE.selection} lineWidth={3} />
+        </>
+      )}
       {focused && <Line name={`focus-ring-${mass.id}`} points={[...mass.footprint, mass.footprint[0]].map((p) => [p.x, massTop(mass) + 0.05, p.z] as [number, number, number])} color={EDITOR_PALETTE.selection} lineWidth={4} />}
       <lineSegments geometry={slabs} raycast={() => null}>
         <lineBasicMaterial color={invalid ? MODEL_COLORS.invalid : MODEL_COLORS.floorEdge} />
