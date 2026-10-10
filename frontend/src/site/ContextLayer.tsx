@@ -49,6 +49,6 @@ export function ContextCredit() {
   const count = useMemo(() => parseSiteContext(raw)?.buildings.length ?? 0, [raw])
   if (!show || !count) return null
   return (
-    <span className="pointer-events-none absolute bottom-2 right-3 z-10 text-[10px] text-muted-light">{OSM_CREDIT}</span>
+    <span className="pointer-events-none absolute bottom-[100px] right-3 z-10 text-[10px] text-muted-light">{OSM_CREDIT}</span>
   )
 }

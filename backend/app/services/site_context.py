@@ -8,6 +8,7 @@ the frontend shows that credit wherever it draws them.
 """
 from __future__ import annotations
 
+import logging
 import math
 import re
 import time
@@ -15,12 +16,14 @@ from collections import OrderedDict
 
 import httpx
 
-OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+# The main instance often answers 429/504 under load; the mirror runs the same API.
+OVERPASS_URLS = ("https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter")
 LEVEL_HEIGHT_M = 3.2
 DEFAULT_HEIGHT_M = 9.0
 MAX_BUILDINGS = 400
 _CACHE_TTL_S = 24 * 3600
 _CACHE_SIZE = 64
+log = logging.getLogger(__name__)
 _cache: OrderedDict[tuple[float, float, int], tuple[float, list[dict]]] = OrderedDict()
 
 
@@ -83,13 +86,18 @@ async def fetch_context(lat: float, lon: float, radius_m: int) -> list[dict]:
     if hit and time.monotonic() - hit[0] < _CACHE_TTL_S:
         _cache.move_to_end(key)
         return hit[1]
-    try:
-        async with httpx.AsyncClient(timeout=25.0, headers={"User-Agent": "ArchiAI/1.0 (site context)"}) as client:
-            response = await client.post(OVERPASS_URL, data={"data": _query(lat, lon, radius_m)})
-            response.raise_for_status()
-            payload = response.json()
-    except (httpx.HTTPError, ValueError) as exc:
-        raise ContextUnavailable("The map service did not answer. Try again in a minute.") from exc
+    payload = None
+    async with httpx.AsyncClient(timeout=25.0, headers={"User-Agent": "ArchiAI/1.0 (site context)"}) as client:
+        for url in OVERPASS_URLS:
+            try:
+                response = await client.post(url, data={"data": _query(lat, lon, radius_m)})
+                response.raise_for_status()
+                payload = response.json()
+                break
+            except (httpx.HTTPError, ValueError) as exc:
+                log.warning("Overpass %s failed: %r", url, exc)
+    if payload is None:
+        raise ContextUnavailable("The map service did not answer. Try again in a minute.")
     buildings = buildings_from_overpass(payload, lat, lon)
     _cache[key] = (time.monotonic(), buildings)
     while len(_cache) > _CACHE_SIZE:

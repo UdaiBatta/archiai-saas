@@ -46,3 +46,20 @@ async def test_context_endpoint_requires_auth_and_maps_upstream_errors(client: A
     monkeypatch.setattr("app.api.site.router.fetch_context", down)
     assert (await client.get("/api/site/context", params={"lat": 28.6, "lon": 77.2}, headers=headers)).status_code == 502
     assert (await client.get("/api/site/context", params={"lat": 28.6, "lon": 77.2, "radius": 9000}, headers=headers)).status_code == 422
+
+
+async def test_fetch_context_falls_back_to_the_mirror(monkeypatch):
+    calls = []
+
+    async def post(self, url, data):
+        calls.append(url)
+        request = site_context.httpx.Request("POST", url)
+        if url == site_context.OVERPASS_URLS[0]:
+            return site_context.httpx.Response(429, request=request)
+        return site_context.httpx.Response(200, request=request, json={"elements": [{"type": "way", "tags": {}, "geometry": [
+            {"lat": 10.0, "lon": 10.0}, {"lat": 10.0, "lon": 10.001}, {"lat": 10.001, "lon": 10.0}]}]})
+
+    monkeypatch.setattr(site_context.httpx.AsyncClient, "post", post)
+    site_context._cache.clear()
+    assert len(await site_context.fetch_context(10.0, 10.0, 77)) == 1
+    assert calls == list(site_context.OVERPASS_URLS)
