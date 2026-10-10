@@ -191,6 +191,9 @@ export const MODEL_COLORS = {
   useOffice: '#cddde9',
   useAmenity: '#ddd4b0',
   useParking: '#d4d3ce',
+  /** Surrounding buildings (OpenStreetMap context): quieter than the scheme. */
+  context: '#dcdbd6',
+  contextEdge: '#a9a8a2',
 } as const
 
 /** A room floor keeps its colour identity as a pale, desaturated tint. */

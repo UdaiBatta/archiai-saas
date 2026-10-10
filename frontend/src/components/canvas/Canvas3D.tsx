@@ -38,6 +38,7 @@ import { CommentLayer } from '../../collab/CommentLayer'
 import { CommentsPanel } from '../../collab/CommentsPanel'
 import { useComments } from '../../collab/commentsStore'
 import { OptionsBar } from '../../site/OptionsBar'
+import { ContextCredit, ContextLayer } from '../../site/ContextLayer'
 import { ComparePanel } from '../../site/ComparePanel'
 
 // Props are stable per room, so metadata or UI-state changes in this
@@ -279,6 +280,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
         {!readOnly && <WallLineHighlight />}
         {comments && <CommentLayer />}
         {studio && <SunHoursLayer />}
+        {studio && <ContextLayer />}
         {studio && <MassLayer orbitRef={orbitRef} readOnly={readOnly} topView={topView} focusedMassId={focusedMassId} />}
         {studio && (
           <SiteLayer orbitRef={orbitRef} readOnly={readOnly} topView={topView} planY={(planFloor?.elevation ?? 0) + floorHeight + 0.4} />
@@ -306,6 +308,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
         {aoOn && <PerformanceMonitor onDecline={() => chooseAo(false)} />}
         {SHOW_PERF && <PerfReadout />}
       </Canvas>
+      {studio && <ContextCredit />}
       {topView && !readOnly && (
         <TopPlanKeyboardLayer rooms={visibleRooms} invalidRoomIds={invalidRoomIds} onFocusRoom={setFocusedRoomId} onFocusMass={setFocusedMassId} />
       )}
