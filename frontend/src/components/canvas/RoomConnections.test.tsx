@@ -54,3 +54,19 @@ describe('RoomConnections', () => {
     expect(screen.getByText('Living Room ↔ Bedroom')).toBeInTheDocument()
   })
 })
+
+describe('RoomConnections, rooms not joined', () => {
+  it('lists an overlapping room and joins it with one click', () => {
+    const at = (id: string, label: string, x: number, w: number): Room => ({ ...room(id, label), position: { x, y: 1.5, z: 0 }, size: { w, h: 3, d: 4 } })
+    useCanvasStore.setState({
+      rooms: [at('living', 'Living Room', 6, 4), at('dining', 'Dining', 2.2, 4)], // dining x 0.2..4.2 overlaps living x 4..8
+      layoutMetadata: { mvpEdges: [] },
+    })
+    render(<RoomConnections roomId="living" />)
+    expect(screen.getByText('Not joined')).toBeInTheDocument()
+    expect(screen.getByText('overlaps 0.20 m')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Join' }))
+    const living = useCanvasStore.getState().rooms.find((r) => r.id === 'living')!
+    expect(living.position.x - living.size.w / 2).toBeCloseTo(4.2)
+  })
+})

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { useCanvasStore } from '../../store/canvasStore'
 import { doorBetween } from '../../store/connections'
+import { joinedTo, nearMisses } from '../../store/edgeSnap'
 import type { Connection, ConnectionKind, RoomEdge } from '../../types/contracts'
 import { effectiveEdges } from './roomGraphModel'
 
@@ -52,7 +53,20 @@ export function RoomConnections({ roomId, onlyWith, disabled = false }: { roomId
   const ownLabel = useCanvasStore((s) => s.rooms.find((r) => r.id === roomId)?.label ?? roomId)
   const neighbours = useNeighbours(roomId).filter((n) => !onlyWith || n.otherId === onlyWith)
 
-  if (neighbours.length === 0) return null
+  const rooms = useCanvasStore((s) => s.rooms)
+  const self = rooms.find((r) => r.id === roomId)
+  const linked = new Set(neighbours.map((n) => n.otherId))
+  // Rooms drawn next to this one that overlap it or leave a gap: the engine
+  // only joins edges that touch, so they are not neighbours until joined.
+  const misses = !onlyWith && self && self.objectType === 'room' && !self.polygonVertices
+    ? nearMisses(
+        self,
+        rooms.filter((r) => r.objectType === 'room' && !r.polygonVertices && r.id !== roomId && !linked.has(r.id) && (r.floorLevel ?? 0) === (self.floorLevel ?? 0)),
+      ).sort((a, b) => Math.abs(a.gap) - Math.abs(b.gap))
+    : []
+  const updateRoom = useCanvasStore((s) => s.updateRoom)
+
+  if (neighbours.length === 0 && misses.length === 0) return null
 
   return (
     <section aria-label="Connections" className="mt-4" onMouseLeave={() => hover(null)}>
@@ -102,6 +116,36 @@ export function RoomConnections({ roomId, onlyWith, disabled = false }: { roomId
           </li>
         ))}
       </ul>
+      {misses.length > 0 && self && (
+        <div className="mt-3">
+          <h4 className="mb-1 text-[11px] font-semibold text-ink">Not joined</h4>
+          <p className="mb-1.5 text-[10.5px] text-muted-light">Next to this room but not touching it exactly, so no shared wall, door or opening.</p>
+          <ul className="space-y-1">
+            {misses.map((miss) => {
+              const other = rooms.find((r) => r.id === miss.id)
+              const joined = joinedTo(self, miss)
+              const amount = `${Math.abs(miss.gap).toFixed(2)} m`
+              return (
+                <li key={miss.id} onMouseEnter={() => hover(miss.id)} className="-mx-1.5 flex items-center justify-between gap-2 rounded-md px-1.5 py-0.5 hover:bg-ink/5">
+                  <span className="min-w-0 truncate text-xs text-muted">
+                    {other?.label ?? miss.id}
+                    <span className={`ml-1.5 text-[10.5px] ${miss.gap < 0 ? 'text-danger' : 'text-warn'}`}>{miss.gap < 0 ? `overlaps ${amount}` : `${amount} gap`}</span>
+                  </span>
+                  <button
+                    type="button"
+                    disabled={disabled || !joined}
+                    title={joined ? `Move this room's edge onto ${other?.label ?? 'it'}` : 'Joining would make this room narrower than 1 m'}
+                    onClick={() => joined && updateRoom(roomId, { position: joined.position, size: joined.size }, { action: 'object.resized', previousValue: self })}
+                    className="shrink-0 rounded-md border border-ink/10 px-2 py-1 text-[10.5px] font-medium text-ink hover:bg-ink/5 disabled:opacity-40"
+                  >
+                    Join
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )}
     </section>
   )
 }
