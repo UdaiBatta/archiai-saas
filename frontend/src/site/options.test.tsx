@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useCanvasStore } from '../store/canvasStore'
 import { OptionsBar } from './OptionsBar'
+import { ComparePanel } from './ComparePanel'
 import { compareOptions, deleteOption, duplicateOption, parseOptions, renameOption, switchOption } from './options'
 import { parseMasses, type Mass } from './siteTypes'
 
@@ -53,8 +54,7 @@ describe('OptionsBar', () => {
 })
 
 describe('ComparePanel', () => {
-  it('shows the focal number, bars per option, and flags an option over the FAR limit', async () => {
-    const { ComparePanel } = await import('./ComparePanel')
+  it('shows the focal number, bars per option, and flags an option over the FAR limit', () => {
     let meta: Record<string, unknown> = { site, masses: [tower] }
     meta = duplicateOption(meta, 'b')
     meta = { ...meta, masses: [{ ...slab, floors: 6 }] } // 2400 m² on a 1600 m² site: FAR 1.5 > 1
