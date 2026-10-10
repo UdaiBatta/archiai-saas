@@ -9,7 +9,7 @@ export const panelClass =
 
 /**
  * "What you get" as a bento grid. Every tile's graphic is built from the
- * real example (the brief, its rules, the generated plan), not stock art.
+ * real product: the massing readout, the example plan and its rules.
  * Hovering a tile lifts its graphic; text sits on a blurred panel below it.
  */
 function BentoCard({
@@ -46,20 +46,48 @@ function BentoCard({
 
 const chip = 'rounded-full border border-ink/15 bg-ink/5 px-2.5 py-1 font-mono text-[11px] text-graphite-100'
 
-function BriefGraphic() {
-  const rules = EXAMPLE.understood.filter((line) => /^(Must connect|Keep apart)/.test(line))
+function MassingGraphic() {
+  // Three stacked masses in axonometric, coloured by floor use, with the zoning readout.
+  // Isometric box standing on its front corner (x, y): w runs right, d runs left, h up.
+  const block = (x: number, y: number, w: number, d: number, h: number, top: string, side: string, key: string) => {
+    const rx = w * 0.866, ry = -w / 2, lx = -d * 0.866, ly = -d / 2
+    const pts = (p: number[][]) => p.map(([px, py]) => `${x + px},${y + py}`).join(' ')
+    return (
+      <g key={key}>
+        <polygon points={pts([[0, 0], [rx, ry], [rx, ry - h], [0, -h]])} className={side} />
+        <polygon points={pts([[0, 0], [lx, ly], [lx, ly - h], [0, -h]])} className="fill-graphite-800" />
+        <polygon points={pts([[0, -h], [rx, ry - h], [rx + lx, ry + ly - h], [lx, ly - h]])} className={top} />
+      </g>
+    )
+  }
   return (
-    <div className="flex h-full flex-col justify-center gap-3 px-6">
-      <p className="rounded-xl border border-ink/10 bg-graphite-900 px-3 py-2 text-[12px] text-muted">
-        <span className="line-clamp-2">“{EXAMPLE.brief}”</span>
-      </p>
-      <div className="flex flex-wrap gap-1.5">
-        {['3 bedrooms', '2 bathrooms', '1 dining', '12 × 15 m', 'faces east'].map((c) => (
-          <span key={c} className={chip}>{c}</span>
+    <div className="flex h-full items-center gap-4 px-6">
+      <svg viewBox="0 -30 200 170" className="h-full w-1/2">
+        {block(150, 92, 40, 30, 30, 'fill-graphite-600', 'fill-graphite-700', 'neighbour')}
+        {block(80, 112, 60, 45, 20, 'fill-ember/60', 'fill-ember/35', 'retail')}
+        {block(80, 92, 60, 45, 62, 'fill-graphite-100', 'fill-graphite-300', 'homes')}
+      </svg>
+      <ul className="flex flex-1 flex-col gap-1.5 font-mono text-[11px]">
+        {[['FAR', '1.82 / 2.00', true], ['Height', '27 / 30 m', true], ['Coverage', '54 / 50 %', false]].map(([k, v, ok]) => (
+          <li key={k as string} className={`flex justify-between rounded-md px-2 py-1 ${ok ? 'bg-ink/5 text-graphite-100' : 'bg-danger/10 text-danger'}`}>
+            <span>{k}</span><span>{v}</span>
+          </li>
         ))}
-        {rules.slice(0, 2).map((r) => (
-          <span key={r} className={`${chip} border-ember/40 text-ember-soft`}>{r.replace(/^(Must connect|Keep apart): /, '')}</span>
-        ))}
+      </ul>
+    </div>
+  )
+}
+
+function AssistantGraphic() {
+  return (
+    <div className="flex h-full flex-col justify-center gap-2 px-6 text-[12px]">
+      <p className="self-end rounded-xl bg-graphite-800 px-3 py-2 text-graphite-100">Make the kitchen brighter</p>
+      <div className="rounded-xl border border-ember/30 bg-graphite-900 px-3 py-2 text-graphite-100">
+        <p>Swap kitchen and dining so the kitchen gets the east window.</p>
+        <p className="mt-1 font-mono text-[10px] text-ok">✓ passes every rule</p>
+      </div>
+      <div className="flex gap-1.5">
+        {['Preview', 'Apply', 'Undo'].map((c) => <span key={c} className={chip}>{c}</span>)}
       </div>
     </div>
   )
@@ -156,7 +184,7 @@ function VersionsGraphic() {
   const rows = [
     ['v3', 'Kitchen opened to dining', 'Named'],
     ['v2', 'Auto-saved draft', 'Draft'],
-    ['v1', 'Generated from brief', 'Generated'],
+    ['v1', 'Option A: one slab', 'Option'],
   ]
   return (
     <div className="flex h-full flex-col justify-center gap-2 px-6">
@@ -168,7 +196,7 @@ function VersionsGraphic() {
         </div>
       ))}
       <div className="flex gap-1.5 pt-1">
-        {['PNG', 'PDF', 'Share link'].map((c) => <span key={c} className={chip}>{c}</span>)}
+        {['DXF', 'IFC', 'PDF', 'Share link'].map((c) => <span key={c} className={chip}>{c}</span>)}
       </div>
     </div>
   )
@@ -179,16 +207,16 @@ export function FeatureBento() {
     <div className="mt-10 grid grid-cols-1 gap-4 lg:grid-cols-6">
       <BentoCard
         className="lg:col-span-3"
-        eyebrow="Review"
-        title="Your brief, read back to you"
-        description="Rooms, counts, must-connect and keep-apart rules are shown for review before any plan is drawn."
-        graphic={<BriefGraphic />}
+        eyebrow="Site & massing"
+        title="Shape it against the zoning"
+        description="Setbacks, height, coverage and FAR live on the site. Push floors, give each one a use, see the neighbours, and compare options side by side."
+        graphic={<MassingGraphic />}
       />
       <BentoCard
         className="lg:col-span-3"
         eyebrow="Checks"
-        title="Plans checked against the brief"
-        description="A broken “must connect”, an unreachable room or a bathroom only reachable through a bedroom is never shown as valid."
+        title="Checked as you draw"
+        description="A broken “must connect”, an unreachable room or a bathroom only reachable through a bedroom is flagged the moment it happens."
         graphic={<ChecksGraphic />}
       />
       <BentoCard
@@ -215,22 +243,16 @@ export function FeatureBento() {
       <BentoCard
         className="lg:col-span-3"
         eyebrow="History"
-        title="Versions, sharing and export"
-        description="Named versions and auto-saved drafts, PNG and PDF export, read-only share links, and team workspaces."
+        title="Versions, sharing and CAD export"
+        description="Auto-save, named versions and design options. DXF for AutoCAD and IFC for Revit, plus PDF and read-only share links."
         graphic={<VersionsGraphic />}
       />
       <BentoCard
         className="lg:col-span-3"
-        eyebrow="Honest"
-        title="Refuses rather than fakes"
-        description="If a brief can’t fit its plot or its rules, ArchiAI says which rule and why, instead of drawing something that quietly breaks it."
-        graphic={
-          <div className="flex h-full items-center px-6">
-            <p className="rounded-xl border border-warn/30 bg-warn/10 px-4 py-3 font-mono text-[12px] leading-relaxed text-warn">
-              4BHK on a 9 × 12 m plot → “zones need at least 15.0 m along the facing axis but the plot only has 12.0 m — increase plot size”
-            </p>
-          </div>
-        }
+        eyebrow="AI, when asked"
+        title="A second opinion, not a starting point"
+        description="Ask the assistant to review a plan, explain a rule or suggest a change. Nothing moves until you preview and apply it, and every change is one undo."
+        graphic={<AssistantGraphic />}
       />
     </div>
   )
