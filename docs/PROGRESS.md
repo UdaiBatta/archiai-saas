@@ -7,7 +7,7 @@ Full plan and competitor map: [roadmap.html](roadmap.html) (published as the
 `python docs/sync_progress.py` to copy them into it. Near-term engine
 work lives in [ROADMAP.md](ROADMAP.md).
 
-_Last updated: 2026-10-01_
+_Last updated: 2026-10-10_
 
 ## Foundation: layout engine quality — PR #44 (merged)
 
@@ -105,3 +105,14 @@ _Last updated: 2026-10-01_
 - [ ] Revit round-trip via IFC with stable GUIDs
 - [ ] Rhino (3DM) and SketchUp (SKP)
 - [ ] Spreadsheet sync for area schedules
+
+## P8: Massing studio (Site Atlas + Arcol) — PR (site-atlas-3d)
+
+- [x] A use per floor on each mass (residential, retail, office, amenity, parking), drawn as coloured floor bands
+- [x] Click a floor in 3D to pick it; set the use for a floor range in one step
+- [x] Design options: duplicate, rename, delete, switch (each is one undo step)
+- [x] Compare options: GFA, FAR, homes, height against the limits, and programme mix
+- [x] Surrounding buildings from OpenStreetMap (100/250/500 m), saved with the project
+- [ ] 2D plan drawing style (paper, poché walls, door swings, furniture symbols, dimensions)
+- [ ] Typical floors: apply one floor's layout to a range, with an area schedule
+- [ ] DXF sheets per floor with blocks and dimensions; IFC storeys and stable GUIDs
