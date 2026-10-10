@@ -15,6 +15,7 @@ import {
 } from './massing'
 import { useMassUi, useSiteAndMasses } from './massStore'
 import { HousingPanel } from './HousingPanel'
+import { FloorProgramme } from './FloorProgramme'
 
 const STATUS_CLASS: Record<MetricStatus, string> = {
   ok: 'text-ok',
@@ -158,6 +159,7 @@ export function MassingPanel({ readOnly, topView, plot, docked = false }: { read
                 <NumberField label="Base (m)" value={selected.baseM} min={0} max={500} step={0.5} disabled={readOnly} onChange={(v) => patch(selected.id, { baseM: v })} />
               </div>
               <div className="font-mono tabular-nums text-muted-light">Top {massTop(selected).toFixed(1)} m</div>
+              <FloorProgramme mass={selected} masses={masses} readOnly={readOnly} />
               {!readOnly && (
                 <div className="flex gap-1">
                   <button type="button" className={btn} onClick={() => addMasses([duplicateMass(masses, selected)])}>Duplicate</button>

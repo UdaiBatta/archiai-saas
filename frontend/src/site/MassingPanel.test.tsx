@@ -29,7 +29,8 @@ describe('MassingPanel inspector', () => {
 
   it('shows GFA and the zoning rows', () => {
     render(<MassingPanel readOnly={false} topView={false} plot={null} />)
-    expect(screen.getByText('400 m²')).toBeInTheDocument()
+    // Site GFA in the metrics, and the same floors' area in the programme rows.
+    expect(screen.getAllByText('400 m²').length).toBeGreaterThan(0)
     expect(screen.getByText('Max height')).toBeInTheDocument()
   })
 })
