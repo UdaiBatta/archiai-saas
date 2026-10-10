@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { Edges, Html } from '@react-three/drei'
 import { useThree, type ThreeEvent } from '@react-three/fiber'
-import type { RefObject } from 'react'
+import type { MutableRefObject, RefObject } from 'react'
+import { useWallLineDrag } from './useWallLineDrag'
 import * as THREE from 'three'
 import { CanvasHistorySnapshot, CanvasViewMode, Room, useCanvasStore } from '../../store/canvasStore'
 import { capabilitiesOf } from '../../store/componentRegistry'
@@ -97,6 +98,7 @@ export function RoomMesh({
   const canvasElement = useThree((s) => s.gl.domElement)
   const camera = useThree((s) => s.camera)
   const pendingMoveRef = useRef<PendingMove | null>(null)
+  const wallDrag = useWallLineDrag(room, orbitRef as MutableRefObject<{ enabled: boolean } | null>)
   const selectedId = useCanvasStore((s) => s.selectedId)
   const selectRoom = useCanvasStore((s) => s.selectRoom)
   const updateRoom = useCanvasStore((s) => s.updateRoom)
@@ -198,6 +200,8 @@ export function RoomMesh({
       return
     }
 
+    if (wallDrag.onPointerDown(event, isSelected)) return
+
     const intent = objectPointerIntent(event.button, isSelected, definition)
     if (intent === 'idle') return
 
@@ -232,6 +236,7 @@ export function RoomMesh({
   }
 
   const handlePointerMove = (event: ThreeEvent<PointerEvent>) => {
+    if (wallDrag.onPointerMove(event)) return
     const pending = pendingMoveRef.current
     if (!pending || pending.pointerId !== event.pointerId) return
     event.stopPropagation()
@@ -265,6 +270,7 @@ export function RoomMesh({
   }
 
   const finishPointerDrag = (event: ThreeEvent<PointerEvent>) => {
+    if (wallDrag.onPointerUp(event)) return
     const pending = pendingMoveRef.current
     if (!pending || pending.pointerId !== event.pointerId) return
     event.stopPropagation()

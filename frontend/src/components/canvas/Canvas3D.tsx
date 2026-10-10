@@ -10,6 +10,7 @@ import { isMergeable } from './mergedGeometry'
 import { TopPlanOverlay } from './TopPlanOverlay'
 import { NeighbourHighlights } from './NeighbourHighlights'
 import { PlacementGhost } from './PlacementGhost'
+import { WallLineHighlight } from './WallLineHighlight'
 import { TopPlanKeyboardLayer } from './TopPlanKeyboardLayer'
 import { PauseWhileMoving, PerfReadout, SHOW_PERF } from './RenderBudget'
 import { useCanvasStore } from '../../store/canvasStore'
@@ -273,6 +274,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
           />
         )}
         {!readOnly && <PlacementGhost />}
+        {!readOnly && <WallLineHighlight />}
         {comments && <CommentLayer />}
         {studio && <SunHoursLayer />}
         {studio && <MassLayer orbitRef={orbitRef} readOnly={readOnly} topView={topView} focusedMassId={focusedMassId} />}
