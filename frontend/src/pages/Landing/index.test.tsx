@@ -4,7 +4,6 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { useAuthStore } from '../../store/authStore'
-import { EXAMPLE } from '../../constants/examplePlan'
 import Landing from './index'
 
 function Probe() {
@@ -35,8 +34,11 @@ describe('Landing page', () => {
   it('leads with what the product does and one main action', () => {
     renderLanding()
     expect(
-      screen.getByRole('heading', { level: 1, name: 'Write the brief. Get the plan.' }),
+      screen.getByRole('heading', { level: 1, name: 'You design. It checks. AI helps.' }),
     ).toBeInTheDocument()
+    // Editor-first: no promise of a plan generated from a written brief.
+    expect(screen.queryByText(/write the brief|your own brief|get the plan/i)).not.toBeInTheDocument()
+    expect(screen.getByText('Ask AI to improve it')).toBeInTheDocument()
     expect(screen.getAllByRole('link', { name: 'Start designing — free' })[0]).toHaveAttribute('href', '/register')
     // No editor chrome on marketing pages.
     expect(screen.queryByRole('tab', { name: '2D Plan' })).not.toBeInTheDocument()
@@ -56,10 +58,9 @@ describe('Landing page', () => {
     expect(screen.queryByText(/pending integration|Watch Demo|Book a Demo/i)).not.toBeInTheDocument()
   })
 
-  it('shows the real example: brief, what was understood, and the generated plan', () => {
+  it('shows the real example: requirements, rules, and the plan', () => {
     renderLanding()
     const example = document.getElementById('example')!
-    expect(within(example).getByText(`“${EXAMPLE.brief}”`)).toBeInTheDocument()
     expect(within(example).getByText('2 bathrooms')).toBeInTheDocument()
     expect(within(example).getByText('Keep apart')).toBeInTheDocument()
     expect(within(example).getByText('kitchen ↔ bathroom')).toBeInTheDocument()

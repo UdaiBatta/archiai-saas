@@ -11,23 +11,23 @@ import { EXAMPLE } from '../../constants/examplePlan'
 import { PLANS } from '../../constants/plans'
 import { useHashScroll } from '../../hooks/useHashScroll'
 
-// The real sequence a project goes through, in order.
+// The real sequence a project goes through, in order. You draw; AI comes last.
 const STEPS = [
   {
-    title: 'Write the brief',
-    description: 'Plot size, facing, rooms, and how they should relate, in plain language.',
+    title: 'Set the site',
+    description: 'Draw the plot or import it (GeoJSON, DXF), load the buildings around it, and set setbacks, height and FAR.',
   },
   {
-    title: 'Check what was understood',
-    description: 'Every room, count and rule is read back before anything is drawn. Fix it or add to it.',
+    title: 'Shape the massing',
+    description: 'Push and pull masses, give each floor a use, and compare design options against the zoning limits.',
   },
   {
-    title: 'Get a checked plan',
-    description: 'The plan must meet every “must connect”, keep every room reachable, and respect privacy.',
+    title: 'Plan every floor',
+    description: 'Fill floors with homes, draw rooms, walls, doors, windows and furniture. Every edit is checked as you make it.',
   },
   {
-    title: 'Shape it in 2D and 3D',
-    description: 'Move rooms, choose wall, door or opening between them, and save versions as you go.',
+    title: 'Ask AI to improve it',
+    description: 'When you want a second opinion: a review, a fix for a broken rule, or an edit you preview, apply and can undo.',
   },
 ]
 
@@ -98,7 +98,7 @@ const RULE_BADGE: Record<string, string> = {
 }
 
 const CHECKS = [
-  'Every room and count from the brief is present',
+  'Every required room and count is present',
   'Every “must connect” is met',
   'Every room is reachable from the entrance',
   'No room is reachable only through a bedroom',
@@ -128,19 +128,20 @@ export default function Landing() {
           />
           <div className="relative mx-auto flex min-h-[min(calc(100svh-3.5rem),56rem)] w-full max-w-6xl flex-col justify-center px-4 py-16 sm:px-6">
             <p className="font-mono text-xs uppercase tracking-[0.2em] text-ember-soft">
-              Brief → checked floor plan
+              Site → massing → plans → AutoCAD &amp; Revit
             </p>
             <h1
               className="mt-6 font-black uppercase leading-[0.88] tracking-tight text-ink"
-              style={{ fontStretch: '125%', fontSize: 'clamp(2.6rem, 7.6vw, 7rem)' }}
+              style={{ fontStretch: '125%', fontSize: 'clamp(2.4rem, 6.4vw, 6rem)' }}
             >
-              <span className="block text-ember [text-shadow:4px_4px_0_theme(colors.ember.deep),8px_8px_0_rgba(122,26,12,0.55)]">Write the </span>
-              <span className="block pl-[8%] [text-shadow:4px_4px_0_theme(colors.ember.deep),8px_8px_0_rgba(122,26,12,0.55)]">brief. </span>
-              <span className="block pl-[22%] [text-shadow:4px_4px_0_theme(colors.ember.deep),8px_8px_0_rgba(122,26,12,0.55)]">Get the plan.</span>
+              <span className="block text-ember [text-shadow:4px_4px_0_theme(colors.ember.deep),8px_8px_0_rgba(122,26,12,0.55)]">You design. </span>
+              <span className="block pl-[8%] [text-shadow:4px_4px_0_theme(colors.ember.deep),8px_8px_0_rgba(122,26,12,0.55)]">It checks. </span>
+              <span className="block pl-[22%] [text-shadow:4px_4px_0_theme(colors.ember.deep),8px_8px_0_rgba(122,26,12,0.55)]">AI helps.</span>
             </h1>
             <p className="mt-8 max-w-md text-base leading-relaxed text-graphite-100">
-              ArchiAI reads your brief back to you, lays out the rooms, and checks the plan
-              against every rule you gave before you see it. Then you shape it in 2D and 3D.
+              A 3D editor for early-stage housing: draw the site, shape the massing against
+              the zoning rules, plan every floor, and export to AutoCAD and Revit. When you
+              want help, ask the AI to review and improve what you made.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Link
@@ -167,8 +168,9 @@ export default function Landing() {
               />
               <FloatingCard
                 className="bottom-[16%] right-[22%] -rotate-[3deg] [animation-delay:1.5s]"
-                label="Brief understood"
-                lines={['3 bedrooms · 2 bathrooms', '1 dining · 1 pooja room', '12 × 15 m plot · faces east']}
+                label="Assistant, when asked"
+                lines={['Move the study next to the living room', 'Still passes every rule', 'One step to undo']}
+                footer="Preview · Apply"
               />
               <HandArrow className="absolute bottom-[31%] right-[42%] h-20 w-20 -rotate-[70deg] text-ember" />
             </div>
@@ -214,8 +216,8 @@ export default function Landing() {
           <div className="mx-auto w-full max-w-6xl px-4 py-20 sm:px-6">
             <SectionHead
               eyebrow="A real example"
-              title="One brief, start to finish"
-              lead="Real output from ArchiAI for this brief, not a mock-up. Hover a room for its size."
+              title="A plan, and what it's checked for"
+              lead="A real ArchiAI plan, not a mock-up, with the rules it's held to on every edit. Hover a room for its size."
             />
             <div className="mt-10 grid items-start gap-6 lg:grid-cols-[1.15fr_1fr]">
               {/* The drawing, as a sheet */}
@@ -223,10 +225,6 @@ export default function Landing() {
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-ink/10 px-5 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-light">
                   <span><span className="text-ember">A-101</span> · Ground floor plan</span>
                   <span>Plot 12 × 15 m · entry east</span>
-                </div>
-                <div className="px-5 pt-5">
-                  <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-ember-soft">Brief</p>
-                  <p className="mt-2 text-[13px] leading-relaxed text-graphite-100">“{EXAMPLE.brief}”</p>
                 </div>
                 <div className="m-5 rounded-xl bg-night bg-[linear-gradient(to_right,rgba(255,59,31,0.07)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,59,31,0.07)_1px,transparent_1px)] bg-[size:1.5rem_1.5rem] p-4 ring-1 ring-ink/10">
                   <ExamplePlanDrawing plan={EXAMPLE.plan} />
@@ -243,14 +241,14 @@ export default function Landing() {
 
               {/* What happened to it, in order */}
               <ol className="relative flex flex-col gap-4 before:absolute before:bottom-8 before:left-[1.1rem] before:top-8 before:w-px before:bg-gradient-to-b before:from-ember/70 before:via-ember/25 before:to-transparent">
-                <ExampleStep n="01" title="What was understood">
+                <ExampleStep n="01" title="The requirements">
                   <ul className="flex flex-wrap gap-1.5">
                     {program.map((line) => (
                       <li key={line} className="rounded-full border border-ink/15 bg-ink/5 px-2.5 py-1 text-[12px] text-graphite-100">{line}</li>
                     ))}
                   </ul>
                 </ExampleStep>
-                <ExampleStep n="02" title="Rules from the brief">
+                <ExampleStep n="02" title="Rules between rooms">
                   <ul className="flex flex-col gap-2">
                     {rules.map((line) => {
                       const [kind, pair] = line.split(': ')
@@ -263,7 +261,7 @@ export default function Landing() {
                     })}
                   </ul>
                 </ExampleStep>
-                <ExampleStep n="03" title="What the plan was checked for">
+                <ExampleStep n="03" title="Checked on every edit">
                   <ul className="flex flex-col gap-1.5 text-[13px] text-graphite-100">
                     {CHECKS.map((check) => (
                       <li key={check} className="flex gap-2">
@@ -321,10 +319,10 @@ export default function Landing() {
               className="font-black uppercase leading-[0.95] tracking-tight text-ink [text-wrap:balance]"
               style={{ fontStretch: '125%', fontSize: 'clamp(2rem, 5vw, 3.75rem)' }}
             >
-              Try it with <span className="text-ember">your own brief</span>
+              Start with <span className="text-ember">your own site</span>
             </h2>
             <p className="max-w-md text-sm text-graphite-100">
-              Describe a plot and the rooms you need. You’ll see what was understood before any plan is drawn.
+              Draw a plot or import one and shape it in 3D. The AI is there when you ask for it, never before.
             </p>
             <Link
               to={startTarget}
