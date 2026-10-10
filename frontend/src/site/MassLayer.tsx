@@ -191,8 +191,29 @@ export function MassLayer({ orbitRef, readOnly, topView, focusedMassId = null }:
 
       {selected && (
         <Html position={[centroid(selected.footprint).x, massTop(selected) + (topView ? 0.5 : 1.6), centroid(selected.footprint).z]} center zIndexRange={[2, 0]} style={{ pointerEvents: 'none' }}>
-          <div data-testid="mass-label" className="whitespace-nowrap rounded-md border border-ink/10 bg-graphite-800/95 px-2 py-1 text-[11px] font-semibold text-ink shadow-sm">
-            {selected.name} <span className="font-mono font-normal tabular-nums text-muted">· {selected.floors} fl · {massTop(selected).toFixed(1)} m</span>
+          <div data-testid="mass-label" className="flex items-center gap-2 whitespace-nowrap rounded-md border border-ink/10 bg-graphite-800/95 px-2 py-1 text-[11px] font-semibold text-ink shadow-sm">
+            <span>
+              {selected.name} <span className="font-mono font-normal tabular-nums text-muted">· {selected.floors} fl · {massTop(selected).toFixed(1)} m</span>
+            </span>
+            {!readOnly && (
+              <button
+                type="button"
+                title="Delete this mass (Delete key)"
+                aria-label={`Delete ${selected.name}`}
+                style={{ pointerEvents: 'auto' }}
+                // Keep the click out of the 3D view (it would drop the selection first).
+                onPointerDown={(event) => event.stopPropagation()}
+                onPointerUp={(event) => event.stopPropagation()}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  useCanvasStore.getState().deleteMass(selected.id)
+                  select(null)
+                }}
+                className="rounded px-1.5 py-0.5 font-medium text-muted hover:bg-danger/15 hover:text-danger"
+              >
+                Delete
+              </button>
+            )}
           </div>
         </Html>
       )}

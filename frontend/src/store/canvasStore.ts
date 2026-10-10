@@ -191,6 +191,8 @@ interface CanvasState {
   setMasses: (masses: Mass[]) => void
   /** Housing fill of one mass (P3), saved with the layout; undoable. null removes it. */
   setHousing: (massId: string, housing: MassHousing | null) => void
+  /** Remove a mass and its housing, as one undo step. */
+  deleteMass: (massId: string) => void
   resizeRoom: (
     id: string,
     size: ComponentSize,
@@ -833,6 +835,19 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       ...pushHistory(state),
       ...markUnsaved(),
     })),
+  deleteMass: (massId) =>
+    set((state) => {
+      const masses = Array.isArray(state.layoutMetadata.masses) ? (state.layoutMetadata.masses as Mass[]) : []
+      if (!masses.some((m) => m.id === massId)) return state
+      const layoutMetadata: Record<string, unknown> = { ...state.layoutMetadata, masses: masses.filter((m) => m.id !== massId) }
+      const housing = state.layoutMetadata.housing as Record<string, MassHousing> | undefined
+      if (housing && massId in housing) {
+        const rest = { ...housing }
+        delete rest[massId]
+        layoutMetadata.housing = rest
+      }
+      return { layoutMetadata, ...pushHistory(state), ...markUnsaved() }
+    }),
   setHousing: (massId, housing) =>
     set((state) => {
       const all = { ...(state.layoutMetadata.housing as Record<string, MassHousing> | undefined) }

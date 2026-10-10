@@ -38,9 +38,14 @@ export function useCanvasKeyboardShortcuts({
         event.preventDefault()
         store.duplicateSelected()
       } else if (shortcut === 'delete') {
+        const massId = useMassUi.getState().selectedMassId
         if (store.selectedId) {
           event.preventDefault()
           store.deleteRoom(store.selectedId)
+        } else if (massId) {
+          event.preventDefault()
+          store.deleteMass(massId)
+          useMassUi.getState().select(null)
         }
       } else if (shortcut === 'escape') {
         event.preventDefault()
