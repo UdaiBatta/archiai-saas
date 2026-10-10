@@ -2,6 +2,7 @@ import { CanvasObjectType, Room, useCanvasStore } from '../../store/canvasStore'
 import { COMPONENT_DEFINITIONS, componentTypeToRoomType, capabilitiesOf } from '../../store/componentRegistry'
 import { formatArea, formatMeters, roomArea, roomPerimeter } from '../../utils/format'
 import { canonicalQuarterTurn } from '../../utils/quarterTurn'
+import { ROOM_USES, isDefaultLabel, roomUseLabel } from './roomUses'
 
 interface InspectorPropertiesProps {
   room: Room
@@ -24,6 +25,7 @@ export function InspectorProperties({ room }: InspectorPropertiesProps) {
   const duplicateRoom = useCanvasStore((s) => s.duplicateRoom)
 
   const definition = capabilitiesOf(room)
+  const currentUse = typeof room.roomType === 'string' && room.roomType ? room.roomType : 'room'
   const roomQuarterTurnOnly = room.objectType === 'room'
 
   const rotateY = (degrees: number) => {
@@ -55,6 +57,27 @@ export function InspectorProperties({ room }: InspectorPropertiesProps) {
         className="rounded-lg border border-ink/10 bg-[#232425]/80 p-3"
       >
         <h3 className="mb-2.5 text-[11px] font-semibold text-ink">Geometry</h3>
+        {room.objectType === 'room' && (
+          <label className="mb-2 flex flex-col gap-1">
+            <span className={LABEL_CLASS}>Room use</span>
+            <select
+              aria-label="Room use"
+              className={FIELD_CLASS}
+              value={currentUse}
+              onChange={(event) => {
+                const next = event.target.value
+                updateRoom(
+                  room.id,
+                  isDefaultLabel(room.label, room.roomType) ? { roomType: next, label: roomUseLabel(next) } : { roomType: next },
+                  { action: 'object.updated', previousValue: room.roomType },
+                )
+              }}
+            >
+              {!ROOM_USES.some((use) => use.value === currentUse) && <option value={currentUse}>{roomUseLabel(currentUse)}</option>}
+              {ROOM_USES.map((use) => <option key={use.value} value={use.value}>{use.label}</option>)}
+            </select>
+          </label>
+        )}
         <div className="grid grid-cols-2 gap-2">
           <label className="flex flex-col gap-1">
             <span className={LABEL_CLASS}>Width (m)</span>
