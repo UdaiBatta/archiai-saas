@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.settings import settings
 from app.database.connection import get_db
+from app.services.design_service import RevisionConflict
 from app.services.llm_client import llm_reachable
 from app.api.auth.router import router as auth_router
 from app.api.billing.router import router as billing_router
@@ -112,6 +113,20 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
             "error": exc.detail,
             "code": STATUS_CODES.get(exc.status_code, "ERROR"),
             "status": exc.status_code,
+        },
+    )
+
+
+@app.exception_handler(RevisionConflict)
+async def revision_conflict_handler(request: Request, exc: RevisionConflict) -> JSONResponse:
+    return JSONResponse(
+        status_code=409,
+        content={
+            "error": exc.detail,
+            "code": "REVISION_CONFLICT",
+            "status": 409,
+            "currentRevision": exc.current_revision,
+            "baseRevision": exc.base_revision,
         },
     )
 

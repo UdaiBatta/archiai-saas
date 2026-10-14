@@ -10,6 +10,7 @@ from app.schemas.design import (
     DesignDraftResponse,
     DesignDraftSaveRequest,
     GenerateResponse,
+    RevisionedResponse,
     SaveDesignRequest,
 )
 from app.services.auth_service import get_current_user
@@ -43,28 +44,30 @@ async def _current_user_id(
     return str(user.id)
 
 
-@router.get("/project/{project_id}/latest", response_model=GenerateResponse)
+@router.get("/project/{project_id}/latest", response_model=RevisionedResponse)
 async def latest_for_project(
     project_id: str,
     user_id: str = Depends(_current_user_id),
     db: AsyncSession = Depends(get_db),
-) -> GenerateResponse:
+) -> RevisionedResponse:
     design, version = await get_latest_project_design(db, user_id, project_id)
     layout = {
         **design.layout_json,
+ 
         "designId": design.id,
         "designVersionId": version.id if version else None,
+        "revision": design.revision,
     }
-    return GenerateResponse(**layout)
+    return RevisionedResponse(**layout)
 
 
-@router.put("/{design_id}", response_model=GenerateResponse)
+@router.put("/{design_id}", response_model=RevisionedResponse)
 async def save_design(
     design_id: str,
     request: SaveDesignRequest,
     user_id: str = Depends(_current_user_id),
     db: AsyncSession = Depends(get_db),
-) -> GenerateResponse:
+) -> RevisionedResponse:
     design, version = await update_design_layout(
         db,
         user_id,
@@ -73,6 +76,7 @@ async def save_design(
         version_name=request.version_name,
         change_summary=request.change_summary,
         thumbnail_url=request.thumbnail_url,
+        base_revision=request.base_revision,
     )
     await log_activity(
         db,
@@ -85,21 +89,23 @@ async def save_design(
         **design.layout_json,
         "designId": design.id,
         "designVersionId": version.id,
+        "revision": design.revision,
     }
-    return GenerateResponse(**layout)
+    return RevisionedResponse(**layout)
 
 
 def _draft_response(design: Design, version: DesignVersion) -> DesignDraftResponse:
     layout = {
         key: value
         for key, value in version.layout_json.items()
-        if key not in ("designId", "designVersionId")
+        if key not in ("designId", "designVersionId", "revision")
     }
     return DesignDraftResponse(
         **layout,
         id=version.id,
         designId=design.id,
         designVersionId=version.id,
+        revision=design.revision,
         projectId=design.project_id,
         versionNumber=version.version_number,
         versionType=version.version_type or "auto_draft",
@@ -115,7 +121,9 @@ async def save_draft(
     user_id: str = Depends(_current_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> DesignDraftResponse:
-    design, draft = await save_design_draft(db, user_id, design_id, request.layout)
+    design, draft = await save_design_draft(
+        db, user_id, design_id, request.layout, base_revision=request.base_revision
+    )
     await log_activity(
         db,
         user_id,

@@ -16,7 +16,7 @@ from app.schemas.mvp import (
 )
 from app.schemas.requirements import RequirementsSpec
 from app.services.catalog import resolve_alias
-from app.services.design_service import AUTO_DRAFT_VERSION_TYPE
+from app.services.design_service import AUTO_DRAFT_VERSION_TYPE, claim_revision
 from app.services.layout_adapter import layout_plan_to_canvas
 from app.services.layout_engine import rebuild_derived_geometry
 from app.services.quality.hard_constraints import validate
@@ -153,6 +153,9 @@ async def save_mvp_snapshot(
         await db.flush()
         next_version = 1
     else:
+        # Server-side generation/save: an unconditional write, but it still
+        # bumps the revision so open editors learn the design changed.
+        await claim_revision(db, design, None)
         design.layout_json = legacy_layout
         design.updated_at = datetime.now(timezone.utc)
         max_version = await db.scalar(

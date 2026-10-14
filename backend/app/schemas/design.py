@@ -22,6 +22,9 @@ class SaveDesignRequest(BaseModel):
     version_name: str | None = Field(default=None, alias="versionName")
     change_summary: str | None = Field(default=None, alias="changeSummary")
     thumbnail_url: str | None = Field(default=None, alias="thumbnailUrl")
+    # The revision this layout was edited from. Refused with 409 when the design
+    # has moved on since (another tab or collaborator saved). Omitted = overwrite.
+    base_revision: int | None = Field(default=None, alias="baseRevision", ge=0)
 
     model_config = {"populate_by_name": True}
 
@@ -30,6 +33,9 @@ class SaveDesignRequest(BaseModel):
 
 class DesignDraftSaveRequest(BaseModel):
     layout: dict[str, Any]
+    base_revision: int | None = Field(default=None, alias="baseRevision", ge=0)
+
+    model_config = {"populate_by_name": True}
 
     _check_layout_size = field_validator("layout")(_validate_layout_size)
 
@@ -142,7 +148,14 @@ class GenerateResponse(BaseModel):
     insights: GenerationInsights | None = None
 
 
-class DesignDraftResponse(GenerateResponse):
+class RevisionedResponse(GenerateResponse):
+    """What the editor loads and saves: the layout plus the design's revision
+    when it was read. Send it back as `baseRevision`."""
+
+    revision: int | None = None
+
+
+class DesignDraftResponse(RevisionedResponse):
     id: str
     projectId: str
     versionNumber: int

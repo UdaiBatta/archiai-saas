@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from fastapi import HTTPException
-from sqlalchemy import desc, func, or_, select
+from sqlalchemy import desc, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.design import Design
@@ -10,6 +10,50 @@ from app.models.project import Project
 from app.services.workspace_service import require_project_edit_access, require_project_read_access
 
 AUTO_DRAFT_VERSION_TYPE = "auto_draft"
+
+
+class RevisionConflict(HTTPException):
+    """The design changed since the client read it (another tab or a collaborator saved).
+
+    The body carries the current revision so the client can offer to reload,
+    compare, or save its own copy on top of it.
+    """
+
+    def __init__(self, current_revision: int, base_revision: int):
+        super().__init__(
+            status_code=409,
+            detail="This design was changed somewhere else since you opened it.",
+        )
+        self.current_revision = current_revision
+        self.base_revision = base_revision
+
+
+async def claim_revision(db: AsyncSession, design: Design, base_revision: int | None) -> int:
+    """Take the next revision of `design`, atomically.
+
+    One UPDATE ... WHERE revision = :base: the database decides, under its row
+    lock, which of two concurrent saves wins; the loser matches no row and gets a
+    RevisionConflict. It runs first in the caller's transaction, so a refused
+    save writes nothing and a failed one rolls the bump back with it.
+
+    `base_revision=None` is an unconditional write (older clients, server-side
+    generation); it still bumps, so other editors see that something changed.
+    """
+    statement = update(Design).where(Design.id == design.id)
+    if base_revision is not None:
+        statement = statement.where(Design.revision == base_revision)
+    result = await db.execute(
+        # updated_at is kept as is: it picks a project's latest design, and an
+        # auto-draft must not make an older design look newer.
+        statement.values(revision=Design.revision + 1, updated_at=Design.updated_at).execution_options(
+            synchronize_session=False
+        )
+    )
+    if result.rowcount == 0:
+        current = await db.scalar(select(Design.revision).where(Design.id == design.id))
+        raise RevisionConflict(current if current is not None else 0, base_revision or 0)
+    await db.refresh(design)
+    return design.revision
 
 
 async def get_owned_design(
@@ -59,8 +103,10 @@ async def update_design_layout(
     version_name: str | None = None,
     change_summary: str | None = None,
     thumbnail_url: str | None = None,
+    base_revision: int | None = None,
 ) -> tuple[Design, DesignVersion]:
     design = await get_owned_design(db, user_id, design_id)
+    await claim_revision(db, design, base_revision)
 
     max_version_result = await db.execute(
         select(func.max(DesignVersion.version_number))
@@ -106,8 +152,10 @@ async def save_design_draft(
     user_id: str,
     design_id: str,
     layout_json: dict,
+    base_revision: int | None = None,
 ) -> tuple[Design, DesignVersion]:
     design = await get_owned_design(db, user_id, design_id)
+    await claim_revision(db, design, base_revision)
 
     draft_result = await db.execute(
         select(DesignVersion)
@@ -154,6 +202,7 @@ async def save_design_draft(
 
     await db.commit()
     await db.refresh(draft)
+    await db.refresh(design)
     return design, draft
 
 
