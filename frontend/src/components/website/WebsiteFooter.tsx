@@ -10,7 +10,7 @@ export function WebsiteFooter() {
             <span className="text-sm font-extrabold tracking-wide text-muted">·AI</span>
           </div>
           <p className="mt-1.5 max-w-xs text-xs leading-relaxed text-muted-light">
-            From a written brief to a checked, editable floor plan in 2D and 3D.
+            Site, massing and floor plans in one 3D editor, checked as you draw.
           </p>
         </div>
         <nav aria-label="Footer" className="flex flex-wrap gap-x-6 gap-y-2 text-xs text-muted">

@@ -11,35 +11,25 @@ import { EXAMPLE } from '../../constants/examplePlan'
 import { PLANS } from '../../constants/plans'
 import { useHashScroll } from '../../hooks/useHashScroll'
 
-// The real sequence a project goes through, in order.
+// The real sequence a project goes through, in order. You draw; AI comes last.
 const STEPS = [
   {
-    title: 'Write the brief',
-    description: 'Plot size, facing, rooms, and how they should relate, in plain language.',
+    title: 'Set the site',
+    description: 'Draw the plot or import it (GeoJSON, DXF), load the buildings around it, and set setbacks, height and FAR.',
   },
   {
-    title: 'Check what was understood',
-    description: 'Every room, count and rule is read back before anything is drawn. Fix it or add to it.',
+    title: 'Shape the massing',
+    description: 'Push and pull masses, give each floor a use, and compare design options against the zoning limits.',
   },
   {
-    title: 'Get a checked plan',
-    description: 'The plan must meet every “must connect”, keep every room reachable, and respect privacy.',
+    title: 'Plan every floor',
+    description: 'Fill floors with homes, draw rooms, walls, doors, windows and furniture. Every edit is checked as you make it.',
   },
   {
-    title: 'Shape it in 2D and 3D',
-    description: 'Move rooms, choose wall, door or opening between them, and save versions as you go.',
+    title: 'Ask AI to improve it',
+    description: 'When you want a second opinion: a review, a fix for a broken rule, or an edit you preview, apply and can undo.',
   },
 ]
-
-/** A hand-drawn arrow accent. */
-function HandArrow({ className = '' }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 100 100" className={className} fill="none" stroke="currentColor" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M90 12 C 80 60 58 82 36 62 C 18 44 38 22 58 32 C 76 42 68 72 46 84" />
-      <path d="M62 80 L46 84 L50 68" />
-    </svg>
-  )
-}
 
 /** A card of real checks floating over the hero's dot field. */
 function FloatingCard({ className, label, lines, footer }: { className: string; label: string; lines: string[]; footer?: string }) {
@@ -98,7 +88,7 @@ const RULE_BADGE: Record<string, string> = {
 }
 
 const CHECKS = [
-  'Every room and count from the brief is present',
+  'Every required room and count is present',
   'Every “must connect” is met',
   'Every room is reachable from the entrance',
   'No room is reachable only through a bedroom',
@@ -121,76 +111,72 @@ export default function Landing() {
         {/* Hero */}
         {/* Pulled up under the see-through navbar so the field runs to the top. */}
         <section className="relative isolate -mt-16 overflow-hidden border-b border-ink/10 pt-16">
-          <AsciiField className="absolute inset-0 -z-10" />
+          <AsciiField className="absolute inset-0 -z-10 opacity-20 lg:opacity-40" />
           <div
             aria-hidden="true"
             className="absolute inset-0 -z-10 bg-[linear-gradient(to_right,rgba(245,245,246,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(245,245,246,0.05)_1px,transparent_1px)] bg-[size:4rem_4rem]"
           />
-          <div className="relative mx-auto flex min-h-[min(calc(100svh-3.5rem),56rem)] w-full max-w-6xl flex-col justify-center px-4 py-16 sm:px-6">
+          <div className="relative mx-auto flex min-h-[min(calc(100svh-7rem),44rem)] w-full max-w-6xl flex-col justify-center px-4 py-16 sm:px-6">
             <p className="font-mono text-xs uppercase tracking-[0.2em] text-ember-soft">
-              Brief → checked floor plan
+              Site → massing → plans → AutoCAD &amp; Revit
             </p>
             <h1
-              className="mt-6 font-black uppercase leading-[0.88] tracking-tight text-ink"
-              style={{ fontStretch: '125%', fontSize: 'clamp(2.6rem, 7.6vw, 7rem)' }}
+              className="mt-5 max-w-[680px] font-black uppercase leading-[0.95] tracking-tight text-ink"
+              style={{ fontStretch: '125%', fontSize: 'clamp(2.25rem, 5.2vw, 4.75rem)' }}
             >
-              <span className="block text-ember [text-shadow:4px_4px_0_theme(colors.ember.deep),8px_8px_0_rgba(122,26,12,0.55)]">Write the </span>
-              <span className="block pl-[8%] [text-shadow:4px_4px_0_theme(colors.ember.deep),8px_8px_0_rgba(122,26,12,0.55)]">brief. </span>
-              <span className="block pl-[22%] [text-shadow:4px_4px_0_theme(colors.ember.deep),8px_8px_0_rgba(122,26,12,0.55)]">Get the plan.</span>
+              <span className="block">Design it. </span>
+              <span className="block text-ember">We check it.</span>
             </h1>
-            <p className="mt-8 max-w-md text-base leading-relaxed text-graphite-100">
-              ArchiAI reads your brief back to you, lays out the rooms, and checks the plan
-              against every rule you gave before you see it. Then you shape it in 2D and 3D.
+            <p className="mt-6 max-w-[560px] text-base leading-relaxed text-graphite-100">
+              Draw a site, shape the massing, plan every floor, and export DXF and IFC files
+              that open in AutoCAD and Revit, with every rule checked as you work. AI helps
+              when you ask.
             </p>
-            <div className="mt-8 flex flex-wrap items-center gap-3">
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
               <Link
                 to={startTarget}
-                className="rounded-full bg-ember px-6 py-3 text-sm font-bold text-graphite-950 shadow-[0_10px_40px_rgba(255,59,31,0.45)] transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/60"
+                className="rounded-full bg-ember px-6 py-3 text-center text-sm font-bold text-graphite-950 shadow-[0_10px_40px_rgba(255,59,31,0.45)] transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/60"
               >
-                Start designing — free
+                Start designing free
               </Link>
               <Link
                 to="/#example"
-                className="rounded-full border border-ink/30 bg-graphite-950/40 px-6 py-3 text-sm font-semibold text-ink backdrop-blur transition-colors hover:bg-ink/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/60"
+                className="rounded-full text-center border border-ink/30 bg-graphite-950/40 px-6 py-3 text-sm font-semibold text-ink backdrop-blur transition-colors hover:bg-ink/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/60"
               >
                 See a real example
               </Link>
             </div>
+            <p className="mt-3 text-xs text-muted-light">No credit card required.</p>
 
             {/* Real checks from the example, floating over the field. */}
             <div className="pointer-events-none absolute inset-0 hidden lg:block" aria-hidden="true">
               <FloatingCard
-                className="right-[3%] top-[20%] rotate-[4deg]"
+                className="right-[2%] top-[18%] rotate-[3deg]"
                 label="Plan checked"
                 lines={['Balcony opens off the living room', 'Master bath attached', 'Kitchen kept away from baths']}
                 footer={`Quality score ${EXAMPLE.score}/100`}
               />
               <FloatingCard
-                className="bottom-[16%] right-[22%] -rotate-[3deg] [animation-delay:1.5s]"
-                label="Brief understood"
-                lines={['3 bedrooms · 2 bathrooms', '1 dining · 1 pooja room', '12 × 15 m plot · faces east']}
+                className="bottom-[14%] right-[14%] -rotate-[2deg] [animation-delay:1.5s]"
+                label="Assistant, when asked"
+                lines={['Move the study next to the living room', 'Still passes every rule', 'One step to undo']}
+                footer="Preview · Apply"
               />
-              <HandArrow className="absolute bottom-[31%] right-[42%] h-20 w-20 -rotate-[70deg] text-ember" />
             </div>
 
-            <Link
-              to={startTarget}
-              aria-label="Start designing — free"
-              className="absolute bottom-8 right-6 hidden h-32 w-32 sm:block lg:bottom-12 lg:right-10"
-            >
-              <span className="relative flex h-full w-full rotate-12 items-center justify-center rounded-full bg-ember shadow-[0_12px_40px_rgba(255,59,31,0.5)] transition-transform hover:scale-105">
-                <svg viewBox="0 0 100 100" className="absolute inset-1 motion-safe:animate-spin-slow" aria-hidden="true">
-                  <path id="badge-ring" d="M 50,50 m -37,0 a 37,37 0 1,1 74,0 a 37,37 0 1,1 -74,0" fill="none" />
-                  <text className="fill-graphite-950 text-[11px] font-black uppercase">
-                    <textPath href="#badge-ring" textLength="228" lengthAdjust="spacing">Start designing • free • </textPath>
-                  </text>
-                </svg>
-                <svg viewBox="0 0 24 24" className="h-9 w-9 text-graphite-950" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M7 17L17 7M17 7H8M17 7v9" />
-                </svg>
-              </span>
-            </Link>
           </div>
+        </section>
+
+        {/* What's in it, at a glance */}
+        <section aria-label="In the product" className="border-b border-ink/10">
+          <ul className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-5 font-mono text-[11px] uppercase tracking-[0.14em] text-graphite-200 sm:px-6">
+            {['3D editor', 'Rule checking', 'DXF · IFC · GLB · OBJ export', 'Undoable AI edits'].map((item) => (
+              <li key={item} className="flex items-center gap-2">
+                <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-ember" />
+                {item}
+              </li>
+            ))}
+          </ul>
         </section>
 
         {/* How it works */}
@@ -214,8 +200,8 @@ export default function Landing() {
           <div className="mx-auto w-full max-w-6xl px-4 py-20 sm:px-6">
             <SectionHead
               eyebrow="A real example"
-              title="One brief, start to finish"
-              lead="Real output from ArchiAI for this brief, not a mock-up. Hover a room for its size."
+              title="A plan, and what it's checked for"
+              lead="A real ArchiAI plan, not a mock-up, with the rules it's held to on every edit. Hover a room for its size."
             />
             <div className="mt-10 grid items-start gap-6 lg:grid-cols-[1.15fr_1fr]">
               {/* The drawing, as a sheet */}
@@ -223,10 +209,6 @@ export default function Landing() {
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-ink/10 px-5 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-light">
                   <span><span className="text-ember">A-101</span> · Ground floor plan</span>
                   <span>Plot 12 × 15 m · entry east</span>
-                </div>
-                <div className="px-5 pt-5">
-                  <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-ember-soft">Brief</p>
-                  <p className="mt-2 text-[13px] leading-relaxed text-graphite-100">“{EXAMPLE.brief}”</p>
                 </div>
                 <div className="m-5 rounded-xl bg-night bg-[linear-gradient(to_right,rgba(255,59,31,0.07)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,59,31,0.07)_1px,transparent_1px)] bg-[size:1.5rem_1.5rem] p-4 ring-1 ring-ink/10">
                   <ExamplePlanDrawing plan={EXAMPLE.plan} />
@@ -243,14 +225,14 @@ export default function Landing() {
 
               {/* What happened to it, in order */}
               <ol className="relative flex flex-col gap-4 before:absolute before:bottom-8 before:left-[1.1rem] before:top-8 before:w-px before:bg-gradient-to-b before:from-ember/70 before:via-ember/25 before:to-transparent">
-                <ExampleStep n="01" title="What was understood">
+                <ExampleStep n="01" title="The requirements">
                   <ul className="flex flex-wrap gap-1.5">
                     {program.map((line) => (
                       <li key={line} className="rounded-full border border-ink/15 bg-ink/5 px-2.5 py-1 text-[12px] text-graphite-100">{line}</li>
                     ))}
                   </ul>
                 </ExampleStep>
-                <ExampleStep n="02" title="Rules from the brief">
+                <ExampleStep n="02" title="Rules between rooms">
                   <ul className="flex flex-col gap-2">
                     {rules.map((line) => {
                       const [kind, pair] = line.split(': ')
@@ -263,7 +245,7 @@ export default function Landing() {
                     })}
                   </ul>
                 </ExampleStep>
-                <ExampleStep n="03" title="What the plan was checked for">
+                <ExampleStep n="03" title="Checked on every edit">
                   <ul className="flex flex-col gap-1.5 text-[13px] text-graphite-100">
                     {CHECKS.map((check) => (
                       <li key={check} className="flex gap-2">
@@ -321,16 +303,16 @@ export default function Landing() {
               className="font-black uppercase leading-[0.95] tracking-tight text-ink [text-wrap:balance]"
               style={{ fontStretch: '125%', fontSize: 'clamp(2rem, 5vw, 3.75rem)' }}
             >
-              Try it with <span className="text-ember">your own brief</span>
+              Start with <span className="text-ember">your own site</span>
             </h2>
             <p className="max-w-md text-sm text-graphite-100">
-              Describe a plot and the rooms you need. You’ll see what was understood before any plan is drawn.
+              Draw a plot or import one and shape it in 3D. The AI is there when you ask for it, never before.
             </p>
             <Link
               to={startTarget}
               className="mt-2 rounded-full bg-ember px-7 py-3.5 text-sm font-bold text-graphite-950 shadow-[0_10px_40px_rgba(255,59,31,0.45)] transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/60"
             >
-              Start designing — free
+              Start designing free
             </Link>
           </div>
         </section>
