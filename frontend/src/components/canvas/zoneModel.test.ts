@@ -39,6 +39,12 @@ describe('zoneForRoom', () => {
   it('falls back to the label when the room type is unknown', () => {
     expect(zoneForRoom(room({ roomType: 'mystery', label: 'Master Bedroom' }))).toBe('private')
   })
+
+  it('does not call an untyped room private', () => {
+    expect(zoneForRoom(room({ roomType: 'room', label: 'Room' }))).toBe('unassigned')
+    expect(zoneForRoom(room({ roomType: undefined, label: 'Room 3' }))).toBe('unassigned')
+    expect(zoneForRoom(room({ roomType: 'mystery', label: 'Thing' }))).toBe('unassigned')
+  })
 })
 
 describe('summarizeZones', () => {
@@ -63,5 +69,16 @@ describe('summarizeZones', () => {
 
   it('returns an empty summary when there are no zonable objects', () => {
     expect(summarizeZones([room({ objectType: 'wall' })])).toEqual([])
+  })
+})
+
+describe('summarizeZones with untyped rooms', () => {
+  it('counts them as their own Unassigned row, not as Private', () => {
+    const rows = summarizeZones([
+      room({ id: 'a', roomType: 'bedroom', size: { w: 5, h: 3, d: 4 } }), // 20 private
+      room({ id: 'b', roomType: 'room', label: 'Room', size: { w: 5, h: 3, d: 4 } }), // 20 unassigned
+    ])
+    expect(rows.map((r) => [r.zone, r.areaSqm, r.percent])).toEqual([['private', 20, 50], ['unassigned', 20, 50]])
+    expect(rows[1].label).toBe('Unassigned')
   })
 })

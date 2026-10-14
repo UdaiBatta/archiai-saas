@@ -152,6 +152,8 @@ export type ZoneType =
   | 'service'
   | 'circulation'
   | 'utility'
+  /** A room with no type yet: not evidence of any zone, so not counted as one. */
+  | 'unassigned'
 
 export const ZONE_ORDER: ZoneType[] = [
   'public',
@@ -160,6 +162,7 @@ export const ZONE_ORDER: ZoneType[] = [
   'service',
   'circulation',
   'utility',
+  'unassigned',
 ]
 
 export const ZONE_META: Record<ZoneType, { label: string; color: string }> = {
@@ -169,4 +172,5 @@ export const ZONE_META: Record<ZoneType, { label: string; color: string }> = {
   service: { label: 'Service', color: MUTED_ROOM_COLORS.amber },
   circulation: { label: 'Circulation', color: MUTED_ROOM_COLORS.charcoal },
   utility: { label: 'Utility', color: MUTED_ROOM_COLORS.stone },
+  unassigned: { label: 'Unassigned', color: '#3A3A3B' },
 }

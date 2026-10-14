@@ -6,6 +6,7 @@ import { ZONE_META, ZONE_ORDER, type ZoneType } from './editorPalette'
  * object's room type / object type. This is a safe functional placeholder:
  * layouts carry no zoning data yet, so the mapping lives in one place and
  * can be swapped for real backend zoning without touching the views.
+ * A room that is not yet typed is its own 'unassigned' zone.
  */
 const ROOM_TYPE_ZONES: Record<string, ZoneType> = {
   living_room: 'public',
@@ -77,7 +78,9 @@ export function zoneForRoom(room: Pick<Room, 'objectType' | 'roomType' | 'label'
   for (const [key, zone] of Object.entries(ROOM_TYPE_ZONES)) {
     if (label.includes(key.replace(/_/g, ' '))) return zone
   }
-  return room.objectType === 'room' ? 'private' : 'utility'
+  // No type and no recognisable name: say so rather than guess a zone (it used
+  // to default to private, which inflated Private and hid untyped rooms).
+  return room.objectType === 'room' ? 'unassigned' : 'utility'
 }
 
 export interface ZoneSummaryRow {
