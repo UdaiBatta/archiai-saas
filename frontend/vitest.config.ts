@@ -9,5 +9,7 @@ export default defineConfig({
     environment: 'happy-dom',
     globals: true,
     setupFiles: ['./src/test-setup.ts'],
+    // Playwright end-to-end specs run with `npm run test:e2e`, not here.
+    include: ['src/**/*.test.{ts,tsx}'],
   },
 })
