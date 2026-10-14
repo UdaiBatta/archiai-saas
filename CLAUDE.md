@@ -41,6 +41,7 @@ one that exists.
 - Tests alongside code. Both suites must stay green:
   - `cd backend && pytest` (needs `DATABASE_URL` and `SECRET_KEY` env vars; any values work, tests use SQLite)
   - `cd frontend && npx tsc --noEmit && npx vitest run`
+  - `cd frontend && npm run test:e2e` for changes to editing, saving, export or the assistant (needs `E2E_DATABASE_URL`; see README "Run Checks"). CI runs it as the `e2e` job.
 - Schema changes to DB models need an Alembic migration with a working downgrade.
 - UI colours come from the tokens in `frontend/tailwind.config.ts`; no new hex literals in components.
 - Keep files small; split a module rather than growing it past ~400 lines.

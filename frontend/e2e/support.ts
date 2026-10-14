@@ -67,10 +67,23 @@ export async function openProject(page: Page, projectId: string) {
   await page.getByTestId('plan-object-win1').first().waitFor({ state: 'attached' })
 }
 
-/** Selects a room from the room list in the right panel (no canvas coordinates). */
+/**
+ * Selects a room from the room list in the right panel (no canvas coordinates).
+ * With a room already selected the panel shows its inspector, so step back to
+ * the list first.
+ */
 export async function selectRoom(page: Page, label: string) {
+  const back = page.getByRole('button', { name: /All rooms/ })
+  if (await back.isVisible()) await back.click()
   await page.getByRole('button', { name: new RegExp('^' + label) }).last().click()
   await expect(page.getByLabel('Object label')).toHaveValue(label)
+}
+
+/** Renames the selected object. The label field sits under "Advanced properties". */
+export async function setLabel(page: Page, label: string) {
+  const input = page.getByLabel('Object label')
+  if (!(await input.isVisible())) await page.getByText('Advanced properties').click()
+  await input.fill(label)
 }
 
 /** The inspector input with this accessible name. */

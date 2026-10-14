@@ -27,7 +27,8 @@ function roomsFrom(system) {
     .split('\n')
     .map((line) => line.split('|').map((part) => part.trim()))
     .filter((cells) => cells.length >= 3 && cells[0] && !cells[0].startsWith('Quality'))
-    .map(([id, type, label]) => ({ id, type, label }))
+    // Rows look like "- r3 | kitchen | Kitchen | 0 | 7.1, 2.6 | 3.7 x 3.2".
+    .map(([id, type, label]) => ({ id: id.replace(/^-\s*/, ''), type, label }))
 }
 
 function answer(system, instruction) {

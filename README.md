@@ -239,6 +239,22 @@ npm run build
 npm audit --omit=dev
 ```
 
+End-to-end (Playwright). These drive the real frontend, backend and a real PostgreSQL database in a browser: open a generated plan, edit, autosave, reload, undo and redo, door and wall editing, the assistant's preview and apply, and every export format. Only the LLM is replaced, by a small fake server (`frontend/e2e/fake-llm.mjs`), so runs are deterministic and cost nothing. The app starts on its own ports (frontend 5175, backend 8001), so your dev stack can keep running.
+
+```powershell
+# a throwaway database used only by these tests
+$env:E2E_DATABASE_URL = "postgresql+asyncpg://USER:PASSWORD@localhost:5432/archiai_e2e"
+# python with backend/requirements.txt installed (default: python)
+$env:E2E_PYTHON = "backend\.venv\Scripts\python.exe"
+# optional: use an installed browser instead of Playwright's Chromium
+$env:E2E_CHANNEL = "chrome"
+cd frontend
+npx playwright install chromium   # once, unless E2E_CHANNEL is set
+npm run test:e2e
+```
+
+CI runs the same suite as the `e2e` job.
+
 Docker:
 
 ```powershell
