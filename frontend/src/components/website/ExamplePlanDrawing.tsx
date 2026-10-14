@@ -12,6 +12,7 @@ const ZONE_FILL: Record<ZoneType, string> = {
   collaborative: 'fill-ink/[0.07]',
   circulation: 'fill-ink/[0.03]',
   utility: 'fill-ink/[0.05]',
+  unassigned: 'fill-ink/[0.03]',
 }
 
 /**
