@@ -9,13 +9,16 @@ export type DrawMode = 'rect' | 'poly' | null
 /** Massing UI state (not saved, not undoable): selection and the Top view draw tool. */
 export const useMassUi = create<{
   selectedMassId: string | null
+  /** A floor of the selected mass picked in 3D (0 = ground), or null for the whole mass. */
+  selectedFloor: number | null
   drawMode: DrawMode
-  select: (id: string | null) => void
+  select: (id: string | null, floor?: number | null) => void
   setDrawMode: (mode: DrawMode) => void
 }>((set) => ({
   selectedMassId: null,
+  selectedFloor: null,
   drawMode: null,
-  select: (selectedMassId) => set({ selectedMassId }),
+  select: (selectedMassId, floor = null) => set({ selectedMassId, selectedFloor: selectedMassId ? floor : null }),
   setDrawMode: (drawMode) => set({ drawMode }),
 }))
 

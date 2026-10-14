@@ -180,10 +180,10 @@ thead th.col-today, thead th.col-target { color: var(--accent); }
       <h1>ArchiAI: feature map &amp; build plan</h1>
     </div>
     <dl>
-      <dt>Updated</dt><dd id="updated">2026-10-01</dd>
+      <dt>Updated</dt><dd id="updated">2026-10-10</dd>
       <dt>Scope</dt><dd>Site, massing, housing, interior</dd>
       <dt>Status</dt><dd>P1 in progress</dd>
-      <dt>Progress</dt><dd id="overall">54 / 73 items</dd>
+      <dt>Progress</dt><dd id="overall">59 / 81 items</dd>
     </dl>
   </div>
   <p class="lede"><strong>ArchiAI is a browser-based, 3D-first design tool for the first weeks of a residential project</strong>: draw the site, shape the mass, and fill it with homes and rooms that already obey the rules an architect would check by hand (daylight, street entry, circulation, adjacency). It is for architects and small practices doing early-stage site and housing design who today stitch together a massing tool, a plan sketcher and a spreadsheet. The engine is deterministic and explainable; AI sits on top as an optional suggestion layer. Everything leaves as clean DXF and IFC, so the work continues in AutoCAD, Revit or ArchiCAD without redrawing.</p>
@@ -433,6 +433,27 @@ thead th.col-today, thead th.col-target { color: var(--accent); }
         <li>Spreadsheet sync for area schedules</li>
       </ul><!--/P7-->
       <div class="done"><b>Done when</b>a model exported to Revit, edited and re-imported keeps element identity and comments, and round-trip passes on five reference projects.</div>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="id">P8</div>
+    <div>
+      <h3>Massing studio</h3>
+      <div class="meta"><span class="tag size">Size L</span><span class="tag">Studio</span></div>
+      <p>Goal: Site Atlas context and Arcol-style options in one editor, then plans and CAD files the office can open.</p>
+      <!--P8--><div class="meter" aria-hidden="true"><i style="width:62%"></i></div><span class="tag prog">5 / 8 done</span>
+      <ul class="check">
+        <li class="ok">A use per floor on each mass (residential, retail, office, amenity, parking), drawn as coloured floor bands</li>
+        <li class="ok">Click a floor in 3D to pick it; set the use for a floor range in one step</li>
+        <li class="ok">Design options: duplicate, rename, delete, switch (each is one undo step)</li>
+        <li class="ok">Compare options: GFA, FAR, homes, height against the limits, and programme mix</li>
+        <li class="ok">Surrounding buildings from OpenStreetMap (100/250/500 m), saved with the project</li>
+        <li>2D plan drawing style (paper, poché walls, door swings, furniture symbols, dimensions)</li>
+        <li>Typical floors: apply one floor&#x27;s layout to a range, with an area schedule</li>
+        <li>DXF sheets per floor with blocks and dimensions; IFC storeys and stable GUIDs</li>
+      </ul><!--/P8-->
+      <div class="done"><b>Done when</b>a scheme goes from site to compared options to per-floor plans, and opens in AutoCAD and Revit without fixes.</div>
     </div>
   </div>
 </section>

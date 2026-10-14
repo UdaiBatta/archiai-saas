@@ -8,8 +8,9 @@ import { useCanvasStore } from '../store/canvasStore'
 import { importSiteDxf } from '../services/site.service'
 import { boundaryFromGeoJson } from './geojson'
 import { edgeLength, frontEdgeIndex, plotBoundary, streetDirection, withBoundary } from './siteEdit'
-import { parseSite, type SitePoint, type SiteRules } from './siteTypes'
+import { DEFAULT_LOCATION, parseSite, type SitePoint, type SiteRules } from './siteTypes'
 import { useSiteUi } from './siteUiStore'
+import { fetchSurroundings, OSM_CREDIT, parseSiteContext, placeOnSite } from './surroundings'
 
 const buttonClass =
   'rounded-md px-2 py-1 text-[11px] font-semibold text-muted transition-colors hover:bg-ink/10 hover:text-ink focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent disabled:opacity-40'
@@ -93,6 +94,30 @@ export function SitePanel({ topView, onRequestTop, defaultOpen = false }: SitePa
   const [allEdges, setAllEdges] = useState('')
   const geojsonInput = useRef<HTMLInputElement>(null)
   const dxfInput = useRef<HTMLInputElement>(null)
+  const contextRaw = useCanvasStore((s) => s.layoutMetadata.siteContext)
+  const editMetadata = useCanvasStore((s) => s.editMetadata)
+  const context = useMemo(() => parseSiteContext(contextRaw), [contextRaw])
+  const showContext = useSiteUi((s) => s.showContext)
+  const setShowContext = useSiteUi((s) => s.setShowContext)
+  const [radius, setRadius] = useState(250)
+
+  const loadSurroundings = async () => {
+    if (!site) return
+    const center = site.location ?? DEFAULT_LOCATION
+    setBusy(true)
+    setMessage(null)
+    try {
+      const buildings = placeOnSite(await fetchSurroundings(center, radius), site.boundary)
+      editMetadata((m) => ({ ...m, siteContext: { buildings, radiusM: radius, center, fetchedAt: new Date().toISOString() } }))
+      setShowContext(true)
+    } catch (error) {
+      const detail = (error as { response?: { data?: { detail?: unknown; error?: unknown } } }).response?.data
+      const text = detail?.error ?? detail?.detail
+      setMessage({ text: typeof text === 'string' ? text : 'Could not load surroundings. Try again in a minute.', error: true })
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const metadata = { mvpRequirements: requirements }
   const groundFootprint = [...floors].sort((a, b) => a.level - b.level).find((f) => f.footprint?.w)?.footprint
@@ -245,6 +270,33 @@ export function SitePanel({ topView, onRequestTop, defaultOpen = false }: SitePa
                   <input type="checkbox" checked={showHeightCap} onChange={(event) => setShowHeightCap(event.target.checked)} className="accent-accent" />
                   Show height limit in 3D
                 </label>
+              )}
+            </fieldset>
+
+            <fieldset className="flex flex-col gap-1">
+              <legend className="mb-1 font-semibold text-ink">Surroundings</legend>
+              {!site.location && <p className="text-warn">No site location set: using the default ({DEFAULT_LOCATION.lat}, {DEFAULT_LOCATION.lon}).</p>}
+              <div className="flex items-center justify-between gap-2">
+                <select aria-label="Surroundings radius" value={radius} onChange={(e) => setRadius(Number(e.target.value))} className="rounded-md border border-ink/10 bg-graphite-900/60 px-1 py-0.5 text-[11px] text-ink">
+                  {[100, 250, 500].map((r) => <option key={r} value={r}>{r} m</option>)}
+                </select>
+                <button type="button" className={buttonClass} disabled={busy} onClick={loadSurroundings}>
+                  {busy ? 'Loading…' : context ? 'Reload' : 'Load from OpenStreetMap'}
+                </button>
+              </div>
+              {context && (
+                <>
+                  <p data-testid="context-status" className="text-muted-light">{context.buildings.length} building{context.buildings.length === 1 ? '' : 's'} · {OSM_CREDIT}</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="flex items-center gap-2 text-muted-light">
+                      <input type="checkbox" checked={showContext} onChange={(e) => setShowContext(e.target.checked)} className="accent-accent" />
+                      Show in 3D
+                    </label>
+                    <button type="button" className={buttonClass} onClick={() => editMetadata((m) => { const { siteContext: _, ...rest } = m; return rest })}>
+                      Remove
+                    </button>
+                  </div>
+                </>
               )}
             </fieldset>
           </>

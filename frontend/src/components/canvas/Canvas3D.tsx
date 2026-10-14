@@ -37,6 +37,9 @@ import { useParams } from 'react-router-dom'
 import { CommentLayer } from '../../collab/CommentLayer'
 import { CommentsPanel } from '../../collab/CommentsPanel'
 import { useComments } from '../../collab/commentsStore'
+import { OptionsBar } from '../../site/OptionsBar'
+import { ContextCredit, ContextLayer } from '../../site/ContextLayer'
+import { ComparePanel } from '../../site/ComparePanel'
 
 // Props are stable per room, so metadata or UI-state changes in this
 // component no longer re-render every room.
@@ -277,6 +280,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
         {!readOnly && <WallLineHighlight />}
         {comments && <CommentLayer />}
         {studio && <SunHoursLayer />}
+        {studio && <ContextLayer />}
         {studio && <MassLayer orbitRef={orbitRef} readOnly={readOnly} topView={topView} focusedMassId={focusedMassId} />}
         {studio && (
           <SiteLayer orbitRef={orbitRef} readOnly={readOnly} topView={topView} planY={(planFloor?.elevation ?? 0) + floorHeight + 0.4} />
@@ -304,6 +308,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
         {aoOn && <PerformanceMonitor onDecline={() => chooseAo(false)} />}
         {SHOW_PERF && <PerfReadout />}
       </Canvas>
+      {studio && <ContextCredit />}
       {topView && !readOnly && (
         <TopPlanKeyboardLayer rooms={visibleRooms} invalidRoomIds={invalidRoomIds} onFocusRoom={setFocusedRoomId} onFocusMass={setFocusedMassId} />
       )}
@@ -344,6 +349,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
               </SunPanel>
             ),
             analysis: <AnalysisPanel />,
+            compare: !modelStage && <ComparePanel />,
             comments: comments && <CommentsPanel />,
             floors: multiFloor && (
               <div role="group" aria-label="Other floors" className={DOCK_CARD}>
@@ -364,6 +370,11 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
       {topView && selectedFloor === 'all' && planFloor && floors.length > 1 && (
         <div role="status" className="pointer-events-none absolute left-1/2 top-28 z-20 -translate-x-1/2 rounded-full border border-warn/30 bg-graphite-800/95 px-3 py-1.5 text-[11px] font-medium text-warn shadow-sm">
           Top view shows {planFloor.name}. Choose a level to edit another floor.
+        </div>
+      )}
+      {studio && !modelStage && !readOnly && (
+        <div className="absolute left-3 top-[60px] z-20 max-w-[calc(100%-1.5rem)] overflow-x-auto">
+          <OptionsBar readOnly={readOnly} />
         </div>
       )}
       {studio && preset !== 'perspective' && (

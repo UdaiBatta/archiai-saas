@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { Axis3d, BarChart3, Box, Building2, Camera, Layers, LayoutGrid, Map as MapIcon, MessageSquare, Network, Sparkles, SquareDashed, Sun } from 'lucide-react'
+import { Axis3d, BarChart3, Box, Building2, Camera, GitCompareArrows, Layers, LayoutGrid, Map as MapIcon, MessageSquare, Network, Sparkles, SquareDashed, Sun } from 'lucide-react'
 import { Toolbar, type ToolbarGroup, type ToolbarItem } from '@/components/ui/toolbar'
 import { useCanvasStore } from '../../store/canvasStore'
 import { CAMERA_PRESETS, type CameraPreset } from './modelView'
 import { useEditTools, type EditTool } from './editTools'
 
-export type DockTool = 'site' | 'massing' | 'views' | 'sun' | 'analysis' | 'floors' | 'comments' | 'assistant'
+export type DockTool = 'site' | 'massing' | 'compare' | 'views' | 'sun' | 'analysis' | 'floors' | 'comments' | 'assistant'
 type DockPopover = DockTool | 'more'
 
 const icon = 'h-[18px] w-[18px]'
@@ -36,6 +36,7 @@ const LENSES = [
 const TOOLS: { id: DockTool; label: string; icon: ReactNode }[] = [
   { id: 'site', label: 'Site', icon: <MapIcon className={icon} /> },
   { id: 'massing', label: 'Massing', icon: <Building2 className={icon} /> },
+  { id: 'compare', label: 'Compare options', icon: <GitCompareArrows className={icon} /> },
   { id: 'sun', label: 'Sun', icon: <Sun className={icon} /> },
   { id: 'analysis', label: 'Analysis', icon: <BarChart3 className={icon} /> },
   { id: 'views', label: 'Views', icon: <Camera className={icon} /> },
@@ -45,7 +46,7 @@ const TOOLS: { id: DockTool; label: string; icon: ReactNode }[] = [
 ]
 /** Where each tool sits: site work, studies, sharing/presenting, AI last. */
 const TOOL_GROUPS: { id: string; label: string; tools: DockTool[] }[] = [
-  { id: 'site', label: 'Site', tools: ['site', 'massing'] },
+  { id: 'site', label: 'Site', tools: ['site', 'massing', 'compare'] },
   { id: 'study', label: 'Study', tools: ['sun', 'analysis'] },
   { id: 'share', label: 'Share', tools: ['views', 'comments', 'floors'] },
   { id: 'ai', label: 'AI', tools: ['assistant'] },

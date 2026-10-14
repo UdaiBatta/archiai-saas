@@ -1,7 +1,8 @@
 """Site import endpoints (roadmap P2)."""
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 
 from app.api.mvp.router import _current_user_id
+from app.services.site_context import ContextUnavailable, fetch_context
 from app.services.site_import import NoBoundaryFound, boundary_from_dxf
 from app.utils.rate_limit import rate_limit
 
@@ -27,3 +28,21 @@ async def import_dxf(
     except NoBoundaryFound as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return {"boundary": boundary}
+
+
+@router.get(
+    "/context",
+    dependencies=[Depends(rate_limit("site_context", limit=10, window_seconds=60))],
+)
+async def site_context(
+    lat: float = Query(ge=-85, le=85),
+    lon: float = Query(ge=-180, le=180),
+    radius: int = Query(default=250, ge=50, le=500),
+    _user_id: str = Depends(_current_user_id),
+) -> dict:
+    """Surrounding buildings from OpenStreetMap, in metres around (lat, lon)."""
+    try:
+        buildings = await fetch_context(lat, lon, radius)
+    except ContextUnavailable as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return {"buildings": buildings, "radius_m": radius, "source": "OpenStreetMap", "attribution": "© OpenStreetMap contributors"}
