@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuthStore } from '../../store/authStore'
 import { useAuth } from '../../hooks/useAuth'
 import { AccountMenu } from '../ui/AccountMenu'
@@ -17,6 +17,28 @@ const NAV_LINKS: { label: string; to: string }[] = [
 export function useStartDesigningTarget() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   return isAuthenticated ? '/projects' : '/register'
+}
+
+/** The landing section most in view (scroll-spy), so its nav link can show as current. */
+function useSectionInView(enabled: boolean) {
+  const [section, setSection] = useState<string | null>(null)
+  useEffect(() => {
+    if (!enabled || typeof IntersectionObserver === 'undefined') return
+    const ids = NAV_LINKS.flatMap((l) => (l.to.startsWith('/#') ? [l.to.slice(2)] : []))
+    const targets = ids.map((id) => document.getElementById(id)).filter((el): el is HTMLElement => !!el)
+    // A section counts as current while it crosses a band just under the navbar.
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const hit = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0]
+        if (hit) setSection(hit.target.id)
+        else if (entries.every((e) => !e.isIntersecting) && window.scrollY < 200) setSection(null)
+      },
+      { rootMargin: '-30% 0px -60% 0px' },
+    )
+    targets.forEach((t) => observer.observe(t))
+    return () => observer.disconnect()
+  }, [enabled])
+  return enabled ? section : null
 }
 
 /**
@@ -75,8 +97,10 @@ export function WebsiteNavbar() {
   const { pathname } = useLocation()
   const focusRing = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/50'
 
+  const section = useSectionInView(pathname === '/')
   const isActive = (to: string) => {
-    const path = to.split('#')[0] || '/'
+    const [path, hash] = to.split('#')
+    if (hash) return pathname === '/' && section === hash
     return path !== '/' && pathname.startsWith(path)
   }
 
@@ -102,7 +126,11 @@ export function WebsiteNavbar() {
           )}
           <Link
             to={startTarget}
-            className={`rounded-full bg-ember px-4 py-2 text-sm font-bold text-graphite-950 shadow-[0_6px_24px_rgba(255,59,31,0.35)] transition-transform hover:-translate-y-px ${focusRing}`}
+            className={
+              isAuthenticated
+                ? `rounded-full border border-ink/20 bg-graphite-950/60 px-4 py-2 text-sm font-semibold text-ink backdrop-blur-md hover:border-ink/40 ${focusRing}`
+                : `rounded-full bg-ember px-4 py-2 text-sm font-bold text-graphite-950 shadow-[0_6px_24px_rgba(255,59,31,0.35)] transition-transform hover:-translate-y-px ${focusRing}`
+            }
           >
             {isAuthenticated ? 'Your projects' : 'Start designing'}
           </Link>
