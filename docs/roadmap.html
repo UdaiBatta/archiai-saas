@@ -180,10 +180,10 @@ thead th.col-today, thead th.col-target { color: var(--accent); }
       <h1>ArchiAI: feature map &amp; build plan</h1>
     </div>
     <dl>
-      <dt>Updated</dt><dd id="updated">2026-10-10</dd>
+      <dt>Updated</dt><dd id="updated">2026-10-14</dd>
       <dt>Scope</dt><dd>Site, massing, housing, interior</dd>
       <dt>Status</dt><dd>P1 in progress</dd>
-      <dt>Progress</dt><dd id="overall">59 / 81 items</dd>
+      <dt>Progress</dt><dd id="overall">68 / 92 items</dd>
     </dl>
   </div>
   <p class="lede"><strong>ArchiAI is a browser-based, 3D-first design tool for the first weeks of a residential project</strong>: draw the site, shape the mass, and fill it with homes and rooms that already obey the rules an architect would check by hand (daylight, street entry, circulation, adjacency). It is for architects and small practices doing early-stage site and housing design who today stitch together a massing tool, a plan sketcher and a spreadsheet. The engine is deterministic and explainable; AI sits on top as an optional suggestion layer. Everything leaves as clean DXF and IFC, so the work continues in AutoCAD, Revit or ArchiCAD without redrawing.</p>
@@ -454,6 +454,30 @@ thead th.col-today, thead th.col-target { color: var(--accent); }
         <li>DXF sheets per floor with blocks and dimensions; IFC storeys and stable GUIDs</li>
       </ul><!--/P8-->
       <div class="done"><b>Done when</b>a scheme goes from site to compared options to per-floor plans, and opens in AutoCAD and Revit without fixes.</div>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="id">P9</div>
+    <div>
+      <h3>Stabilization</h3>
+      <div class="meta"><span class="tag size">Size M</span><span class="tag">Studio</span></div>
+      <p>Goal: the editor stays correct as it grows: regression tests on the real stack, and saving that cannot silently lose work.</p>
+      <!--P9--><div class="meter" aria-hidden="true"><i style="width:82%"></i></div><span class="tag prog">9 / 11 done</span>
+      <ul class="check">
+        <li class="ok">Export docs list every format (PNG, PDF, DXF, IFC, GLB, OBJ, SVG) with its limits (PR #61)</li>
+        <li class="ok">Untyped rooms are their own &quot;Unassigned&quot; zone, not Private (PR #61)</li>
+        <li class="ok">Concept-stage disclaimer under the landing hero (PR #60)</li>
+        <li class="ok">Playwright end-to-end suite on the real app, backend and PostgreSQL, run in CI (PR #62)</li>
+        <li class="ok">E2E: edit, autosave, reload; snapping; door sliding; wall/door/open; undo/redo; assistant preview, apply and stale-plan protection (PR #62)</li>
+        <li class="ok">E2E: every export format downloaded and its content checked (PR #62)</li>
+        <li class="ok">PNG and PDF export contain a real PNG (they held an SVG) (PR #62)</li>
+        <li class="ok">Revision-safe saving: a stale save gets 409 and writes nothing, atomically (PR #63)</li>
+        <li class="ok">Conflict banner: Compare, Save as new version, Reload; local edits are kept (PR #63)</li>
+        <li>Merge two copies of a plan instead of choosing one</li>
+        <li>E2E: 3D view interaction, multi-floor plans, share links</li>
+      </ul><!--/P9-->
+      <div class="done"><b>Done when</b>the core editing loop is covered end to end in CI, and two people editing one project can never overwrite each other unnoticed.</div>
     </div>
   </div>
 </section>
