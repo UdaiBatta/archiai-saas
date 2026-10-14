@@ -204,6 +204,8 @@ export interface GenerateMvpResponse {
   defaults_applied: string[]
   designId: string | null
   designVersionId: string | null
+  /** The saved design's revision; the editor sends it back as `baseRevision`. */
+  revision?: number | null
   /** Canvas-shaped, geometrically distinct best-of-64 runners-up (each with a
    * `score`). Structurally LayoutOption[] from design.service — cast at the
    * consumption boundary. Empty for polygon/multi-floor programmes. */

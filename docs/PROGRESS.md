@@ -7,7 +7,7 @@ Full plan and competitor map: [roadmap.html](roadmap.html) (published as the
 `python docs/sync_progress.py` to copy them into it. Near-term engine
 work lives in [ROADMAP.md](ROADMAP.md).
 
-_Last updated: 2026-10-10_
+_Last updated: 2026-10-14_
 
 ## Foundation: layout engine quality — PR #44 (merged)
 
@@ -116,3 +116,17 @@ _Last updated: 2026-10-10_
 - [ ] 2D plan drawing style (paper, poché walls, door swings, furniture symbols, dimensions)
 - [ ] Typical floors: apply one floor's layout to a range, with an area schedule
 - [ ] DXF sheets per floor with blocks and dimensions; IFC storeys and stable GUIDs
+
+## P9: Stabilization — PRs #60–#63
+
+- [x] Export docs list every format (PNG, PDF, DXF, IFC, GLB, OBJ, SVG) with its limits (PR #61)
+- [x] Untyped rooms are their own "Unassigned" zone, not Private (PR #61)
+- [x] Concept-stage disclaimer under the landing hero (PR #60)
+- [x] Playwright end-to-end suite on the real app, backend and PostgreSQL, run in CI (PR #62)
+- [x] E2E: edit, autosave, reload; snapping; door sliding; wall/door/open; undo/redo; assistant preview, apply and stale-plan protection (PR #62)
+- [x] E2E: every export format downloaded and its content checked (PR #62)
+- [x] PNG and PDF export contain a real PNG (they held an SVG) (PR #62)
+- [x] Revision-safe saving: a stale save gets 409 and writes nothing, atomically (PR #63)
+- [x] Conflict banner: Compare, Save as new version, Reload; local edits are kept (PR #63)
+- [ ] Merge two copies of a plan instead of choosing one
+- [ ] E2E: 3D view interaction, multi-floor plans, share links

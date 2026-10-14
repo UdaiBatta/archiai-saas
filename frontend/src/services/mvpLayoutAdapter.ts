@@ -35,6 +35,7 @@ interface AdapterOptions {
   quality?: MvpQualitySnapshot | HardQualitySnapshot
   designId?: string | null
   designVersionId?: string | null
+  revision?: number | null
 }
 
 function round3(value: number) {
@@ -277,6 +278,7 @@ export function layoutPlanToCanvas(
     version: '1.0',
     designId: options.designId ?? undefined,
     designVersionId: options.designVersionId ?? undefined,
+    revision: options.revision ?? undefined,
     metadata: {
       pipeline: 'mvp',
       prompt: options.prompt,
@@ -456,5 +458,6 @@ export function generateResponseToCanvas(
     quality: response.quality,
     designId: response.designId,
     designVersionId: response.designVersionId,
+    revision: response.revision,
   })
 }

@@ -30,6 +30,7 @@ async def _create_saved_design(client: AsyncClient, token: str, project_id: str)
     generated = await generate_design(client, {"Authorization": f"Bearer {token}"}, project_id)
     assert generated.status_code == 200
     layout = generated.json()
+    layout.pop("revision")  # the editor's revision travels beside a layout, never inside it
     layout["rooms"][0]["label"] = "Latest Saved Room"
     saved = await client.put(
         f"/api/design/{layout['designId']}",
@@ -37,7 +38,8 @@ async def _create_saved_design(client: AsyncClient, token: str, project_id: str)
         headers={"Authorization": f"Bearer {token}"},
     )
     assert saved.status_code == 200
-    return saved.json()
+    # The editor's revision is not part of a shared layout.
+    return {key: value for key, value in saved.json().items() if key != "revision"}
 
 
 async def _create_workspace(client: AsyncClient, token: str) -> dict:

@@ -269,6 +269,7 @@ async def generate_mvp_layout(
     )
     design_id = None
     version_id = None
+    revision = None
     if request.project_id is not None:
         design, version = await save_mvp_snapshot(
             db,
@@ -282,6 +283,7 @@ async def generate_mvp_layout(
         )
         design_id = design.id
         version_id = version.id
+        revision = design.revision
 
     await log_activity(
         db,
@@ -297,6 +299,7 @@ async def generate_mvp_layout(
         defaults_applied=defaults_applied,
         designId=design_id,
         designVersionId=version_id,
+        revision=revision,
         alternatives=alternatives,
     )
 

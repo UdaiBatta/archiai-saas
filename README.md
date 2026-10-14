@@ -273,6 +273,18 @@ docker compose build backend frontend
 7. Export from File > Export (PNG, PDF, DXF, IFC, GLB, OBJ or SVG).
 8. Create a read-only share link, open it without authentication, and revoke it when finished.
 
+## Saving And Conflicts
+
+Every write to a design (a named save, an autosave draft, a generated plan) bumps the design's `revision`. The editor loads a design with its revision and sends it back as `baseRevision` on each save. The check and the write are one atomic database update, so of two simultaneous saves exactly one wins.
+
+If the design changed since the editor loaded it (another tab, or a collaborator), the save is refused with HTTP 409 (`code: REVISION_CONFLICT`, with `currentRevision`) and nothing is written. The editor keeps the edits on screen, stops autosaving over the newer copy, and shows three choices:
+
+- **Compare**: what differs between this tab and the saved copy.
+- **Save as new version**: this tab's copy as a new named version on top of the current revision. The other copy stays in the version history.
+- **Reload**: take the saved copy and drop this tab's edits (asks first).
+
+A request without `baseRevision` is an unconditional write (older clients and server-side generation). It still bumps the revision, so open editors find out that something changed. Conflicts are detected per design: regenerating a project's plan in one tab creates a new design, which another tab's saves do not see.
+
 ## Export And Share Behavior
 
 - PNG and PDF files are generated in the browser and downloaded locally.
@@ -309,8 +321,8 @@ Treat share links as sensitive. The MVP does not yet support passwords, expiry d
 | POST | `/api/extract` | Brief text to structured requirements (LLM + fallback rules) |
 | POST | `/api/generate` | Generate and persist a layout from requirements |
 | POST | `/api/validate` | Re-derive walls/doors and quality-check an edited layout |
-| PUT | `/api/design/{id}` | Manual save and create named version |
-| PUT | `/api/design/{id}/draft` | Save/update separate auto-draft |
+| PUT | `/api/design/{id}` | Manual save and create named version (`baseRevision`; 409 if stale) |
+| PUT | `/api/design/{id}/draft` | Save/update separate auto-draft (`baseRevision`; 409 if stale) |
 | POST | `/api/projects/{id}/export/image` | Record image export |
 | POST | `/api/projects/{id}/export/pdf` | Record PDF export |
 | POST | `/api/projects/{id}/export/{format}` | Download the posted plan as `dxf`, `ifc`, `glb`, `obj` or `svg` |

@@ -28,6 +28,7 @@ export function BottomStatusBar() {
   const saveStatus = useCanvasStore((s) => s.saveStatus)
   const lastSavedAt = useCanvasStore((s) => s.lastSavedAt)
   const draftStatus = useCanvasStore((s) => s.draftStatus)
+  const saveConflict = useCanvasStore((s) => s.saveConflict)
   const lastDraftSavedAt = useCanvasStore((s) => s.lastDraftSavedAt)
   const insights = useCanvasStore((s) => s.generationInsights)
   const layoutMetadata = useCanvasStore((s) => s.layoutMetadata)
@@ -51,7 +52,7 @@ export function BottomStatusBar() {
   )
   const netArea = spaceRooms.reduce((sum, room) => sum + room.size.w * room.size.d, 0)
   const selected = rooms.find((room) => room.id === selectedId) ?? null
-  const persistence = persistenceStatus({ saveStatus, lastSavedAt, draftStatus, lastDraftSavedAt })
+  const persistence = persistenceStatus({ saveStatus, lastSavedAt, draftStatus, lastDraftSavedAt, conflict: Boolean(saveConflict) })
   const saveTone = { error: 'text-danger', pending: 'text-warn', busy: 'text-warn', ok: 'text-muted' }[persistence.tone]
 
   return (

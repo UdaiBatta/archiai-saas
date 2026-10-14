@@ -36,6 +36,12 @@ export type CanvasEditAction =
 export type SaveStatus = 'saved' | 'saving' | 'unsaved' | 'error'
 export type DraftStatus = 'idle' | 'dirty' | 'saving' | 'saved' | 'error'
 
+/** A save the server refused because the design changed since this editor loaded it. */
+export interface SaveConflict {
+  currentRevision: number
+  message: string
+}
+
 export interface Room {
   [key: string]: unknown
   id: string
@@ -79,6 +85,8 @@ export interface CanvasLayout {
   version: string
   designId?: string
   designVersionId?: string
+  /** Read from the server on load; never part of what is saved (see serializeLayout). */
+  revision?: number
   metadata?: Record<string, unknown>
   insights?: GenerationInsights
   building?: {
@@ -129,6 +137,10 @@ interface CanvasState {
   floorHeight: number
   designId: string | null
   designVersionId: string | null
+  /** The server revision this editor's copy is based on; sent with every save. */
+  designRevision: number | null
+  /** Set when a save was refused (another tab or collaborator saved first). */
+  saveConflict: SaveConflict | null
   layoutMetadata: Record<string, unknown>
   generationInsights: GenerationInsights | null
   selectedId: string | null
@@ -168,7 +180,11 @@ interface CanvasState {
   createHistorySnapshot: () => CanvasHistorySnapshot
   markDirty: () => void
   markDraftSaving: () => void
-  markDraftSaved: (timestamp?: string, versionId?: string | null) => void
+  markDraftSaved: (timestamp?: string, versionId?: string | null, revision?: number) => void
+  /** Keep the local edits, stop autosaving over the server's newer copy, and show the options. */
+  markSaveConflict: (conflict: SaveConflict) => void
+  clearSaveConflict: () => void
+  setDesignRevision: (revision: number | null) => void
   markDraftError: (message: string) => void
   clearDraftState: () => void
   setLastSavedAt: (timestamp: string | null) => void
@@ -582,6 +598,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   floorHeight: DEFAULT_FLOOR_HEIGHT,
   designId: null,
   designVersionId: null,
+  designRevision: null,
+  saveConflict: null,
   layoutMetadata: {},
   generationInsights: null,
   selectedId: null,
@@ -643,15 +661,26 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       draftStatus: 'saving',
       draftError: null,
     }),
-  markDraftSaved: (timestamp = new Date().toISOString(), versionId) =>
+  markDraftSaved: (timestamp = new Date().toISOString(), versionId, revision) =>
     set((state) => ({
       hasUnsavedChanges: false,
       draftStatus: 'saved',
       lastDraftSavedAt: timestamp,
       draftError: null,
+      saveConflict: null,
+      designRevision: revision ?? state.designRevision,
       latestDraftVersionId:
         versionId === undefined ? state.latestDraftVersionId : versionId,
     })),
+  markSaveConflict: (conflict) =>
+    set({
+      hasUnsavedChanges: true,
+      draftStatus: 'error',
+      draftError: conflict.message,
+      saveConflict: conflict,
+    }),
+  clearSaveConflict: () => set({ saveConflict: null }),
+  setDesignRevision: (revision) => set({ designRevision: revision }),
   markDraftError: (message) =>
     set({
       hasUnsavedChanges: true,
@@ -1298,6 +1327,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       floorHeight,
       designId: layout.designId ?? null,
       designVersionId: layout.designVersionId ?? null,
+      designRevision: layout.revision ?? null,
+      saveConflict: null,
       layoutMetadata: layout.metadata ?? {},
       generationInsights: layout.insights ?? null,
       selectedId: null,

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 
-import { saveDesignDraft } from '../services/design.service'
+import { revisionConflictOf, saveDesignDraft } from '../services/design.service'
 import { useCanvasStore } from '../store/canvasStore'
 
 export const DEFAULT_AUTO_SAVE_DEBOUNCE_MS = 3000
@@ -36,6 +36,8 @@ export function useAutoSave({
   const markDraftSaving = useCanvasStore((state) => state.markDraftSaving)
   const markDraftSaved = useCanvasStore((state) => state.markDraftSaved)
   const markDraftError = useCanvasStore((state) => state.markDraftError)
+  const markSaveConflict = useCanvasStore((state) => state.markSaveConflict)
+  const saveConflict = useCanvasStore((state) => state.saveConflict)
   const markDirty = useCanvasStore((state) => state.markDirty)
   const mountedRef = useRef(true)
   const savingRef = useRef(false)
@@ -48,7 +50,9 @@ export function useAutoSave({
   }, [])
 
   useEffect(() => {
-    if (!enabled || !designId || !hasUnsavedChanges || draftStatus !== 'dirty') {
+    // While a save is refused (conflict) nothing is sent: the user chooses what
+    // happens to the server's newer copy first.
+    if (!enabled || !designId || !hasUnsavedChanges || draftStatus !== 'dirty' || saveConflict) {
       return
     }
 
@@ -61,9 +65,9 @@ export function useAutoSave({
       try {
         const payload = serializeLayout()
         const saved = JSON.stringify(payload)
-        const draft = await saveDesignDraft(designId, payload)
+        const draft = await saveDesignDraft(designId, payload, { baseRevision: useCanvasStore.getState().designRevision })
         if (!mountedRef.current) return
-        markDraftSaved(draft.updatedAt ?? draft.createdAt, draft.id)
+        markDraftSaved(draft.updatedAt ?? draft.createdAt, draft.id, draft.revision)
         // Edits that landed while the request was in flight are not in this
         // draft, and markDraftSaved has just cleared the dirty flag they set.
         // Re-mark so the next debounce window drafts them instead of dropping
@@ -71,7 +75,9 @@ export function useAutoSave({
         if (JSON.stringify(serializeLayout()) !== saved) markDirty()
       } catch (error) {
         if (!mountedRef.current) return
-        markDraftError(getErrorMessage(error))
+        const conflict = revisionConflictOf(error)
+        if (conflict) markSaveConflict(conflict)
+        else markDraftError(getErrorMessage(error))
       } finally {
         savingRef.current = false
       }
@@ -90,6 +96,8 @@ export function useAutoSave({
     markDraftError,
     markDraftSaved,
     markDraftSaving,
+    markSaveConflict,
+    saveConflict,
     serializeLayout,
   ])
 }

@@ -30,6 +30,8 @@ export interface GenerateResponse {
   version: string
   designId?: string
   designVersionId?: string
+  /** The design's revision when this was read; sent back as `baseRevision` on save. */
+  revision?: number
   metadata: GenerateMetadata
   building?: {
     floorHeight?: number
@@ -58,6 +60,26 @@ export async function getLatestProjectDesign(projectId: string): Promise<Generat
   return data
 }
 
+/** Saved on top of this revision of the design; refused with 409 if it is no longer current. */
+export interface RevisionOptions {
+  baseRevision?: number | null
+}
+
+/** A save refused because the design changed since this editor loaded it (HTTP 409). */
+export interface RevisionConflict {
+  currentRevision: number
+  message: string
+}
+
+export function revisionConflictOf(error: unknown): RevisionConflict | null {
+  const response = (error as { response?: { status?: number; data?: { code?: string; error?: string; currentRevision?: number } } })?.response
+  if (response?.status !== 409 || response.data?.code !== 'REVISION_CONFLICT') return null
+  return {
+    currentRevision: Number(response.data.currentRevision ?? 0),
+    message: response.data.error ?? 'This design was changed somewhere else since you opened it.',
+  }
+}
+
 export async function saveDesignLayout(
   designId: string,
   layout: CanvasLayout,
@@ -65,13 +87,14 @@ export async function saveDesignLayout(
     versionName?: string
     changeSummary?: string
     thumbnailUrl?: string | null
-  }
+  } & RevisionOptions
 ): Promise<GenerateResponse> {
   const { data } = await api.put<GenerateResponse>(`/api/design/${designId}`, {
     layout,
     versionName: options?.versionName,
     changeSummary: options?.changeSummary,
     thumbnailUrl: options?.thumbnailUrl,
+    baseRevision: options?.baseRevision ?? undefined,
   })
   return data
 }
@@ -79,9 +102,11 @@ export async function saveDesignLayout(
 export async function saveDesignDraft(
   designId: string,
   layout: CanvasLayout,
+  options?: RevisionOptions,
 ): Promise<DesignDraftResponse> {
   const { data } = await api.put<DesignDraftResponse>(`/api/design/${designId}/draft`, {
     layout,
+    baseRevision: options?.baseRevision ?? undefined,
   })
   return data
 }
