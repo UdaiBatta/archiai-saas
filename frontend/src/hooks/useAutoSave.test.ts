@@ -10,7 +10,8 @@ import {
   useCanvasStore,
 } from '../store/canvasStore'
 
-vi.mock('../services/design.service', () => ({
+vi.mock('../services/design.service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../services/design.service')>()),
   saveDesignDraft: vi.fn(),
 }))
 
@@ -55,6 +56,8 @@ function resetCanvasStore() {
     lastDraftSavedAt: null,
     draftStatus: 'idle',
     draftError: null,
+    designRevision: null,
+    saveConflict: null,
     recoveredDraftAvailable: false,
     latestDraftVersionId: null,
     activityLog: [],
@@ -131,7 +134,55 @@ describe('useAutoSave', () => {
         designId: 'design-1',
         rooms: expect.any(Array),
       }),
+      { baseRevision: null },
     )
+  })
+
+  it('saves on top of the revision it loaded, and moves on to the one the server returns', async () => {
+    useCanvasStore.setState({ designRevision: 4 })
+    vi.mocked(saveDesignDraft).mockResolvedValue({ ...draftResponse, revision: 5 })
+    useCanvasStore.getState().markDirty()
+    renderHook(() => useAutoSave({ designId: 'design-1', debounceMs: 100 }))
+
+    await advance(100)
+
+    expect(vi.mocked(saveDesignDraft).mock.calls[0][2]).toEqual({ baseRevision: 4 })
+    expect(useCanvasStore.getState().designRevision).toBe(5)
+  })
+
+  it('keeps the edits and stops saving when the server says the design changed elsewhere', async () => {
+    useCanvasStore.setState({ designRevision: 4 })
+    vi.mocked(saveDesignDraft).mockRejectedValue({
+      response: { status: 409, data: { code: 'REVISION_CONFLICT', error: 'Changed elsewhere', currentRevision: 7 } },
+    })
+    useCanvasStore.getState().markDirty()
+    renderHook(() => useAutoSave({ designId: 'design-1', debounceMs: 100 }))
+
+    await advance(100)
+
+    const state = useCanvasStore.getState()
+    expect(state.saveConflict).toEqual({ currentRevision: 7, message: 'Changed elsewhere' })
+    expect(state.hasUnsavedChanges).toBe(true)
+    expect(state.rooms.length).toBeGreaterThan(0)
+    expect(state.designRevision).toBe(4)
+
+    // Further edits do not retry the refused save every few seconds.
+    act(() => {
+      useCanvasStore.getState().updateRoom('room-1', { position: { x: 9, y: 1.5, z: 0 } })
+    })
+    await advance(1000)
+    expect(saveDesignDraft).toHaveBeenCalledTimes(1)
+  })
+
+  it('a plain network failure is an error, not a conflict', async () => {
+    vi.mocked(saveDesignDraft).mockRejectedValue({ response: { status: 500, data: { error: 'boom' } } })
+    useCanvasStore.getState().markDirty()
+    renderHook(() => useAutoSave({ designId: 'design-1', debounceMs: 100 }))
+
+    await advance(100)
+
+    expect(useCanvasStore.getState().saveConflict).toBeNull()
+    expect(useCanvasStore.getState().draftStatus).toBe('error')
   })
 
   it('marks draft as saving while the save request is pending', async () => {

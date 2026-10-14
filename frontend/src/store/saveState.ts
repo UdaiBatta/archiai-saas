@@ -16,7 +16,10 @@ export function persistenceStatus(state: {
   draftStatus: DraftStatus
   lastSavedAt: string | null
   lastDraftSavedAt: string | null
+  /** A save was refused: the design was changed somewhere else. */
+  conflict?: boolean
 }): { tone: SaveTone; label: string } {
+  if (state.conflict) return { tone: 'error', label: 'Not saved: changed elsewhere' }
   if (state.saveStatus === 'saving' || state.draftStatus === 'saving') return { tone: 'busy', label: 'Saving…' }
   if (state.saveStatus === 'error' || state.draftStatus === 'error') return { tone: 'error', label: 'Save failed' }
   if (state.draftStatus === 'dirty') return { tone: 'pending', label: 'Unsaved' }

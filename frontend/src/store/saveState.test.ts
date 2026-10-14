@@ -14,6 +14,12 @@ describe('persistenceStatus', () => {
   it('surfaces a failed autosave', () => {
     expect(persistenceStatus({ ...base, saveStatus: 'unsaved', draftStatus: 'error' }).tone).toBe('error')
   })
+  it('says plainly when a save was refused because the plan changed elsewhere', () => {
+    expect(persistenceStatus({ ...base, saveStatus: 'unsaved', draftStatus: 'error', conflict: true })).toEqual({
+      tone: 'error',
+      label: 'Not saved: changed elsewhere',
+    })
+  })
   it('shows a named save', () => {
     expect(persistenceStatus(base)).toMatchObject({ tone: 'ok', label: 'Saved' })
   })

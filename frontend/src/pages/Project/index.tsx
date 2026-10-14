@@ -20,6 +20,7 @@ import {
   fetchDesignDraft,
   getLatestProjectDesign,
   LayoutOption,
+  revisionConflictOf,
   saveDesignLayout,
 } from '../../services/design.service'
 import { extractBrief, generateMvpLayout } from '../../services/mvp.service'
@@ -38,6 +39,7 @@ import { useMvpQualityValidation } from '../../hooks/useMvpQualityValidation'
 import { getApiErrorMessage } from '../../services/apiError'
 import { ShareProjectDialog } from '../../components/projects/ShareProjectDialog'
 import { LayoutOptionsDialog } from '../../components/canvas/LayoutOptionsDialog'
+import { SaveConflictBanner } from '../../components/canvas/SaveConflictBanner'
 import type { CanvasLayout } from '../../store/canvasStore'
 import type { ExtractResponse } from '../../types/contracts'
 
@@ -507,6 +509,7 @@ export default function ProjectPage() {
         versionName: versionName.trim() || undefined,
         changeSummary: changeSummary.trim() || undefined,
         thumbnailUrl,
+        baseRevision: useCanvasStore.getState().designRevision,
       })
       loadLayout(result)
       setRecoveredDraftAvailable(false)
@@ -520,8 +523,15 @@ export default function ProjectPage() {
         )
       }
     } catch (err) {
-      useCanvasStore.setState({ saveStatus: 'error' })
-      setLayoutSaveError(getApiErrorMessage(err, 'Failed to save layout'))
+      const conflict = revisionConflictOf(err)
+      if (conflict) {
+        // Changed elsewhere: keep these edits and let the banner offer the choices.
+        useCanvasStore.getState().markSaveConflict(conflict)
+        useCanvasStore.setState({ saveStatus: 'unsaved' })
+      } else {
+        useCanvasStore.setState({ saveStatus: 'error' })
+        setLayoutSaveError(getApiErrorMessage(err, 'Failed to save layout'))
+      }
     } finally {
       setLayoutSaving(false)
     }
@@ -546,6 +556,8 @@ export default function ProjectPage() {
           if (latestDesign.designId) {
             try {
               const draft = await fetchDesignDraft(latestDesign.designId)
+              // The draft was read after the saved copy, so its revision is the newer one.
+              if (active && draft?.revision != null) useCanvasStore.getState().setDesignRevision(draft.revision)
               // Autosave is the user's latest work: open on it, no "recover?"
               // prompt. The status shows it as auto-saved, not a named save.
               if (active && draft && hasRecoverableDraft(latestDesign, draft)) {
@@ -901,6 +913,8 @@ export default function ProjectPage() {
                 </button>
               </div>
             )}
+
+            {id && <SaveConflictBanner projectId={id} />}
 
             {editingBrief && hasPlan && (
               <div aria-hidden="true" className="absolute inset-0 z-10 bg-graphite-900/75 backdrop-blur-sm" />

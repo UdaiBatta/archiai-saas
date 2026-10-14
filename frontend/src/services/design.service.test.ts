@@ -3,7 +3,9 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import api from './api'
 import {
   fetchDesignDraft,
+  revisionConflictOf,
   saveDesignDraft,
+  saveDesignLayout,
   type DesignDraftResponse,
 } from './design.service'
 import type { CanvasLayout } from '../store/canvasStore'
@@ -55,6 +57,24 @@ describe('draft design service', () => {
       layout,
     })
     expect(result).toBe(draftResponse)
+  })
+
+  it('sends the revision a save is based on, for drafts and for named saves', async () => {
+    vi.mocked(api.put).mockResolvedValue({ data: draftResponse })
+
+    await saveDesignDraft('design-1', layout, { baseRevision: 6 })
+    await saveDesignLayout('design-1', layout, { versionName: 'v', baseRevision: 6 })
+
+    expect(vi.mocked(api.put).mock.calls[0][1]).toMatchObject({ baseRevision: 6 })
+    expect(vi.mocked(api.put).mock.calls[1][1]).toMatchObject({ baseRevision: 6, versionName: 'v' })
+  })
+
+  it('recognises a revision conflict (409) and nothing else', () => {
+    const conflict = { response: { status: 409, data: { code: 'REVISION_CONFLICT', error: 'elsewhere', currentRevision: 9 } } }
+    expect(revisionConflictOf(conflict)).toEqual({ currentRevision: 9, message: 'elsewhere' })
+    expect(revisionConflictOf({ response: { status: 409, data: { code: 'CONFLICT' } } })).toBeNull()
+    expect(revisionConflictOf({ response: { status: 500, data: { code: 'REVISION_CONFLICT' } } })).toBeNull()
+    expect(revisionConflictOf(new Error('network'))).toBeNull()
   })
 
   it('fetches a draft through the backend draft endpoint', async () => {

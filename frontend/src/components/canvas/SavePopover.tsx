@@ -39,8 +39,9 @@ export function SavePopover({
   const saveStatus = useCanvasStore((s) => s.saveStatus)
   const lastSavedAt = useCanvasStore((s) => s.lastSavedAt)
   const draftStatus = useCanvasStore((s) => s.draftStatus)
+  const saveConflict = useCanvasStore((s) => s.saveConflict)
   const lastDraftSavedAt = useCanvasStore((s) => s.lastDraftSavedAt)
-  const persistence = persistenceStatus({ saveStatus, lastSavedAt, draftStatus, lastDraftSavedAt })
+  const persistence = persistenceStatus({ saveStatus, lastSavedAt, draftStatus, lastDraftSavedAt, conflict: Boolean(saveConflict) })
   // An empty project reports the store's default 'saved' — misleading before
   // the first generation. Show the honest state until a layout exists.
   const notGenerated = !hasLayout && !lastSavedAt
