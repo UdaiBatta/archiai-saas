@@ -65,7 +65,8 @@ describe('LayoutThumbnail', () => {
   it('sizes the SVG in pixels, keeping the plan proportions, when asked (for the PNG export)', () => {
     const wide = room({ id: 'w', size: { w: 8, h: 3, d: 4 } })
     const svg = decodeURIComponent(layoutThumbnailDataUrl([wide], undefined, 800)!.split(',')[1])
-    expect(svg).toContain('width="800" height="400"')
+    // 8 x 4 m plus the thumbnail's 6% padding each side: 8.96 x 4.96 m.
+    expect(svg).toContain(`width="800" height="${Math.round((800 * 4.96) / 8.96)}"`)
     const plain = decodeURIComponent(layoutThumbnailDataUrl([wide])!.split(',')[1])
     expect(plain).not.toContain('width="800"')
   })
