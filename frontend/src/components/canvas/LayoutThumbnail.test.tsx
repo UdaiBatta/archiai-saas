@@ -62,6 +62,14 @@ describe('LayoutThumbnail', () => {
     expect(svg).toContain('points="-1,-3 1,-3 1,3 -1,3"')
   })
 
+  it('sizes the SVG in pixels, keeping the plan proportions, when asked (for the PNG export)', () => {
+    const wide = room({ id: 'w', size: { w: 8, h: 3, d: 4 } })
+    const svg = decodeURIComponent(layoutThumbnailDataUrl([wide], undefined, 800)!.split(',')[1])
+    expect(svg).toContain('width="800" height="400"')
+    const plain = decodeURIComponent(layoutThumbnailDataUrl([wide])!.split(',')[1])
+    expect(plain).not.toContain('width="800"')
+  })
+
   it('has no preview for a plan with no rooms', () => {
     expect(layoutThumbnailDataUrl([])).toBeNull()
   })

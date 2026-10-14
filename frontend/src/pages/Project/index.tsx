@@ -30,7 +30,7 @@ import {
 } from '../../services/mvpGenerationPolicy'
 import { useCanvasStore, type CanvasViewMode } from '../../store/canvasStore'
 import { loadPreferences } from '../../utils/preferences'
-import { layoutThumbnailDataUrl } from '../../components/canvas/LayoutThumbnail'
+import { layoutPngDataUrl, layoutThumbnailDataUrl } from '../../components/canvas/LayoutThumbnail'
 import { VersionHistoryDrawer } from '../../components/canvas/VersionHistoryDrawer'
 import { ActivityDrawer } from '../../components/canvas/ActivityDrawer'
 import { useAutoSave } from '../../hooks/useAutoSave'
@@ -46,6 +46,12 @@ import type { ExtractResponse } from '../../types/contracts'
 function captureCanvasThumbnail() {
   const { rooms, floors } = useCanvasStore.getState()
   return layoutThumbnailDataUrl(rooms, floors)
+}
+
+/** The plan as a PNG, for the PNG and PDF exports. */
+function capturePlanPng() {
+  const { rooms, floors } = useCanvasStore.getState()
+  return layoutPngDataUrl(rooms, floors)
 }
 
 function exportFileName(projectTitle: string, extension: string) {
@@ -688,7 +694,7 @@ export default function ProjectPage() {
     setExportingImage(true)
     setExportError(null)
     try {
-      const image = captureCanvasThumbnail()
+      const image = await capturePlanPng()
       if (!image) {
         setExportError('The canvas is not ready for export yet.')
         return
@@ -707,7 +713,7 @@ export default function ProjectPage() {
     setExportingPdf(true)
     setExportError(null)
     try {
-      const image = captureCanvasThumbnail()
+      const image = await capturePlanPng()
       if (!image) {
         setExportError('The canvas is not ready for export yet.')
         return

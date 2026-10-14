@@ -91,7 +91,7 @@ export function LayoutThumbnail({ rooms, floors, className }: LayoutThumbnailPro
  * preview. Drawn from the plan data, so it never depends on which view (or
  * which canvas) happens to be on screen when the project is saved.
  */
-export function layoutThumbnailDataUrl(rooms: Room[], floors?: CanvasFloor[]): string | null {
+export function layoutThumbnailDataUrl(rooms: Room[], floors?: CanvasFloor[], widthPx?: number): string | null {
   const { shapes, bounds } = thumbnailGeometry(rooms, floors)
   if (shapes.length === 0) return null
   const stroke = Math.max(bounds.w, bounds.d) * 0.006
@@ -102,10 +102,33 @@ export function layoutThumbnailDataUrl(rooms: Room[], floors?: CanvasFloor[]): s
         `stroke="${EDITOR_PALETTE.planFrame}" stroke-opacity="0.5" stroke-width="${n(stroke)}"/>`,
     )
     .join('')
+  // An explicit pixel size lets the browser rasterise it (see layoutPngDataUrl);
+  // without one the SVG scales to whatever box shows it.
+  const size = widthPx ? ` width="${widthPx}" height="${Math.round((widthPx * bounds.d) / bounds.w)}"` : ''
   const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${n(bounds.x)} ${n(bounds.z)} ${n(bounds.w)} ${n(bounds.d)}" preserveAspectRatio="xMidYMid meet">` +
+    `<svg xmlns="http://www.w3.org/2000/svg"${size} viewBox="${n(bounds.x)} ${n(bounds.z)} ${n(bounds.w)} ${n(bounds.d)}" preserveAspectRatio="xMidYMid meet">` +
     `<rect x="${n(bounds.x)}" y="${n(bounds.z)}" width="${n(bounds.w)}" height="${n(bounds.d)}" fill="${EDITOR_PALETTE.planSheetEnd}"/>` +
     rects +
     '</svg>'
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+}
+
+/**
+ * The same drawing as a real PNG data URL, for File > Export > PNG and the PDF
+ * sheet. (The thumbnail itself is an SVG; saving that as ".png" gives a file no
+ * image viewer opens.)
+ */
+export async function layoutPngDataUrl(rooms: Room[], floors?: CanvasFloor[], widthPx = 1600): Promise<string | null> {
+  const svgUrl = layoutThumbnailDataUrl(rooms, floors, widthPx)
+  if (!svgUrl) return null
+  const image = new Image()
+  image.src = svgUrl
+  await image.decode()
+  const canvas = document.createElement('canvas')
+  canvas.width = image.naturalWidth
+  canvas.height = image.naturalHeight
+  const context = canvas.getContext('2d')
+  if (!context) return null
+  context.drawImage(image, 0, 0)
+  return canvas.toDataURL('image/png')
 }
