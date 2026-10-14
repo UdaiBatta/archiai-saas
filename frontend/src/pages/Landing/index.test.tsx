@@ -40,6 +40,9 @@ describe('Landing page', () => {
     expect(screen.queryByText(/write the brief|your own brief|get the plan/i)).not.toBeInTheDocument()
     expect(screen.getByText('Ask AI to improve it')).toBeInTheDocument()
     expect(screen.getByText('No credit card required.')).toBeInTheDocument()
+    expect(
+      screen.getByText('Concept-stage design checks. Not a substitute for professional review or regulatory certification.'),
+    ).toBeInTheDocument()
     expect(within(screen.getByRole('region', { name: 'In the product' })).getByText('Undoable AI edits')).toBeInTheDocument()
     expect(screen.getAllByRole('link', { name: 'Start designing free' })[0]).toHaveAttribute('href', '/register')
     // No editor chrome on marketing pages.

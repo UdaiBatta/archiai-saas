@@ -147,6 +147,9 @@ export default function Landing() {
               </Link>
             </div>
             <p className="mt-3 text-xs text-muted-light">No credit card required.</p>
+            <p className="mt-6 max-w-[560px] border-l border-ink/20 pl-3 text-xs leading-relaxed text-muted-light">
+              Concept-stage design checks. Not a substitute for professional review or regulatory certification.
+            </p>
 
             {/* Real checks from the example, floating over the field. */}
             <div className="pointer-events-none absolute inset-0 hidden lg:block" aria-hidden="true">
