@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { OrbitControls, OrthographicCamera, Grid, Html, Line, Edges, GizmoHelper, GizmoViewcube } from '@react-three/drei'
+import { OrbitControls, Grid, Html, Line, Edges, GizmoHelper, GizmoViewcube } from '@react-three/drei'
 import * as THREE from 'three'
 import { CanvasViewMode, useCanvasStore } from '../../store/canvasStore'
 import { canClearSelectionFromEmptyCanvas } from '../../store/interactionModel'
@@ -105,6 +105,31 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
     swing.current = useViewTransition.getState().startedAt !== null ? { from: lastPose.current, to: null } : null
   }, [preset])
   const swingTo = transitionAt !== null ? swing.current?.to : null
+
+  // The camera each view draws through, set explicitly on every render:
+  // Persp (and every 3D <-> Top flight) uses the canvas's perspective camera,
+  // Axo and Top an orthographic one. (drei's makeDefault cameras hand back to
+  // whichever camera was default when they mounted, and a stale one there
+  // left Top drawn through the perspective camera.)
+  const set = useThree((s) => s.set)
+  const get = useThree((s) => s.get)
+  const perspectiveCamera = useRef<THREE.PerspectiveCamera | null>(null)
+  if (!perspectiveCamera.current) {
+    const initial = get().camera as THREE.PerspectiveCamera
+    perspectiveCamera.current = initial.isPerspectiveCamera ? initial : new THREE.PerspectiveCamera(PERSPECTIVE_FOV, 1, 0.1, 1000)
+  }
+  const orthoCamera = useMemo(() => new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 2000), [])
+  const wantOrtho = !isPlanView && preset !== 'perspective' && !swingTo
+  useLayoutEffect(() => {
+    // R3F sizes an orthographic default camera in pixels, as drei's did.
+    orthoCamera.left = -viewportSize.width / 2
+    orthoCamera.right = viewportSize.width / 2
+    orthoCamera.top = viewportSize.height / 2
+    orthoCamera.bottom = -viewportSize.height / 2
+    orthoCamera.updateProjectionMatrix()
+    const wanted = wantOrtho ? orthoCamera : perspectiveCamera.current!
+    if (get().camera !== wanted) set({ camera: wanted })
+  })
   const framingKey = `${frameNonce}:${selectedFloor}:${viewMode}:${modelStage}:${preset}:${footprint?.w ?? 0}:${footprint?.d ?? 0}:${siteKey}:${transitionAt === null}`
   useEffect(() => {
     const pending = useViewTransition.getState().startedAt !== null ? swing.current : null
@@ -129,10 +154,11 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
       return
     }
     swing.current = null
-    camera.position.set(...view.position)
-    camera.zoom = view.zoom
-    camera.updateProjectionMatrix()
-    camera.lookAt(...view.target)
+    const live = get().camera as THREE.PerspectiveCamera | THREE.OrthographicCamera
+    live.position.set(...view.position)
+    live.zoom = view.zoom
+    live.updateProjectionMatrix()
+    live.lookAt(...view.target)
     orbitRef.current?.target?.set(...view.target)
     orbitRef.current?.update?.()
     // frameloop="demand": moving the camera here draws nothing by itself, so
@@ -204,7 +230,6 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
         shadow-camera-near={shadow.near}
         shadow-camera-far={shadow.far}
       />
-      {!isPlanView && preset !== 'perspective' && !swingTo && <OrthographicCamera makeDefault near={0.1} far={2000} />}
       {swingTo && swing.current && transitionAt !== null && (
         <SwingCamera from={swing.current.from} to={swingTo} startedAt={transitionAt} />
       )}
@@ -264,7 +289,8 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
           showPlot={!siteModel}
           northAngle={orientationNorth}
           fadeDistance={shadow.radius * 8}
-          ortho={preset !== 'perspective'}
+          // No fog mid-flight: the swing starts with a long lens from far off.
+          ortho={preset !== 'perspective' || transitionAt !== null}
           blocks={blocks}
         />
       )}

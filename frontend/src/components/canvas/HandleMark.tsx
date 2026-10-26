@@ -11,6 +11,10 @@ export function usePixelsPerMetre() {
   const [zoom, setZoom] = useState(30)
   const last = useRef(zoom)
   useFrame(({ camera }) => {
+    // Only an orthographic camera's zoom is pixels per metre. A perspective
+    // one (Persp, or a 3D <-> Top flight) has zoom 1, which would blow plan
+    // grips up to metres across.
+    if (!(camera as THREE.OrthographicCamera).isOrthographicCamera) return
     if (Math.abs(camera.zoom - last.current) / camera.zoom > 0.02) {
       last.current = camera.zoom
       setZoom(camera.zoom)
