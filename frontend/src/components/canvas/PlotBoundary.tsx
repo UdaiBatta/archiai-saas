@@ -6,6 +6,7 @@ import { type CanvasHistorySnapshot, useCanvasStore } from '../../store/canvasSt
 import { isPrimaryPointerButton } from '../../store/interactionModel'
 import { EDITOR_PALETTE } from './editorPalette'
 import { HANDLE_PX, useHandleMetres } from './HandleMark'
+import { useViewTransition } from './viewTransition'
 
 type Axis = 'w' | 'd' | 'both'
 
@@ -63,6 +64,8 @@ export function PlotBoundary({ orbitRef, readOnly = false }: { orbitRef: RefObje
   const setPlotSize = useCanvasStore((s) => s.setPlotSize)
   const setPointerIntent = useCanvasStore((s) => s.setPointerIntent)
   const metres = useHandleMetres()
+  // Labels and grips step aside while the view swings between 3D and Top.
+  const flying = useViewTransition((s) => s.startedAt !== null)
   const dragRef = useRef<PlotDrag | null>(null)
   // The drag previews locally and commits once, so the camera and the
   // server check do not chase every pointer move.
@@ -135,19 +138,23 @@ export function PlotBoundary({ orbitRef, readOnly = false }: { orbitRef: RefObje
         gapSize={0.3}
         raycast={() => null}
       />
-      {!readOnly && (
+      {!readOnly && !flying && (
         <>
           {handle('w', [x + w, Y + 0.05, z + d / 2], [size * 0.45, 0.06, size * 1.6])}
           {handle('d', [x + w / 2, Y + 0.05, z + d], [size * 1.6, 0.06, size * 0.45])}
           {handle('both', [x + w, Y + 0.05, z + d], [size, 0.06, size])}
         </>
       )}
-      <Html position={[x + w / 2, Y, z + d + labelOffset]} center zIndexRange={[2, 0]}>
-        <SizeInput label="W" value={round(w)} readOnly={readOnly} onCommit={(value) => setPlotSize(value, footprint.d)} />
-      </Html>
-      <Html position={[x - labelOffset, Y, z + d / 2]} center zIndexRange={[2, 0]}>
-        <SizeInput label="D" value={round(d)} readOnly={readOnly} onCommit={(value) => setPlotSize(footprint.w, value)} />
-      </Html>
+      {!flying && (
+        <>
+          <Html position={[x + w / 2, Y, z + d + labelOffset]} center zIndexRange={[2, 0]}>
+            <SizeInput label="W" value={round(w)} readOnly={readOnly} onCommit={(value) => setPlotSize(value, footprint.d)} />
+          </Html>
+          <Html position={[x - labelOffset, Y, z + d / 2]} center zIndexRange={[2, 0]}>
+            <SizeInput label="D" value={round(d)} readOnly={readOnly} onCommit={(value) => setPlotSize(footprint.w, value)} />
+          </Html>
+        </>
+      )}
     </group>
   )
 }

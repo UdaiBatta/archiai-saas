@@ -133,15 +133,11 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
   const heatmapStale = useSunResultStale()
   const sunStudy = openTool === 'sun' || openTool === 'analysis' || (heatmapShown && !heatmapStale)
   const blocks = blocksActive({ studio, modelStage, style: viewStyle, sunStudy })
-  // Switching between 3D and Top plays one burst-and-settle animation.
+  // 3D <-> Top is one animated shot (Scene starts it): annotations step
+  // aside for the flight, and in blocks the rooms fly apart and back.
   const transitionAt = useViewTransition((s) => s.startedAt)
-  const lastTopView = useRef(topView)
-  useEffect(() => {
-    if (lastTopView.current === topView) return
-    lastTopView.current = topView
-    if (blocks) useViewTransition.getState().start()
-  }, [topView, blocks])
-  const exploding = blocks && transitionAt !== null
+  const flying = transitionAt !== null
+  const exploding = blocks && flying
   // Ambient occlusion is a presentation option, off by default and not
   // remembered: a full-screen pass at 4x multisampling was the heaviest thing
   // in Persp on laptop GPUs, and a remembered "on" made Persp feel slow for
@@ -283,7 +279,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
           {solidModel && (
             <MergedModel objects={mergedObjects} openings={openings} invalidRoomIds={invalidRoomIds} readOnly={readOnly} plan={topView} blocks={blocks} />
           )}
-          {individualRooms.map((r) => (
+          {!exploding && individualRooms.map((r) => (
             <RoomMesh
               key={r.id}
               room={r}
@@ -297,9 +293,9 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
             />
           ))}
         </group>
-        {exploding && <ExplodedRooms rooms={visibleRooms} startedAt={transitionAt} />}
-        {!modelStage && <NeighbourHighlights readOnly={readOnly} planY={topView ? (planFloor?.elevation ?? 0) + floorHeight + 0.35 : undefined} />}
-        {topView && (
+        {exploding && transitionAt !== null && <ExplodedRooms rooms={visibleRooms} startedAt={transitionAt} />}
+        {!modelStage && !flying && <NeighbourHighlights readOnly={readOnly} planY={topView ? (planFloor?.elevation ?? 0) + floorHeight + 0.35 : undefined} />}
+        {topView && !flying && (
           <TopPlanOverlay
             orbitRef={orbitRef}
             readOnly={readOnly}
@@ -311,9 +307,9 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
             blocks={blocks}
           />
         )}
-        {!readOnly && <PlacementGhost />}
-        {!readOnly && <WallLineHighlight />}
-        {comments && <CommentLayer />}
+        {!readOnly && !flying && <PlacementGhost />}
+        {!readOnly && !flying && <WallLineHighlight />}
+        {comments && !flying && <CommentLayer />}
         {studio && <SunHoursLayer />}
         {studio && <ContextLayer />}
         {studio && <MassLayer orbitRef={orbitRef} readOnly={readOnly} topView={topView} focusedMassId={focusedMassId} />}
