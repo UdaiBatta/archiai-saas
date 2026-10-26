@@ -521,15 +521,21 @@ function normalizeRoom(room: Partial<Room>, floor?: CanvasFloor): Room {
   }
 }
 
+/** The plot every storey stands on. */
+const sharedPlot = (floors: CanvasFloor[]) => floors.find((floor) => floor.footprint)?.footprint
+
 function normalizeLayout(layout: CanvasLayout) {
   const floorHeight = layout.building?.floorHeight ?? DEFAULT_FLOOR_HEIGHT
   const sourceFloors = layout.floors?.length ? layout.floors : [DEFAULT_FLOOR]
+  // Every storey stands on the same plot. Floors added before new ones were
+  // given it were saved without one, and the views could not frame them.
+  const plot = sourceFloors.find((floor) => floor.footprint)?.footprint ?? layout.building?.footprint
   const floors = sourceFloors.map((floor) => ({
     id: floor.id,
     name: floor.name || floorName(floor.level),
     level: floor.level,
     elevation: floor.elevation ?? floor.level * floorHeight,
-    footprint: floor.footprint,
+    footprint: floor.footprint ?? plot,
   }))
   const rooms = layout.floors?.length
     ? layout.floors.flatMap((floor) =>
@@ -1327,6 +1333,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         name: floorName(level),
         level,
         elevation: level * state.floorHeight,
+        footprint: sharedPlot(state.floors),
       }
       return {
         floors: [...state.floors, floor],
@@ -1344,6 +1351,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         name: floorName(level),
         level,
         elevation: level * state.floorHeight,
+        footprint: sharedPlot(state.floors),
       }
       return {
         floors: [...state.floors, floor],

@@ -57,3 +57,24 @@ describe('resizing the plot', () => {
     expect(useCanvasStore.getState().floors[0].footprint).toMatchObject({ w: 6, d: 4 })
   })
 })
+
+describe('floors share the plot', () => {
+  it('gives a new floor above or below the plot of the others', () => {
+    useCanvasStore.setState({ floors: [{ id: 'floor_0', name: 'Ground', level: 0, elevation: 0, footprint }] })
+    useCanvasStore.getState().addFloorAbove()
+    useCanvasStore.getState().addFloorBelow()
+    for (const floor of useCanvasStore.getState().floors) expect(floor.footprint).toEqual(footprint)
+  })
+
+  it('repairs a saved floor that has no plot when the layout loads', () => {
+    useCanvasStore.getState().loadLayout({
+      version: '1.0',
+      floors: [
+        { id: 'floor_0', name: 'Ground', level: 0, elevation: 0, footprint, rooms: [room] },
+        { id: 'floor_1', name: 'First', level: 1, elevation: 3, rooms: [] },
+      ],
+      rooms: [room],
+    })
+    expect(useCanvasStore.getState().floors.map((floor) => floor.footprint)).toEqual([footprint, footprint])
+  })
+})
