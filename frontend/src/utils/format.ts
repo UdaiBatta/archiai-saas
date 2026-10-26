@@ -21,6 +21,11 @@ export function formatArea(sqm: number): string {
   return `${sqm.toFixed(1)} m²`
 }
 
+/** Sun hours: up to two decimals, no trailing zeros ("6.75 h", "8.5 h", "0 h", "10 h"). */
+export function formatHours(hours: number): string {
+  return `${Number(hours.toFixed(2))} h`
+}
+
 export function roomArea(size: { w: number; d: number }): number {
   return size.w * size.d
 }

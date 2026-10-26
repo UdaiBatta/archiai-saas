@@ -1,9 +1,9 @@
 import { DOCK_CARD } from '../components/canvas/EditorDock'
+import { formatHours } from '../utils/format'
 import { PALETTE, useSunAnalysis, useSunResultStale } from './sunAnalysis'
 import { useSunContext } from './sunStore'
 
 const pct = (v: number) => `${Math.round(v * 100)}%`
-const fmtHours = (h: number) => `${h.toFixed(h % 1 ? 2 : 0).replace(/0$/, '')} h`
 const button =
   'rounded-md bg-accent px-3 py-1 text-[11px] font-semibold text-graphite-950 transition-colors hover:bg-accent-bright disabled:opacity-50'
 
@@ -52,7 +52,7 @@ export function AnalysisPanel() {
             <div className="h-2 rounded-full" style={{ background: `linear-gradient(90deg, ${PALETTE.join(', ')})` }} aria-hidden />
             <div className="mt-0.5 flex justify-between text-muted-light">
               <span>0 h</span>
-              <span>{fmtHours(summary.maxHours)} (whole day)</span>
+              <span>{formatHours(summary.maxHours)} (whole day)</span>
             </div>
           </div>
           <span>
@@ -68,7 +68,7 @@ export function AnalysisPanel() {
                   return (
                     <li key={room.id} className="flex justify-between gap-3">
                       <span className={low ? 'text-warn' : 'text-ink'}>{room.label}</span>
-                      <span className={low ? 'text-warn' : ''}>{room.hours === null ? 'no window' : fmtHours(room.hours)}</span>
+                      <span className={low ? 'text-warn' : ''}>{room.hours === null ? 'no window' : formatHours(room.hours)}</span>
                     </li>
                   )
                 })}
