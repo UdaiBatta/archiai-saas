@@ -15,7 +15,8 @@ import { hashString } from './editorPalette'
 import { furnitureParts } from './furnitureParts'
 import { edgesOf, flatten, type MergedModel, type Part } from './mergedGeometry'
 import { wallModelPieces } from './modelGeometry'
-import { BLOCK_COLORS, MODEL_COLORS, mixHex } from './modelView'
+import { insetOutline } from '../../store/roomOutline'
+import { BLOCK_COLORS, BLOCK_GAP_M, MODEL_COLORS, mixHex } from './modelView'
 
 /** The coloured floor under a room volume, metres. */
 export const BLOCK_FLOOR_M = 0.03
@@ -36,19 +37,19 @@ export function blockFill(room: Pick<Room, 'objectType' | 'roomType' | 'label'>,
 /** A block's outline: its own colour, lighter, so rooms read as glass boxes. */
 export const blockEdge = (fill: string) => mixHex(fill, BLOCK_COLORS.highlight, 0.45)
 
-/** A room block's geometry, centred on its own height: the polygon outline
- * when there is one, else the box. */
-export function blockVolumeGeometry(room: Room, height: number): THREE.BufferGeometry {
+/** A room block's geometry, centred on its own height and `inset` inside its
+ * outline: the polygon when there is one, else the box. */
+export function blockVolumeGeometry(room: Room, height: number, inset = BLOCK_GAP_M): THREE.BufferGeometry {
   const vertices = room.polygonVertices
   if (vertices && vertices.length >= 3) {
-    const shape = new THREE.Shape(vertices.map((v) => new THREE.Vector2(v.x - room.position.x, v.z - room.position.z)))
+    const shape = new THREE.Shape(insetOutline(vertices, inset).map((v) => new THREE.Vector2(v.x - room.position.x, v.z - room.position.z)))
     const geometry = new THREE.ExtrudeGeometry(shape, { depth: height, bevelEnabled: false })
     // Shape y -> world z, extrusion -> y, centred on the block.
     geometry.rotateX(Math.PI / 2)
     geometry.translate(0, height / 2, 0)
     return geometry
   }
-  return new THREE.BoxGeometry(room.size.w, height, room.size.d)
+  return new THREE.BoxGeometry(Math.max(0.05, room.size.w - 2 * inset), height, Math.max(0.05, room.size.d - 2 * inset))
 }
 
 const toRad = THREE.MathUtils.degToRad

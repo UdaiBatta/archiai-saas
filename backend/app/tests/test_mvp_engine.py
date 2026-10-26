@@ -848,6 +848,22 @@ def test_villa_brief_gets_balcony_and_entry_on_outside_walls():
             assert touches_outside(room, plan), room.label
 
 
+def test_a_shaped_room_on_the_building_outline_is_outside_even_in_a_yard():
+    from app.services.quality.hard_constraints import touches_outside
+
+    # An L-shaped room on the east side of a 6 x 6 m building, set in a
+    # 12 x 12 m plot: only its east edge (x = 6) is on the building outline.
+    l_room = {
+        "id": "r1", "type": "balcony", "label": "Balcony", "x": 3.0, "y": 2.0, "w": 3.0, "h": 3.0,
+        "vertices": [{"x": 3, "y": 2}, {"x": 6, "y": 2}, {"x": 6, "y": 5}, {"x": 4, "y": 5}, {"x": 4, "y": 4}, {"x": 3, "y": 4}],
+    }
+    payload = {"plot": {"width_m": 12, "depth_m": 12, "facing": "east"}, "rooms": [l_room], "walls": [], "doors": []}
+    in_yard = LayoutPlan.model_validate({**payload, "footprint": {"x": 0, "y": 0, "w": 6, "h": 6}})
+    fills_plot = LayoutPlan.model_validate(payload)
+    assert touches_outside(in_yard.rooms[0], in_yard)
+    assert not touches_outside(fills_plot.rooms[0], fills_plot)
+
+
 def _row_plan(types: list[str], building: str = "house", must: list[tuple[str, str]] = ()):
     """Rooms 3 m wide side by side along x (4 m deep), doored in a chain:
     a door on every shared edge, the front door on the first room's west wall.

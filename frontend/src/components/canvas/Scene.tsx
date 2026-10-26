@@ -9,6 +9,7 @@ import { sunAt } from './sunModel'
 import { useSunContext } from '../../analysis/sunStore'
 import { BLOCKS_LIGHT_DIRECTION, BLOCKS_MAX_POLAR_ANGLE, BLOCK_COLORS, MODEL_COLORS, presetView, sceneExtent, shadowFrustum, type CameraPreset } from './modelView'
 import { parseMasses, parseSite } from '../../site/siteTypes'
+import { PlotBoundary } from './PlotBoundary'
 
 /** Site ground sits below floor level so the ground-floor slab reads as a plinth. */
 const GROUND_Y = -0.2
@@ -234,6 +235,10 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
         />
       )}
 
+      {/* The plot edge, sized by dragging or typing (the site layer draws a
+          real boundary instead once one is drawn). */}
+      {footprint && !siteModel && <PlotBoundary orbitRef={orbitRef} readOnly={readOnly || modelStage} />}
+
       {/* Orientation markers: cardinal letters at the footprint edges, the
           facing edge labelled as Front — same mapping as the 2D plan. */}
       {orientation &&
@@ -425,7 +430,7 @@ function SiteGround({
   const colors = blocks ? BLOCK_COLORS : MODEL_COLORS
   const cx = plot.x + plot.w / 2
   const cz = plot.z + plot.d / 2
-  const x0 = plot.x, x1 = plot.x + plot.w, z0 = plot.z, z1 = plot.z + plot.d
+  const x1 = plot.x + plot.w, z0 = plot.z
   const size = Math.min(4, Math.max(1.2, Math.max(plot.w, plot.d) * 0.08))
   const offset = size * 2.2
   // Classic split north arrow in shape space (+y = north), laid on the ground.
@@ -472,14 +477,6 @@ function SiteGround({
         fadeStrength={1.5}
         fadeFrom={ortho ? 0 : 1}
       />
-      {showPlot && (
-        <Line
-          points={[[x0, 0, z0], [x1, 0, z0], [x1, 0, z1], [x0, 0, z1], [x0, 0, z0]]}
-          position={[0, GROUND_Y + 0.04, 0]}
-          color={colors.plotLine}
-          lineWidth={1.6}
-        />
-      )}
       <group position={[x1 + offset, GROUND_Y + 0.04, z0 - offset]} rotation={[0, -northAngle, 0]} scale={size}>
         <group rotation={[-Math.PI / 2, 0, 0]}>
           <mesh geometry={arrowDark} raycast={() => null}>

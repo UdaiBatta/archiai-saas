@@ -438,14 +438,26 @@ export function canvasObjectsToLayoutPlan(
     }]
   })
 
+  // Without an engine footprint the building is taken to fill the plot. Once
+  // the plot is resized past the rooms, their extent is the building outline,
+  // or every room facing the new garden would count as having no outside wall.
+  const frame = building ?? roomsFrame(rooms, footprint)
   return {
     plot: { width_m: footprint.w, depth_m: footprint.d, facing },
     rooms,
     walls,
     doors,
     ...(connections.length ? { connections } : {}),
-    ...(building ? { footprint: building } : {}),
+    ...(frame ? { footprint: frame } : {}),
   }
+}
+
+function roomsFrame(rooms: { x: number; y: number; w: number; h: number }[], plot: { w: number; d: number }): PlanZoneSpan | undefined {
+  if (!rooms.length) return undefined
+  const x0 = Math.min(...rooms.map((r) => r.x)), y0 = Math.min(...rooms.map((r) => r.y))
+  const x1 = Math.max(...rooms.map((r) => r.x + r.w)), y1 = Math.max(...rooms.map((r) => r.y + r.h))
+  const fillsPlot = x0 <= 0.01 && y0 <= 0.01 && x1 >= plot.w - 0.01 && y1 >= plot.d - 0.01
+  return fillsPlot ? undefined : { x: round3(x0), y: round3(y0), w: round3(x1 - x0), h: round3(y1 - y0) }
 }
 
 export function generateResponseToCanvas(

@@ -66,9 +66,11 @@ function parseConnections(value: unknown): Connection[] {
 function geometryFingerprint(
   objects: ReturnType<typeof useCanvasStore.getState>['rooms'],
   connections: unknown = [],
+  footprint: unknown = null,
 ) {
   return JSON.stringify([
     connections,
+    footprint,
     objects
       .filter((object) => ['room', 'wall', 'door'].includes(object.objectType))
       .map((object) => [
@@ -82,6 +84,7 @@ function geometryFingerprint(
         object.size.w,
         object.size.d,
         object.rotation.y,
+        object.polygonVertices,
       ])
       .sort((left, right) => String(left[0]).localeCompare(String(right[0]))),
   ])
@@ -108,9 +111,11 @@ export function useMvpQualityValidation({
   const connectionsValue = useCanvasStore((state) => state.layoutMetadata.mvpConnections)
   const hasEdges = useCanvasStore((state) => Array.isArray(state.layoutMetadata.mvpEdges))
   const connections = useMemo(() => parseConnections(connectionsValue), [connectionsValue])
+  // The plot is part of the plan: resizing it re-checks the layout too.
+  const plot = floors[0]?.footprint
   const fingerprint = useMemo(
-    () => geometryFingerprint(objects, connections),
-    [objects, connections],
+    () => geometryFingerprint(objects, connections, plot),
+    [objects, connections, plot],
   )
   const previousFingerprint = useRef<string | null>(null)
   const requestSequence = useRef(0)
@@ -169,7 +174,7 @@ export function useMvpQualityValidation({
             // A newer edit may land before React runs this effect's cleanup.
             // Never paint derived geometry from an older room snapshot.
             if (
-              geometryFingerprint(state.rooms, parseConnections(state.layoutMetadata.mvpConnections))
+              geometryFingerprint(state.rooms, parseConnections(state.layoutMetadata.mvpConnections), state.floors[0]?.footprint)
               !== fingerprint
             ) return state
 
@@ -179,7 +184,7 @@ export function useMvpQualityValidation({
             // The wall/door replacement changes the fingerprint. Advance the
             // baseline now so derived-state repaint does not enqueue a second
             // validation request.
-            previousFingerprint.current = geometryFingerprint(rooms, syncedConnections)
+            previousFingerprint.current = geometryFingerprint(rooms, syncedConnections, state.floors[0]?.footprint)
             return {
               rooms,
               selectedId: followSelection(state.rooms, rooms, state.selectedId),

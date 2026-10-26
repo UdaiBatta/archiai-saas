@@ -205,8 +205,10 @@ export function RightPanel({ onCreateModel, open = true, onClose }: { onCreateMo
     </ul>
   )
 
-  const plotWidth = typeof designParams.plotWidthM === 'number' ? designParams.plotWidthM : null
-  const plotDepth = typeof designParams.plotDepthM === 'number' ? designParams.plotDepthM : null
+  // The live plot (it can be resized on the canvas), else the brief's.
+  const plot = activeFloor?.footprint
+  const plotWidth = plot?.w || (typeof designParams.plotWidthM === 'number' ? designParams.plotWidthM : null)
+  const plotDepth = plot?.d || (typeof designParams.plotDepthM === 'number' ? designParams.plotDepthM : null)
   const siteBlock =
     orientation || plotWidth ? (
       <div

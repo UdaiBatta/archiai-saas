@@ -207,6 +207,9 @@ export type ViewStyle = 'blocks' | 'model'
 
 /** Blocks style: how opaque a room volume (and a wall) is. */
 export const BLOCK_OPACITY = 0.3
+/** Blocks style: each room volume stops this far inside its outline, so a
+ * dark border shows between neighbouring rooms (about half a wall). */
+export const BLOCK_GAP_M = 0.08
 
 /** The camera a plan opens with in the layout stage: true isometric. */
 export const DEFAULT_LAYOUT_PRESET: Exclude<CameraPreset, 'top'> = 'axo'

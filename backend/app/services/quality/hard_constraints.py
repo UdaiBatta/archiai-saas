@@ -491,9 +491,14 @@ def _staircase_alignment_violations(
 def touches_outside(room: PlanRoom, plan: LayoutPlan) -> bool:
     """Does the room have an outside wall (the building outline)?"""
     if room.vertices is not None or plan.plot.boundary is not None:
-        shared = polygon.room_to_polygon(room).boundary.intersection(
-            polygon.plot_to_polygon(plan.plot).boundary
+        # A building in a yard: its own outline, not the plot's, is outside.
+        frame = plan.footprint
+        outline = (
+            polygon.rect_to_polygon(Rect(frame.x, frame.y, frame.w, frame.h))
+            if frame is not None and plan.plot.boundary is None
+            else polygon.plot_to_polygon(plan.plot)
         )
+        shared = polygon.room_to_polygon(room).boundary.intersection(outline.boundary)
         return shared.length > EPS
     # The building's outline: its footprint when it sits inside a yard,
     # otherwise the plot itself.
