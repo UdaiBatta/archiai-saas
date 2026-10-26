@@ -4,6 +4,7 @@ import { type Room, useCanvasStore } from '../../store/canvasStore'
 import { COMPONENT_REGISTRY } from '../../store/componentRegistry'
 import { isPrimaryPointerButton, objectPointerIntent } from '../../store/interactionModel'
 import { formatArea, formatDims } from '../../utils/format'
+import { buildBlockModel } from './blockGeometry'
 import { buildMergedModel } from './mergedGeometry'
 import { roomLabelLayout, roomPlanArea, roomWorldBounds } from './topViewModel'
 
@@ -25,15 +26,21 @@ interface MergedModelProps {
   readOnly: boolean
   /** Top view: hover tooltips for rooms too small to label. */
   plan: boolean
+  /** Block planning look (plan 005) instead of the white model. */
+  blocks?: boolean
 }
 
 /** The unselected walls, floors and windows as 3 draw calls (see mergedModel). */
-export function MergedModel({ objects, openings, invalidRoomIds, readOnly, plan }: MergedModelProps) {
+export function MergedModel({ objects, openings, invalidRoomIds, readOnly, plan, blocks = false }: MergedModelProps) {
   const stableObjects = useStableList(objects)
   const stableOpenings = useStableList(openings)
+  const floors = useCanvasStore((s) => s.floors)
+  const floorElevations = useMemo(() => new Map(floors.map((floor) => [floor.level, floor.elevation])), [floors])
   const model = useMemo(
-    () => buildMergedModel(stableObjects, stableOpenings, invalidRoomIds),
-    [stableObjects, stableOpenings, invalidRoomIds],
+    () => blocks
+      ? buildBlockModel(stableObjects, stableOpenings, invalidRoomIds, { floorElevations })
+      : buildMergedModel(stableObjects, stableOpenings, invalidRoomIds),
+    [blocks, stableObjects, stableOpenings, invalidRoomIds, floorElevations],
   )
   useEffect(() => () => {
     model.solid?.dispose()
@@ -89,7 +96,7 @@ export function MergedModel({ objects, openings, invalidRoomIds, readOnly, plan 
           onPointerMove={onPointerMove(model.solidOwners)}
           onPointerOut={onPointerOut}
         >
-          <meshStandardMaterial vertexColors roughness={0.93} metalness={0} />
+          <meshStandardMaterial vertexColors roughness={blocks ? 1 : 0.93} metalness={0} />
         </mesh>
       )}
       {model.glass && (

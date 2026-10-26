@@ -40,6 +40,7 @@ import { getApiErrorMessage } from '../../services/apiError'
 import { ShareProjectDialog } from '../../components/projects/ShareProjectDialog'
 import { LayoutOptionsDialog } from '../../components/canvas/LayoutOptionsDialog'
 import { SaveConflictBanner } from '../../components/canvas/SaveConflictBanner'
+import { DEFAULT_LAYOUT_PRESET } from '../../components/canvas/modelView'
 import type { CanvasLayout } from '../../store/canvasStore'
 import type { ExtractResponse } from '../../types/contracts'
 
@@ -291,7 +292,7 @@ export default function ProjectPage() {
   const activityCount = useCanvasStore((s) => s.activityLog.length)
   const viewMode = useCanvasStore((s) => s.viewMode)
   // Persp/Axo picked in the lens dock: the 3D view opens with that camera.
-  const [lensExitPreset, setLensExitPreset] = useState<'perspective' | 'axo'>('perspective')
+  const [lensExitPreset, setLensExitPreset] = useState<'perspective' | 'axo'>(DEFAULT_LAYOUT_PRESET)
   const loadLayout = useCanvasStore((s) => s.loadLayout)
   const clearLayout = useCanvasStore((s) => s.clearLayout)
   const serializeLayout = useCanvasStore((s) => s.serializeLayout)

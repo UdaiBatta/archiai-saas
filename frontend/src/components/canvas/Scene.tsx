@@ -7,7 +7,7 @@ import { canClearSelectionFromEmptyCanvas } from '../../store/interactionModel'
 import { edgeCardinals, northAngleDeg, parseOrientation, type ScreenEdge } from './orientationModel'
 import { sunAt } from './sunModel'
 import { useSunContext } from '../../analysis/sunStore'
-import { MODEL_COLORS, presetView, sceneExtent, shadowFrustum, type CameraPreset } from './modelView'
+import { BLOCKS_LIGHT_DIRECTION, BLOCKS_MAX_POLAR_ANGLE, BLOCK_COLORS, MODEL_COLORS, presetView, sceneExtent, shadowFrustum, type CameraPreset } from './modelView'
 import { parseMasses, parseSite } from '../../site/siteTypes'
 
 /** Site ground sits below floor level so the ground-floor slab reads as a plinth. */
@@ -36,9 +36,11 @@ interface SceneProps {
   frameNonce?: number
   /** What the camera frames: the building's rooms (plot when absent). */
   focus?: { x: number; z: number; w: number; d: number } | null
+  /** Block planning look (plan 005): flat light, light ground, orbit limit. */
+  blocks?: boolean
 }
 
-export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage = false, sunHour = 10, preset = 'perspective', site = false, level, frameNonce = 0, focus = null }: SceneProps) {
+export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage = false, sunHour = 10, preset = 'perspective', site = false, level, frameNonce = 0, focus = null, blocks = false }: SceneProps) {
   const camera = useThree((s) => s.camera)
   const invalidate = useThree((s) => s.invalidate)
   const viewportSize = useThree((s) => s.size)
@@ -136,9 +138,11 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
 
   return (
     <>
-      <ambientLight intensity={isPlanView ? 0.9 : studio ? 0.08 : 0.35} />
+      <ambientLight intensity={isPlanView ? 0.9 : blocks ? 0.8 : studio ? 0.08 : 0.35} />
       {!isPlanView && (
-        studio
+        blocks
+          ? <hemisphereLight args={[BLOCK_COLORS.highlight, BLOCK_COLORS.gridSection, 1.15]} />
+          : studio
           ? <hemisphereLight args={['#ffffff', '#c8c6c0', 1.35]} />
           : <hemisphereLight args={['#BDBDC0', '#26282D', 0.45]} />
       )}
@@ -147,16 +151,20 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
         position={
           isPlanView
             ? [10, 20, 10]
+            : blocks
+            ? [centerX + BLOCKS_LIGHT_DIRECTION[0] * shadow.distance, BLOCKS_LIGHT_DIRECTION[1] * shadow.distance, centerZ + BLOCKS_LIGHT_DIRECTION[2] * shadow.distance]
             : [centerX + sun.direction[0] * shadow.distance, sun.direction[1] * shadow.distance, centerZ + sun.direction[2] * shadow.distance]
         }
-        color={isPlanView ? '#ffffff' : sun.color}
-        intensity={isPlanView ? 0.55 : studio ? sun.intensity * 1.9 : sun.intensity}
+        color={isPlanView ? '#ffffff' : blocks ? BLOCK_COLORS.highlight : sun.color}
+        // Blocks: ambient and sky light are divided by pi in three's Lambert term;
+        // with this key light a top face lands on its palette colour.
+        intensity={isPlanView ? 0.55 : blocks ? 1.4 : studio ? sun.intensity * 1.9 : sun.intensity}
         castShadow={!isPlanView && !topView}
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
         shadow-bias={-0.0001}
         shadow-normalBias={0.03}
-        shadow-radius={studio ? 4 : 1}
+        shadow-radius={blocks ? 6 : studio ? 4 : 1}
         shadow-camera-left={-shadow.radius}
         shadow-camera-right={shadow.radius}
         shadow-camera-top={shadow.radius}
@@ -182,7 +190,7 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
             <mesh position={[centerX, slabY, centerZ]} raycast={() => null} castShadow={studio} receiveShadow>
               <boxGeometry args={[footprint.w, slabHeight, footprint.d]} />
               {studio ? (
-                <meshStandardMaterial color={MODEL_COLORS.slab} roughness={0.95} />
+                <meshStandardMaterial color={blocks ? BLOCK_COLORS.slab : MODEL_COLORS.slab} roughness={0.95} />
               ) : (
                 <meshStandardMaterial
                   color={floorSlabColor(floor.level)}
@@ -192,7 +200,7 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
                   metalness={0.04}
                 />
               )}
-              <Edges color={studio ? MODEL_COLORS.edge : floor.level === 0 ? '#909094' : '#6A6A6E'} />
+              <Edges color={blocks ? BLOCK_COLORS.edge : studio ? MODEL_COLORS.edge : floor.level === 0 ? '#909094' : '#6A6A6E'} />
             </mesh>
 
             {/* Ceiling plane between floors (only in 3D multi-floor mode) */}
@@ -222,6 +230,7 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
           northAngle={orientationNorth}
           fadeDistance={shadow.radius * 8}
           ortho={preset !== 'perspective'}
+          blocks={blocks}
         />
       )}
 
@@ -293,6 +302,7 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
         enableZoom
         screenSpacePanning
         mouseButtons={mouseButtons}
+        maxPolarAngle={blocks ? BLOCKS_MAX_POLAR_ANGLE : Math.PI}
       />
       {studio && !topView && (
         <GizmoHelper alignment="top-right" margin={[76, 160]} renderPriority={2}>
@@ -399,6 +409,7 @@ function SiteGround({
   northAngle,
   fadeDistance,
   ortho,
+  blocks = false,
 }: {
   plot: { x: number; z: number; w: number; d: number }
   /** Off once a site is drawn: the site layer draws the real boundary. */
@@ -408,7 +419,10 @@ function SiteGround({
   /** Axo/Top: the camera sits far off, so fog and the grid's camera-based
    * fade would wash the ground out to the sky colour. */
   ortho: boolean
+  /** Block planning: lighter ground, grid and fog to match. */
+  blocks?: boolean
 }) {
+  const colors = blocks ? BLOCK_COLORS : MODEL_COLORS
   const cx = plot.x + plot.w / 2
   const cz = plot.z + plot.d / 2
   const x0 = plot.x, x1 = plot.x + plot.w, z0 = plot.z, z1 = plot.z + plot.d
@@ -431,15 +445,15 @@ function SiteGround({
   return (
     <>
       {/* Fog must attach to the scene itself, so this component returns a fragment. */}
-      {!ortho && <fog attach="fog" args={[MODEL_COLORS.sky, fadeDistance * 0.9, fadeDistance * 2.2]} />}
+      {!ortho && <fog attach="fog" args={[colors.sky, fadeDistance * 0.9, fadeDistance * 2.2]} />}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[cx, GROUND_Y, cz]} receiveShadow raycast={() => null}>
         <planeGeometry args={[fadeDistance * 5, fadeDistance * 5]} />
-        <meshStandardMaterial color={MODEL_COLORS.ground} roughness={1} />
+        <meshStandardMaterial color={colors.ground} roughness={1} />
       </mesh>
       {showPlot && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[cx, GROUND_Y + 0.02, cz]} receiveShadow raycast={() => null}>
           <planeGeometry args={[plot.w, plot.d]} />
-          <meshStandardMaterial color={MODEL_COLORS.plot} roughness={1} />
+          <meshStandardMaterial color={colors.plot} roughness={1} />
         </mesh>
       )}
       {/* A fixed patch centred on the plot: drei's infiniteGrid centres its
@@ -452,8 +466,8 @@ function SiteGround({
         sectionSize={5}
         cellThickness={0.6}
         sectionThickness={1}
-        cellColor={MODEL_COLORS.gridCell}
-        sectionColor={MODEL_COLORS.gridSection}
+        cellColor={colors.gridCell}
+        sectionColor={colors.gridSection}
         fadeDistance={fadeDistance}
         fadeStrength={1.5}
         fadeFrom={ortho ? 0 : 1}
