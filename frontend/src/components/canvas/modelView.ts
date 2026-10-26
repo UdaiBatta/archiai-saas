@@ -196,6 +196,56 @@ export const MODEL_COLORS = {
   contextEdge: '#a9a8a2',
 } as const
 
+/**
+ * Block planning (plan 005): how the layout stage draws the 3D view. Rooms
+ * are coloured volumes by zone, walls are cut at plan height so every room is
+ * visible from above, and the lighting is flat. `model` is the white model
+ * above, kept for the model stage and for the sun studies.
+ */
+export type ViewStyle = 'blocks' | 'model'
+
+/** Walls are cut this high above their floor in the blocks style. */
+export const PLAN_CUT_M = 1.2
+/** Room blocks stop this far below the cut, so walls read as lines between them. */
+export const BLOCK_INSET_M = 0.15
+
+/** The camera a plan opens with in the layout stage: true isometric. */
+export const DEFAULT_LAYOUT_PRESET: Exclude<CameraPreset, 'top'> = 'axo'
+/** Blocks style: the camera stays at least 20 degrees above the ground, so
+ * rooms are never seen edge-on behind their walls (OrbitControls polar angle). */
+export const BLOCKS_MAX_POLAR_ANGLE = (70 * Math.PI) / 180
+
+/** Blocks style: one fixed light from high over the camera's side (south-east),
+ * so faces read by tone and shadows stay short; no time of day. */
+export const BLOCKS_LIGHT_DIRECTION: [number, number, number] = [0.36, 0.86, 0.36]
+
+/** Light-scene palette for block planning. Checked by blockPalette.test.ts:
+ * every pair at least delta-E 10 apart, every filled zone at least 1.5:1
+ * against the ground (unassigned stays pale on purpose). */
+export const BLOCK_COLORS = {
+  zone: {
+    public: '#F2B66D',
+    private: '#8DB4E2',
+    collaborative: '#B79CE0',
+    service: '#EE8F7A',
+    circulation: '#BDB8AE',
+    utility: '#A9BC92',
+    unassigned: '#E4E2DC',
+  },
+  /** Cut walls: near white, so the blocks carry the colour. */
+  wall: '#fbfaf7',
+  edge: '#2f2e2b',
+  /** Selection lifts a block's colour toward white. */
+  highlight: '#ffffff',
+  ground: '#F3F3F1',
+  plot: '#fafaf8',
+  gridCell: '#e3e1db',
+  gridSection: '#dad8d2',
+  slab: '#e2e0d9',
+  sky: '#f1f2f2',
+  skyTop: '#e7eaed',
+} as const
+
 /** A room floor keeps its colour identity as a pale, desaturated tint. */
 export const floorTint = (roomColor: string) => mixHex(roomColor, MODEL_COLORS.floorBase, 0.8)
 
