@@ -240,6 +240,14 @@ export const BLOCK_COLORS = {
   skyTop: '#0b0e13',
 } as const
 
+/** Top plan annotations (labels, dimensions, symbols) on the white model's
+ * light ground and on the blocks' dark one. */
+export const PLAN_INK = {
+  model: { text: MODEL_COLORS.plotLine, halo: '#ffffff', line: MODEL_COLORS.plotLine, faint: MODEL_COLORS.floorEdge, chip: MODEL_COLORS.plot },
+  blocks: { text: '#e8ecf2', halo: BLOCK_COLORS.ground, line: '#b9c2cf', faint: BLOCK_COLORS.plotLine, chip: BLOCK_COLORS.slab },
+} as const
+export type PlanInk = (typeof PLAN_INK)[keyof typeof PLAN_INK]
+
 /** A room floor keeps its colour identity as a pale, desaturated tint. */
 export const floorTint = (roomColor: string) => mixHex(roomColor, MODEL_COLORS.floorBase, 0.8)
 

@@ -5,6 +5,7 @@ import * as THREE from 'three'
 import { type CanvasHistorySnapshot, useCanvasStore } from '../../store/canvasStore'
 import { isPrimaryPointerButton } from '../../store/interactionModel'
 import { EDITOR_PALETTE } from './editorPalette'
+import { HANDLE_PX, useHandleMetres } from './HandleMark'
 
 type Axis = 'w' | 'd' | 'both'
 
@@ -61,6 +62,7 @@ export function PlotBoundary({ orbitRef, readOnly = false }: { orbitRef: RefObje
   const footprint = useCanvasStore((s) => s.floors[0]?.footprint)
   const setPlotSize = useCanvasStore((s) => s.setPlotSize)
   const setPointerIntent = useCanvasStore((s) => s.setPointerIntent)
+  const metres = useHandleMetres()
   const dragRef = useRef<PlotDrag | null>(null)
   // The drag previews locally and commits once, so the camera and the
   // server check do not chase every pointer move.
@@ -104,7 +106,9 @@ export function PlotBoundary({ orbitRef, readOnly = false }: { orbitRef: RefObje
     setPreview(null)
   }
 
-  const size = Math.max(0.35, Math.min(0.9, Math.max(w, d) * 0.03))
+  const size = metres(HANDLE_PX.corner)
+  // Outside the plan's own overall dimension lines (TopPlanOverlay).
+  const labelOffset = Math.max(1.2, metres(72))
   const handle = (axis: Axis, position: [number, number, number], args: [number, number, number]) => (
     <mesh
       name={`plot-handle-${axis}`}
@@ -138,10 +142,10 @@ export function PlotBoundary({ orbitRef, readOnly = false }: { orbitRef: RefObje
           {handle('both', [x + w, Y + 0.05, z + d], [size, 0.06, size])}
         </>
       )}
-      <Html position={[x + w / 2, Y, z - 0.7]} center zIndexRange={[2, 0]}>
+      <Html position={[x + w / 2, Y, z + d + labelOffset]} center zIndexRange={[2, 0]}>
         <SizeInput label="W" value={round(w)} readOnly={readOnly} onCommit={(value) => setPlotSize(value, footprint.d)} />
       </Html>
-      <Html position={[x - 0.7, Y, z + d / 2]} center zIndexRange={[2, 0]}>
+      <Html position={[x - labelOffset, Y, z + d / 2]} center zIndexRange={[2, 0]}>
         <SizeInput label="D" value={round(d)} readOnly={readOnly} onCommit={(value) => setPlotSize(footprint.w, value)} />
       </Html>
     </group>

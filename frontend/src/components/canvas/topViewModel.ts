@@ -127,14 +127,6 @@ export function planHandlePoints(room: Pick<Room, 'position' | 'size' | 'rotatio
   })
 }
 
-/** Midpoints of each polygon edge (index = edge start vertex). */
-export function polygonEdgeMidpoints(vertices: PlanPoint[]): PlanPoint[] {
-  return vertices.map((a, i) => {
-    const b = vertices[(i + 1) % vertices.length]
-    return { x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 }
-  })
-}
-
 export function cloneRoom(room: Room): Room {
   return {
     ...room,

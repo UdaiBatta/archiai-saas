@@ -1,26 +1,17 @@
-import { useEffect, useRef, useState, type RefObject } from 'react'
-import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
+import { useEffect, useRef, type RefObject } from 'react'
+import { useThree, type ThreeEvent } from '@react-three/fiber'
 import { Html, Line } from '@react-three/drei'
 import * as THREE from 'three'
 import { type CanvasHistorySnapshot, type Room, useCanvasStore, workArea } from '../../store/canvasStore'
 import { capabilitiesOf } from '../../store/componentRegistry'
 import { formatArea } from '../../utils/format'
-import {
-  insertPolygonVertex,
-  movePolygonVertex,
-  removePolygonVertex,
-  resizeRoomFromPlanHandle,
-  type PlanBounds,
-  type PlanPoint,
-  type PlanResizeHandle,
-} from './plan2dGeometry'
+import { resizeRoomFromPlanHandle, type PlanBounds, type PlanPoint, type PlanResizeHandle } from './plan2dGeometry'
 import {
   LABEL_PX,
   cloneRoom,
   dimensionStrings,
   planEditPatch,
   planHandlePoints,
-  polygonEdgeMidpoints,
   roomLabelLayout,
   roomPlanArea,
   roomWorldBounds,
@@ -28,7 +19,8 @@ import {
 } from './topViewModel'
 import { edgeCardinals, parseOrientation, type ScreenEdge } from './orientationModel'
 import { EDITOR_PALETTE } from './editorPalette'
-import { MODEL_COLORS } from './modelView'
+import { HANDLE_PX, HandleMark, usePixelsPerMetre } from './HandleMark'
+import { MODEL_COLORS, PLAN_INK, type PlanInk } from './modelView'
 
 interface OrbitHandle {
   enabled: boolean
@@ -46,38 +38,25 @@ interface TopPlanOverlayProps {
   bounds?: PlanBounds
   /** Height the annotations float at: above everything on this level. */
   y: number
+  /** Drawn over the dark blocks ground rather than the white model. */
+  blocks?: boolean
 }
 
-type EditKind = { type: 'resize'; handle: PlanResizeHandle } | { type: 'vertex'; index: number }
 
 interface ActiveEdit {
   pointerId: number
   startRoom: Room
   historySnapshot: CanvasHistorySnapshot
-  kind: EditKind
+  handle: PlanResizeHandle
 }
 
 const GROUND = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
-export const HANDLE_PX = 11
 const INWARD_ARROW: Record<ScreenEdge, string> = { top: '↓', bottom: '↑', left: '→', right: '←' }
 const OUTWARD: Record<ScreenEdge, PlanPoint> = {
   top: { x: 0, z: -1 },
   bottom: { x: 0, z: 1 },
   left: { x: -1, z: 0 },
   right: { x: 1, z: 0 },
-}
-
-/** Orthographic zoom = screen pixels per metre; re-rendered only on a real change. */
-export function usePixelsPerMetre() {
-  const [zoom, setZoom] = useState(30)
-  const last = useRef(zoom)
-  useFrame(({ camera }) => {
-    if (Math.abs(camera.zoom - last.current) / camera.zoom > 0.02) {
-      last.current = camera.zoom
-      setZoom(camera.zoom)
-    }
-  })
-  return zoom
 }
 
 const at = (point: PlanPoint, y: number): [number, number, number] => [point.x, y, point.z]
@@ -95,10 +74,11 @@ function localToWorld(room: Room, x: number, z: number, y: number): [number, num
 
 /**
  * The drawing layer of the Top view: adaptive room labels, dimension
- * strings, plan symbols, violation outlines and the selected room's resize /
- * vertex handles - the editing surface the SVG plan used to provide.
+ * strings, plan symbols, violation outlines and the selected object's resize
+ * handles. A room's points are shaped with ShapeHandles, as in 3D.
  */
-export function TopPlanOverlay({ orbitRef, readOnly, rooms, invalidRoomIds, focusedRoomId = null, bounds, y }: TopPlanOverlayProps) {
+export function TopPlanOverlay({ orbitRef, readOnly, rooms, invalidRoomIds, focusedRoomId = null, bounds, y, blocks = false }: TopPlanOverlayProps) {
+  const ink = PLAN_INK[blocks ? 'blocks' : 'model']
   const pxPerMetre = usePixelsPerMetre()
   const gl = useThree((s) => s.gl)
   const selectedId = useCanvasStore((s) => s.selectedId)
@@ -145,14 +125,14 @@ export function TopPlanOverlay({ orbitRef, readOnly, rooms, invalidRoomIds, focu
     }
   }, [readOnly])
 
-  const begin = (room: Room, kind: EditKind) => (event: ThreeEvent<PointerEvent>) => {
+  const begin = (room: Room, handle: PlanResizeHandle) => (event: ThreeEvent<PointerEvent>) => {
     if (event.button !== 0) return
     event.stopPropagation()
     activeRef.current = {
       pointerId: event.pointerId,
       startRoom: cloneRoom(room),
       historySnapshot: useCanvasStore.getState().createHistorySnapshot(),
-      kind,
+      handle,
     }
     if (orbitRef.current) orbitRef.current.enabled = false
     setInteractionMode('resize')
@@ -174,10 +154,7 @@ export function TopPlanOverlay({ orbitRef, readOnly, rooms, invalidRoomIds, focu
       gridSize: state.gridSize,
       footprint: workArea(state.floors.find((floor) => floor.level === (active.startRoom.floorLevel ?? 0))?.footprint),
     }
-    const next =
-      active.kind.type === 'resize'
-        ? resizeRoomFromPlanHandle({ ...options, handle: active.kind.handle })
-        : movePolygonVertex({ ...options, vertexIndex: active.kind.index })
+    const next = resizeRoomFromPlanHandle({ ...options, handle: active.handle })
     if (next) updateRoom(active.startRoom.id, next, { log: false })
   }
 
@@ -200,11 +177,6 @@ export function TopPlanOverlay({ orbitRef, readOnly, rooms, invalidRoomIds, focu
     reset()
   }
 
-  const editPolygon = (room: Room, next: ReturnType<typeof insertPolygonVertex>) => (event: ThreeEvent<MouseEvent>) => {
-    event.stopPropagation()
-    if (next) updateRoom(room.id, next, { action: 'object.resized', previousValue: cloneRoom(room) })
-  }
-
   const handleProps = (cursor: string) => ({
     onPointerMove: drag,
     onPointerUp: finish,
@@ -213,7 +185,7 @@ export function TopPlanOverlay({ orbitRef, readOnly, rooms, invalidRoomIds, focu
     onPointerOut: () => { gl.domElement.style.cursor = '' },
   })
 
-  const handleSize = HANDLE_PX * metre
+  const handleSize = HANDLE_PX.corner * metre
   const editable =
     selected && !readOnly && capabilitiesOf(selected).canResize ? selected : null
 
@@ -228,7 +200,7 @@ export function TopPlanOverlay({ orbitRef, readOnly, rooms, invalidRoomIds, focu
   return (
     <group>
       {bounds && bounds.w > 0 && bounds.d > 0 && (
-        <Dimensions strings={dimensionStrings(bounds, Math.max(0.9, 34 * metre))} y={y} strong testId="overall" />
+        <Dimensions strings={dimensionStrings(bounds, Math.max(0.9, 34 * metre))} y={y} strong testId="overall" ink={ink} />
       )}
 
       {rooms.map((room) => {
@@ -281,7 +253,7 @@ export function TopPlanOverlay({ orbitRef, readOnly, rooms, invalidRoomIds, focu
                     const t = Math.PI + (i / 12) * (Math.PI / 2)
                     return localToWorld(room, w / 2 + Math.cos(t) * w, d / 2 + Math.sin(t) * w, y)
                   })}
-                  color={MODEL_COLORS.floorEdge}
+                  color={ink.faint}
                   lineWidth={1}
                   dashed
                   dashSize={0.12}
@@ -289,7 +261,7 @@ export function TopPlanOverlay({ orbitRef, readOnly, rooms, invalidRoomIds, focu
                 />
                 <Line
                   points={[localToWorld(room, w / 2, d / 2, y), localToWorld(room, w / 2, d / 2 - w, y)]}
-                  color={MODEL_COLORS.edge}
+                  color={ink.line}
                   lineWidth={1.2}
                 />
               </>
@@ -302,7 +274,7 @@ export function TopPlanOverlay({ orbitRef, readOnly, rooms, invalidRoomIds, focu
                     localToWorld(room, -w / 2, -d / 2 + (d * step) / 6, y),
                     localToWorld(room, w / 2, -d / 2 + (d * step) / 6, y),
                   ]}
-                  color={MODEL_COLORS.floorEdge}
+                  color={ink.faint}
                   lineWidth={1}
                 />
               ))}
@@ -317,8 +289,8 @@ export function TopPlanOverlay({ orbitRef, readOnly, rooms, invalidRoomIds, focu
                   data-testid={`top-label-${room.id}`}
                   className="whitespace-nowrap text-center leading-tight"
                   style={{
-                    color: invalid ? MODEL_COLORS.invalid : MODEL_COLORS.plotLine,
-                    textShadow: '0 0 3px #fff, 0 0 3px #fff, 0 0 2px #fff',
+                    color: invalid ? MODEL_COLORS.invalid : ink.text,
+                    textShadow: `0 0 3px ${ink.halo}, 0 0 3px ${ink.halo}, 0 0 2px ${ink.halo}`,
                   }}
                 >
                   <div style={{ fontSize: label.nameFontPx, fontWeight: isSelected ? 700 : 550 }}>
@@ -339,6 +311,7 @@ export function TopPlanOverlay({ orbitRef, readOnly, rooms, invalidRoomIds, focu
                 y={y}
                 strong={isSelected}
                 testId={room.id}
+                ink={ink}
               />
             )}
           </group>
@@ -356,60 +329,32 @@ export function TopPlanOverlay({ orbitRef, readOnly, rooms, invalidRoomIds, focu
           zIndexRange={[1, 0]}
           style={{ pointerEvents: 'none' }}
         >
-          <span className="whitespace-nowrap text-[10px] font-semibold" style={{ color: MODEL_COLORS.plotLine }}>
+          <span className="whitespace-nowrap text-[10px] font-semibold" style={{ color: ink.text }}>
             {INWARD_ARROW[facingEdge]} Main entry
           </span>
         </Html>
       )}
 
       {editable && !editable.polygonVertices &&
-        planHandlePoints(editable).map((point) => (
-          <HandleMark
-            key={point.handle.key}
-            name={`plan-resize-${editable.id}-${point.handle.key}`}
-            position={[point.x, y + 0.2, point.z]}
-            size={handleSize}
-            onPointerDown={begin(editable, { type: 'resize', handle: point.handle })}
-            {...handleProps(point.cursor)}
-          />
-        ))}
-
-      {editable?.polygonVertices && (
-        <>
-          {polygonEdgeMidpoints(editable.polygonVertices).map((point, index) => (
+        planHandlePoints(editable)
+          // A room's edge midpoints add points (ShapeHandles), so it keeps only its corners here.
+          .filter((point) => editable.objectType !== 'room' || (point.handle.sx !== 0 && point.handle.sz !== 0))
+          .map((point) => (
             <HandleMark
-              key={`edge-${index}`}
-              name={`plan-vertex-edge-${editable.id}-${index}`}
-              position={[point.x, y + 0.1, point.z]}
-              size={handleSize * 0.7}
-              round
-              faint
-              onPointerDown={(event) => event.stopPropagation()}
-              onDoubleClick={editPolygon(editable, insertPolygonVertex(editable, index))}
-              onPointerOver={() => { gl.domElement.style.cursor = 'copy' }}
-              onPointerOut={() => { gl.domElement.style.cursor = '' }}
-            />
-          ))}
-          {editable.polygonVertices.map((vertex, index) => (
-            <HandleMark
-              key={`vertex-${index}`}
-              name={`plan-vertex-${editable.id}-${index}`}
-              position={[vertex.x, y + 0.2, vertex.z]}
+              key={point.handle.key}
+              name={`plan-resize-${editable.id}-${point.handle.key}`}
+              position={[point.x, y + 0.2, point.z]}
               size={handleSize}
-              round
-              onPointerDown={begin(editable, { type: 'vertex', index })}
-              onDoubleClick={editPolygon(editable, removePolygonVertex(editable, index))}
-              {...handleProps('move')}
+              onPointerDown={begin(editable, point.handle)}
+              {...handleProps(point.cursor)}
             />
           ))}
-        </>
-      )}
     </group>
   )
 }
 
-function Dimensions({ strings, y, strong, testId }: { strings: DimensionString[]; y: number; strong: boolean; testId: string }) {
-  const color = strong ? MODEL_COLORS.plotLine : MODEL_COLORS.floorEdge
+function Dimensions({ strings, y, strong, testId, ink }: { strings: DimensionString[]; y: number; strong: boolean; testId: string; ink: PlanInk }) {
+  const color = strong ? ink.line : ink.faint
   return (
     <group name={`dimensions-${testId}`}>
       {strings.map((string) => (
@@ -423,7 +368,7 @@ function Dimensions({ strings, y, strong, testId }: { strings: DimensionString[]
               className="block whitespace-nowrap rounded-sm px-1 font-mono text-[10px] tabular-nums"
               style={{
                 color,
-                background: MODEL_COLORS.plot,
+                background: ink.chip,
                 transform: string.vertical ? 'rotate(-90deg)' : undefined,
               }}
             >
@@ -432,38 +377,6 @@ function Dimensions({ strings, y, strong, testId }: { strings: DimensionString[]
           </Html>
         </group>
       ))}
-    </group>
-  )
-}
-
-interface HandleMarkProps {
-  name: string
-  position: [number, number, number]
-  size: number
-  round?: boolean
-  faint?: boolean
-  onPointerDown?: (event: ThreeEvent<PointerEvent>) => void
-  onPointerMove?: (event: ThreeEvent<PointerEvent>) => void
-  onPointerUp?: (event: ThreeEvent<PointerEvent>) => void
-  onPointerCancel?: (event: ThreeEvent<PointerEvent>) => void
-  onPointerOver?: () => void
-  onPointerOut?: () => void
-  onDoubleClick?: (event: ThreeEvent<MouseEvent>) => void
-}
-
-/** A flat, screen-constant grip drawn over everything. */
-export function HandleMark({ name, position, size, round, faint, ...events }: HandleMarkProps) {
-  const shape = (s: number) => (round ? <circleGeometry args={[s / 2, 20]} /> : <planeGeometry args={[s, s]} />)
-  return (
-    <group position={position}>
-      <mesh name={name} rotation={[-Math.PI / 2, 0, 0]} renderOrder={31} {...events}>
-        {shape(size)}
-        <meshBasicMaterial color={EDITOR_PALETTE.selection} transparent opacity={faint ? 0.45 : 1} depthTest={false} />
-      </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} renderOrder={30} raycast={() => null}>
-        {shape(size * 1.35)}
-        <meshBasicMaterial color="#ffffff" transparent opacity={faint ? 0.6 : 1} depthTest={false} />
-      </mesh>
     </group>
   )
 }

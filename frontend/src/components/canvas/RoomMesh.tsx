@@ -466,15 +466,16 @@ export function RoomMesh({
     <>
       {mesh}
       {!plan && !modelStage && isSelected && (isPlanView || room.objectType === 'room') && !room.polygonVertices && (
-        <ResizeHandles
-          room={room}
-          orbitRef={orbitRef}
-          readOnly={readOnly}
-          viewMode={viewMode}
-        />
+        <ResizeHandles room={room} orbitRef={orbitRef} readOnly={readOnly} />
       )}
-      {!plan && !modelStage && isSelected && !readOnly && room.objectType === 'room' && (
-        <ShapeHandles room={room} orbitRef={orbitRef as RefObject<{ enabled: boolean }>} is3d={!isPlanView} />
+      {/* Shaping works the same in Top (plan) and 3D; in Top the grips sit
+          above the plan annotations. */}
+      {!modelStage && isSelected && !readOnly && room.objectType === 'room' && (
+        <ShapeHandles
+          room={room}
+          orbitRef={orbitRef as RefObject<{ enabled: boolean }>}
+          y={room.position.y + room.size.h / 2 + (plan ? 0.6 : 0.1)}
+        />
       )}
       {label}
       {dimensions}

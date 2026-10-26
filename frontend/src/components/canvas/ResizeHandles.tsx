@@ -4,7 +4,6 @@ import type { RefObject } from 'react'
 import * as THREE from 'three'
 import {
   type CanvasHistorySnapshot,
-  type CanvasViewMode,
   type Room,
   useCanvasStore,
 } from '../../store/canvasStore'
@@ -16,7 +15,7 @@ import {
   resizeRoomFromWorldCorner,
   type CornerResizeHandle,
 } from './resizeHandleGeometry'
-import { EDITOR_PALETTE } from './editorPalette'
+import { HANDLE_PX, HandleMark, useHandleMetres } from './HandleMark'
 
 interface OrbitHandle {
   enabled: boolean
@@ -26,7 +25,6 @@ interface ResizeHandlesProps {
   room: Room
   orbitRef: RefObject<OrbitHandle>
   readOnly?: boolean
-  viewMode?: CanvasViewMode
 }
 
 interface ActiveResize {
@@ -50,7 +48,6 @@ export function ResizeHandles({
   room,
   orbitRef,
   readOnly = false,
-  viewMode = '3d',
 }: ResizeHandlesProps) {
   const activeResizeRef = useRef<ActiveResize | null>(null)
   const updateRoom = useCanvasStore((s) => s.updateRoom)
@@ -58,6 +55,7 @@ export function ResizeHandles({
   const setPointerIntent = useCanvasStore((s) => s.setPointerIntent)
   const floors = useCanvasStore((s) => s.floors)
   const definition = capabilitiesOf(room)
+  const metres = useHandleMetres()
   const footprint = floors.find((floor) => floor.level === room.floorLevel)?.footprint
 
   useEffect(() => {
@@ -178,43 +176,23 @@ export function ResizeHandles({
     setPointerIntent('idle')
   }
 
-  const handleSize = Math.max(
-    0.3,
-    Math.min(0.5, Math.max(room.size.w, room.size.d) * 0.08),
-  )
   const y = room.position.y + room.size.h / 2 + 0.08
-  const is3d = viewMode === '3d'
 
   return (
     <group>
       {CORNER_RESIZE_HANDLES.map((handle) => {
         const position = cornerHandlePosition(room, handle)
-        const handleHeight = is3d ? Math.max(0.14, handleSize * 0.42) : 0.08
         return (
-          <mesh
+          <HandleMark
             key={handle.key}
             name={`resize-handle-${room.id}-${handle.key}`}
             position={[position.x, y, position.z]}
-            renderOrder={20}
+            size={metres(HANDLE_PX.corner)}
             onPointerDown={handlePointerDown(handle)}
             onPointerMove={handlePointerMove}
             onPointerUp={finishResize}
             onPointerCancel={finishResize}
-          >
-            <boxGeometry args={[handleSize, handleHeight, handleSize]} />
-            <meshStandardMaterial
-              color={EDITOR_PALETTE.selection}
-              emissive={EDITOR_PALETTE.selection}
-              emissiveIntensity={is3d ? 0.55 : 0.25}
-              depthTest={false}
-            />
-            <lineSegments raycast={() => null}>
-              <edgesGeometry
-                args={[new THREE.BoxGeometry(handleSize, handleHeight, handleSize)]}
-              />
-              <lineBasicMaterial color="#ffffff" depthTest={false} />
-            </lineSegments>
-          </mesh>
+          />
         )
       })}
     </group>

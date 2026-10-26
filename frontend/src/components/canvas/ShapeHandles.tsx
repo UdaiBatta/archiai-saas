@@ -1,10 +1,10 @@
 import { useRef, type RefObject } from 'react'
-import type { ThreeEvent } from '@react-three/fiber'
+import { useThree, type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import { type CanvasHistorySnapshot, type Room, useCanvasStore, workArea } from '../../store/canvasStore'
 import { isPrimaryPointerButton } from '../../store/interactionModel'
 import { MAX_ROOM_POINTS, MIN_ROOM_POINTS, roomOutline, type OutlinePoint } from '../../store/roomOutline'
-import { EDITOR_PALETTE } from './editorPalette'
+import { HANDLE_PX, HandleMark, useHandleMetres } from './HandleMark'
 
 interface ShapeDrag {
   pointerId: number
@@ -19,8 +19,11 @@ interface ShapeDrag {
  * Reshape a selected room: drag a point to move it, drag an edge's midpoint
  * to add a point there (up to MAX_ROOM_POINTS), double-click a point to remove
  * it. A box room shows only the midpoints; its corners are the resize handles.
+ * The same grips in Top, Axo and Persp.
  */
-export function ShapeHandles({ room, orbitRef, is3d }: { room: Room; orbitRef: RefObject<{ enabled: boolean }>; is3d: boolean }) {
+export function ShapeHandles({ room, orbitRef, y }: { room: Room; orbitRef: RefObject<{ enabled: boolean }>; y: number }) {
+  const metres = useHandleMetres()
+  const canvas = useThree((s) => s.gl.domElement)
   const dragRef = useRef<ShapeDrag | null>(null)
   const setRoomOutline = useCanvasStore((s) => s.setRoomOutline)
   const setInteractionMode = useCanvasStore((s) => s.setInteractionMode)
@@ -87,44 +90,45 @@ export function ShapeHandles({ room, orbitRef, is3d }: { room: Room; orbitRef: R
     setRoomOutline(room.id, outline.filter((_, i) => i !== index), { commit: true })
   }
 
-  const size = Math.max(0.24, Math.min(0.42, Math.max(room.size.w, room.size.d) * 0.06))
-  const y = room.position.y + room.size.h / 2 + 0.08
-  const height = is3d ? size * 0.5 : 0.08
   const handlers = { onPointerMove: move, onPointerUp: finish, onPointerCancel: finish }
+
+  const cursor = (value: string) => ({
+    onPointerOver: () => { canvas.style.cursor = value },
+    onPointerOut: () => { canvas.style.cursor = '' },
+  })
 
   return (
     <group>
-      {shaped && outline.map((p, i) => (
-        <mesh
-          key={`v${i}`}
-          name={`shape-point-${room.id}-${i}`}
-          position={[p.x, y, p.z]}
-          renderOrder={21}
-          onPointerDown={(event) => begin(event, i, outline)}
-          onDoubleClick={remove(i)}
-          {...handlers}
-        >
-          <cylinderGeometry args={[size / 2, size / 2, height, 16]} />
-          <meshBasicMaterial color={EDITOR_PALETTE.selection} depthTest={false} />
-        </mesh>
-      ))}
       {canAdd && outline.map((p, i) => {
         const q = outline[(i + 1) % outline.length]
         const mid = { x: (p.x + q.x) / 2, z: (p.z + q.z) / 2 }
         return (
-          <mesh
+          <HandleMark
             key={`m${i}`}
             name={`shape-midpoint-${room.id}-${i}`}
             position={[mid.x, y, mid.z]}
-            renderOrder={21}
+            size={metres(HANDLE_PX.midpoint)}
+            round
+            faint
             onPointerDown={(event) => begin(event, i + 1, [...outline.slice(0, i + 1), mid, ...outline.slice(i + 1)])}
             {...handlers}
-          >
-            <cylinderGeometry args={[size / 3, size / 3, height, 12]} />
-            <meshBasicMaterial color={EDITOR_PALETTE.selectionSoft} transparent opacity={0.85} depthTest={false} />
-          </mesh>
+            {...cursor('copy')}
+          />
         )
       })}
+      {shaped && outline.map((p, i) => (
+        <HandleMark
+          key={`v${i}`}
+          name={`shape-point-${room.id}-${i}`}
+          position={[p.x, y + 0.01, p.z]}
+          size={metres(HANDLE_PX.point)}
+          round
+          onPointerDown={(event) => begin(event, i, outline)}
+          onDoubleClick={remove(i)}
+          {...handlers}
+          {...cursor('move')}
+        />
+      ))}
     </group>
   )
 }

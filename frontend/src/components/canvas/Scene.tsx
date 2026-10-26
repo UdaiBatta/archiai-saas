@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
-import { useThree } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, OrthographicCamera, Grid, Html, Line, Edges, GizmoHelper, GizmoViewcube } from '@react-three/drei'
 import * as THREE from 'three'
 import { CanvasViewMode, useCanvasStore } from '../../store/canvasStore'
@@ -10,6 +10,7 @@ import { useSunContext } from '../../analysis/sunStore'
 import { BLOCKS_LIGHT_DIRECTION, BLOCKS_MAX_POLAR_ANGLE, BLOCK_COLORS, MODEL_COLORS, presetView, sceneExtent, shadowFrustum, type CameraPreset } from './modelView'
 import { parseMasses, parseSite } from '../../site/siteTypes'
 import { PlotBoundary } from './PlotBoundary'
+import { easeInOut, prefersReducedMotion, progressAt } from './viewTransition'
 
 /** Site ground sits below floor level so the ground-floor slab reads as a plinth. */
 const GROUND_Y = -0.2
@@ -85,6 +86,12 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
   // Reframe when the site changes, not on every mass edit (that would jump
   // the camera mid push/pull).
   const siteKey = siteModel ? siteModel.boundary.map((p) => `${p.x.toFixed(1)},${p.z.toFixed(1)}`).join(';') : ''
+  const lastPresetRef = useRef(preset)
+  const swingRef = useRef<{
+    from: { position: THREE.Vector3; target: THREE.Vector3; zoom: number }
+    to: { position: THREE.Vector3; target: THREE.Vector3; zoom: number }
+    startedAt: number
+  } | null>(null)
   const framingKey = `${frameNonce}:${selectedFloor}:${viewMode}:${modelStage}:${preset}:${footprint?.w ?? 0}:${footprint?.d ?? 0}:${siteKey}`
   useEffect(() => {
     if (!extent) return
@@ -98,6 +105,24 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
       const distance = view.position[1] - elevation
       view.position = [view.target[0], elevation + distance * 1.7, view.target[2] + 0.01]
     }
+    // Axo <-> Top (both orthographic) swing over instead of cutting, in step
+    // with the rooms' burst (viewTransition).
+    const previous = lastPresetRef.current
+    lastPresetRef.current = preset
+    const orbitTarget = orbitRef.current?.target
+    if (
+      previous !== preset && previous !== 'perspective' && preset !== 'perspective'
+      && (previous === 'top' || preset === 'top') && orbitTarget && !prefersReducedMotion()
+    ) {
+      swingRef.current = {
+        from: { position: camera.position.clone(), target: orbitTarget.clone(), zoom: camera.zoom },
+        to: { position: new THREE.Vector3(...view.position), target: new THREE.Vector3(...view.target), zoom: view.zoom },
+        startedAt: performance.now(),
+      }
+      invalidate()
+      return
+    }
+    swingRef.current = null
     camera.position.set(...view.position)
     camera.zoom = view.zoom
     camera.updateProjectionMatrix()
@@ -108,6 +133,28 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
     // the old view could stay on screen under the new view's labels.
     invalidate()
   }, [framingKey, camera, viewportSize.width, viewportSize.height])
+
+  useFrame(() => {
+    const swing = swingRef.current
+    if (!swing) return
+    const t = progressAt(swing.startedAt, performance.now())
+    const k = easeInOut(t)
+    const target = swing.from.target.clone().lerp(swing.to.target, k)
+    // Swing the viewing direction round, rather than sliding the camera
+    // through the model, and ease the zoom geometrically.
+    const fromOffset = swing.from.position.clone().sub(swing.from.target)
+    const toOffset = swing.to.position.clone().sub(swing.to.target)
+    const length = THREE.MathUtils.lerp(fromOffset.length(), toOffset.length(), k)
+    const direction = fromOffset.normalize().lerp(toOffset.normalize(), k).normalize()
+    camera.position.copy(target).addScaledVector(direction, length)
+    camera.zoom = Math.exp(THREE.MathUtils.lerp(Math.log(swing.from.zoom), Math.log(swing.to.zoom), k))
+    camera.updateProjectionMatrix()
+    camera.lookAt(target)
+    orbitRef.current?.target?.copy(target)
+    orbitRef.current?.update?.()
+    if (t >= 1) swingRef.current = null
+    invalidate()
+  })
 
   // The 3D sun: aimed at the house centre from where the sun is at
   // `sunHour`, with a shadow box fitted to the site so shadows stay crisp.

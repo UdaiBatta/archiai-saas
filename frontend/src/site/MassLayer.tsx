@@ -5,7 +5,7 @@ import * as THREE from 'three'
 import { useCanvasStore } from '../store/canvasStore'
 import { MODEL_COLORS, mixHex } from '../components/canvas/modelView'
 import { EDITOR_PALETTE } from '../components/canvas/editorPalette'
-import { HANDLE_PX, HandleMark, usePixelsPerMetre } from '../components/canvas/TopPlanOverlay'
+import { HANDLE_PX, HandleMark, usePixelsPerMetre } from '../components/canvas/HandleMark'
 import { buildableEnvelope, polygonArea, type Region } from './siteGeometry'
 import { FLOOR_USE_LABEL, floorUse, useBands, type FloorUse, type Mass, type SitePoint } from './siteTypes'
 import {
@@ -258,7 +258,7 @@ export function MassLayer({ orbitRef, readOnly, topView, focusedMassId = null }:
             key={index}
             name={`mass-corner-${selected.id}-${index}`}
             position={[p.x, massTop(selected) + 0.3, p.z]}
-            size={HANDLE_PX * metre}
+            size={HANDLE_PX.corner * metre}
             round
             onPointerDown={beginDrag(selected, { type: 'corner', index })}
             {...dragHandlers}
