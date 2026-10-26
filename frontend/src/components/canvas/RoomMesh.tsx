@@ -19,8 +19,8 @@ import { roomVisualTreatment } from './roomVisualTreatment'
 import { EDITOR_PALETTE, displayRoomColor } from './editorPalette'
 import { wallModelPieces } from './modelGeometry'
 import { furnitureParts } from './furnitureParts'
-import { BLOCK_COLORS, MODEL_COLORS, PLAN_CUT_M, floorTint, mixHex } from './modelView'
-import { blockFill, blockFurnitureParts, blockHeight, blockWallPieces, clipSpan } from './blockGeometry'
+import { BLOCK_COLORS, BLOCK_OPACITY, MODEL_COLORS, floorTint, mixHex } from './modelView'
+import { blockEdge, blockFill } from './blockGeometry'
 import { roomLabelLayout, roomPlanArea, roomWorldBounds } from './topViewModel'
 import { formatArea, formatDims } from '../../utils/format'
 
@@ -120,9 +120,8 @@ export function RoomMesh({
   // as one continuous space instead of two outlined boxes.
   const solid3d = modelStage || viewMode === '3d'
   const wallPieces = useMemo(() => solid3d && room.objectType === 'wall'
-    ? (blocks ? blockWallPieces(room, hostedOpenings) : wallModelPieces(room, hostedOpenings))
-    : null, [solid3d, blocks, room, hostedOpenings])
-  const floorBase = useCanvasStore((s) => s.floors.find((floor) => floor.level === (room.floorLevel ?? 0))?.elevation ?? 0)
+    ? wallModelPieces(room, hostedOpenings)
+    : null, [solid3d, room, hostedOpenings])
 
   const isSelected = selectedId === room.id
   const definition = capabilitiesOf(room)
@@ -135,18 +134,17 @@ export function RoomMesh({
   const isSpace = definition.category === 'space'
   const modelSurface = solid3d && (isSpace || (room.objectType === 'door' && typeof room.hostWallId === 'string'))
   const isGlass = solid3d && room.objectType === 'window'
-  // Blocks: rooms are volumes, windows only show below the plan cut.
-  const glassSpan = blocks && isGlass ? clipSpan(room.position.y, room.size.h, floorBase + PLAN_CUT_M) : null
-  const renderHeight = modelSurface ? (blocks && isSpace ? blockHeight() : 0.045) : glassSpan?.height ?? room.size.h
+  // Blocks: a room is its whole see-through volume, not a floor slab.
+  const blockVolume = blocks && isSpace
+  const renderHeight = modelSurface && !blockVolume ? 0.045 : room.size.h
   const boxEdges = useBoxEdges(room.size.w, room.size.h, room.size.d)
   const selectionEdges = useBoxEdges(room.size.w + 0.08, Math.max(renderHeight + 0.08, 0.12), room.size.d + 0.08)
-  const renderY = modelSurface ? room.position.y - room.size.h / 2 + renderHeight / 2 : glassSpan?.centerY ?? room.position.y
-  const cutAway = blocks && isGlass && !glassSpan
+  const renderY = modelSurface ? room.position.y - room.size.h / 2 + renderHeight / 2 : room.position.y
   const modelFurniture = solid3d && room.objectType === 'furniture'
   // White model: matte surfaces, floors keep a pale tint of their room colour,
   // windows read as glass.
   const noRaycast = () => null
-  const modelColor = blocks && isSpace
+  const modelColor = blockVolume
     ? blockFill(room, invalid, isSelected)
     : isSelected
     ? MODEL_COLORS.wallSelected
@@ -169,8 +167,8 @@ export function RoomMesh({
     return geometry
   }, [modelSurface, room.polygonVertices, room.position.x, room.position.z, renderHeight])
   useEffect(() => () => polygonSlab?.dispose(), [polygonSlab])
-  const see = ghost ? 0.12 : isGlass ? 0.35 : 1
-  const edgeColor = blocks ? BLOCK_COLORS.edge : isSpace ? MODEL_COLORS.floorEdge : MODEL_COLORS.edge
+  const see = ghost ? 0.12 : isGlass ? 0.35 : blocks && (isSpace || wallPieces) ? BLOCK_OPACITY : 1
+  const edgeColor = blockVolume ? blockEdge(modelColor) : blocks ? BLOCK_COLORS.edge : isSpace ? MODEL_COLORS.floorEdge : MODEL_COLORS.edge
   const visual = roomVisualTreatment(
     definition,
     room.objectType,
@@ -361,7 +359,8 @@ export function RoomMesh({
         <boxGeometry args={[room.size.w, renderHeight, room.size.d]} />
       )}
       <meshStandardMaterial
-        visible={!wallPieces && !modelFurniture && !cutAway}
+        visible={!wallPieces && !modelFurniture}
+        side={blocks ? THREE.DoubleSide : THREE.FrontSide}
         color={solid3d ? modelColor : displayRoomColor(room)}
         emissive={visual.emissive}
         emissiveIntensity={visual.emissiveIntensity}
@@ -371,7 +370,7 @@ export function RoomMesh({
         roughness={solid3d ? (isGlass ? 0.05 : 0.92) : visual.roughness}
         metalness={solid3d ? (isGlass ? 0.1 : 0) : visual.metalness}
       />
-      {solid3d && !wallPieces && !modelFurniture && !cutAway && (
+      {solid3d && !wallPieces && !modelFurniture && (
         <Edges color={edgeColor} transparent={ghost} opacity={ghost ? 0.3 : 1} />
       )}
       {wallPieces?.map((piece, index) => (
@@ -380,14 +379,14 @@ export function RoomMesh({
           <meshStandardMaterial
             color={isSelected ? MODEL_COLORS.wallSelected : blocks ? BLOCK_COLORS.wall : MODEL_COLORS.wall}
             roughness={0.95}
-            transparent={ghost}
+            transparent={see < 1}
             opacity={see}
-            depthWrite={!ghost}
+            depthWrite={see === 1}
           />
           <Edges color={MODEL_COLORS.edge} transparent={ghost} opacity={ghost ? 0.3 : 1} />
         </mesh>
       ))}
-      {modelFurniture && (blocks ? blockFurnitureParts(room) : furnitureParts(room)).map((part, index) => (
+      {modelFurniture && furnitureParts(room).map((part, index) => (
         <mesh key={index} position={part.position} castShadow receiveShadow>
           <boxGeometry args={part.size} />
           <meshStandardMaterial color={isSelected ? MODEL_COLORS.wallSelected : part.color} roughness={0.9} />

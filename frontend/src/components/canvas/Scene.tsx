@@ -419,7 +419,7 @@ function SiteGround({
   /** Axo/Top: the camera sits far off, so fog and the grid's camera-based
    * fade would wash the ground out to the sky colour. */
   ortho: boolean
-  /** Block planning: lighter ground, grid and fog to match. */
+  /** Block planning: dark ground, grid and fog to match. */
   blocks?: boolean
 }) {
   const colors = blocks ? BLOCK_COLORS : MODEL_COLORS
@@ -476,24 +476,24 @@ function SiteGround({
         <Line
           points={[[x0, 0, z0], [x1, 0, z0], [x1, 0, z1], [x0, 0, z1], [x0, 0, z0]]}
           position={[0, GROUND_Y + 0.04, 0]}
-          color={MODEL_COLORS.plotLine}
+          color={colors.plotLine}
           lineWidth={1.6}
         />
       )}
       <group position={[x1 + offset, GROUND_Y + 0.04, z0 - offset]} rotation={[0, -northAngle, 0]} scale={size}>
         <group rotation={[-Math.PI / 2, 0, 0]}>
           <mesh geometry={arrowDark} raycast={() => null}>
-            <meshBasicMaterial color={MODEL_COLORS.plotLine} />
+            <meshBasicMaterial color={colors.plotLine} />
           </mesh>
           <mesh geometry={arrowLight} raycast={() => null}>
             <meshBasicMaterial color="#ffffff" />
           </mesh>
         </group>
-        <Line points={ringPoints} scale={0.78} color={MODEL_COLORS.plotLine} lineWidth={1} />
+        <Line points={ringPoints} scale={0.78} color={colors.plotLine} lineWidth={1} />
         {/* "N" beyond the tip (world -z is shape +y). */}
         <Line
           points={[[-0.2, 0, -1.25], [-0.2, 0, -1.7], [0.2, 0, -1.25], [0.2, 0, -1.7]]}
-          color={MODEL_COLORS.plotLine}
+          color={colors.plotLine}
           lineWidth={1.6}
         />
       </group>

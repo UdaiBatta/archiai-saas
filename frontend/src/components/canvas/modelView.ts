@@ -197,17 +197,16 @@ export const MODEL_COLORS = {
 } as const
 
 /**
- * Block planning (plan 005): how the layout stage draws the 3D view. Rooms
- * are coloured volumes by zone, walls are cut at plan height so every room is
- * visible from above, and the lighting is flat. `model` is the white model
+ * Block planning (plan 005): how the layout stage draws the 3D view. On a
+ * dark ground every room is a see-through volume in its room type's colour,
+ * so furniture and the rooms behind show through, and walls are faint glass
+ * dividers (the rooms already carry the boundary). `model` is the white model
  * above, kept for the model stage and for the sun studies.
  */
 export type ViewStyle = 'blocks' | 'model'
 
-/** Walls are cut this high above their floor in the blocks style. */
-export const PLAN_CUT_M = 1.2
-/** Room blocks stop this far below the cut, so walls read as lines between them. */
-export const BLOCK_INSET_M = 0.15
+/** Blocks style: how opaque a room volume (and a wall) is. */
+export const BLOCK_OPACITY = 0.3
 
 /** The camera a plan opens with in the layout stage: true isometric. */
 export const DEFAULT_LAYOUT_PRESET: Exclude<CameraPreset, 'top'> = 'axo'
@@ -219,31 +218,23 @@ export const BLOCKS_MAX_POLAR_ANGLE = (70 * Math.PI) / 180
  * so faces read by tone and shadows stay short; no time of day. */
 export const BLOCKS_LIGHT_DIRECTION: [number, number, number] = [0.36, 0.86, 0.36]
 
-/** Light-scene palette for block planning. Checked by blockPalette.test.ts:
- * every pair at least delta-E 10 apart, every filled zone at least 1.5:1
- * against the ground (unassigned stays pale on purpose). */
+/** Dark-scene palette for block planning (the ground is Hypar's viewer
+ * background, a blue-black rather than pure black). Room colours come from
+ * blockFill, one per room type. */
 export const BLOCK_COLORS = {
-  zone: {
-    public: '#F2B66D',
-    private: '#8DB4E2',
-    collaborative: '#B79CE0',
-    service: '#EE8F7A',
-    circulation: '#BDB8AE',
-    utility: '#A9BC92',
-    unassigned: '#E4E2DC',
-  },
-  /** Cut walls: near white, so the blocks carry the colour. */
-  wall: '#fbfaf7',
-  edge: '#2f2e2b',
+  /** Walls: a pale glass divider between the coloured rooms. */
+  wall: '#aab4c3',
+  edge: '#4a5466',
   /** Selection lifts a block's colour toward white. */
   highlight: '#ffffff',
-  ground: '#F3F3F1',
-  plot: '#fafaf8',
-  gridCell: '#e3e1db',
-  gridSection: '#dad8d2',
-  slab: '#e2e0d9',
-  sky: '#f1f2f2',
-  skyTop: '#e7eaed',
+  ground: '#13171f',
+  plot: '#181d27',
+  plotLine: '#7d889a',
+  gridCell: '#1f2530',
+  gridSection: '#2b3240',
+  slab: '#1c222c',
+  sky: '#13171f',
+  skyTop: '#0b0e13',
 } as const
 
 /** A room floor keeps its colour identity as a pale, desaturated tint. */
