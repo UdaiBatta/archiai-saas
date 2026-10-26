@@ -19,7 +19,10 @@ import { useCanvasKeyboardShortcuts } from './useCanvasKeyboardShortcuts'
 import { shouldRenderCanvasObject } from './canvasObjectVisibility'
 import { EDITOR_PALETTE } from './editorPalette'
 import { hardViolationRoomIds, parseMvpQuality } from './qualityModel'
-import { MODEL_COLORS, PERSPECTIVE_FOV, floorDisplay, type CameraPreset } from './modelView'
+import * as THREE from 'three'
+import { BLOCK_COLORS, DEFAULT_LAYOUT_PRESET, MODEL_COLORS, PERSPECTIVE_FOV, floorDisplay, type CameraPreset } from './modelView'
+import { blocksActive, useViewStyle } from './viewStyleStore'
+import { useSunAnalysis, useSunResultStale } from '../../analysis/sunAnalysis'
 import { DOCK_CARD, EditorDock } from './EditorDock'
 import { SavedViewsPanel, ViewCamera, type ViewCameraApi } from './SavedViewsPanel'
 import { parseSavedViews, restorableFloor, type SavedView } from './savedViews'
@@ -64,7 +67,7 @@ interface Canvas3DProps {
   initialViewId?: string
 }
 
-export function Canvas3D({ className, readOnly = false, modelStage = false, briefBackground = false, initialPreset = 'perspective', dock = true, initialViewId }: Canvas3DProps) {
+export function Canvas3D({ className, readOnly = false, modelStage = false, briefBackground = false, initialPreset = DEFAULT_LAYOUT_PRESET, dock = true, initialViewId }: Canvas3DProps) {
   const orbitRef = useRef<{ enabled: boolean }>(null)
   const rooms = useCanvasStore((s) => s.rooms)
   const selectedFloor = useCanvasStore((s) => s.selectedFloor)
@@ -81,6 +84,11 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
   const [sunHour, setSunHour] = useState(10)
   const [orbitPreset, setOrbitPreset] = useState<CameraPreset>(initialPreset)
   const preset: CameraPreset = planLens ? 'top' : orbitPreset
+  // The model stage is a presentation view: it opens in perspective as before,
+  // whatever camera the layout stage (axo by default) was using.
+  useEffect(() => {
+    if (modelStage) setOrbitPreset('perspective')
+  }, [modelStage])
   const [frameNonce, setFrameNonce] = useState(0)
   const [focusedRoomId, setFocusedRoomId] = useState<string | null>(null)
   const [focusedMassId, setFocusedMassId] = useState<string | null>(null)
@@ -115,6 +123,14 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
   // capture canvas behind the plan lenses, nor the empty-brief backdrop).
   const studio = viewMode === '3d' && !briefBackground
   const topView = studio && preset === 'top'
+  // Block planning (plan 005) while laying out; the white model in the model
+  // stage and whenever the sun studies need the real full-height building.
+  const viewStyle = useViewStyle((s) => s.style)
+  const [openTool, setOpenTool] = useState<string | null>(null)
+  const heatmapShown = useSunAnalysis((s) => s.show && s.result !== null)
+  const heatmapStale = useSunResultStale()
+  const sunStudy = openTool === 'sun' || openTool === 'analysis' || (heatmapShown && !heatmapStale)
+  const blocks = blocksActive({ studio, topView, modelStage, style: viewStyle, sunStudy })
   // Ambient occlusion is a presentation option, off by default and not
   // remembered: a full-screen pass at 4x multisampling was the heaviest thing
   // in Persp on laptop GPUs, and a remembered "on" made Persp feel slow for
@@ -189,7 +205,9 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
     viewMode === '3d'
       ? { position: [10, 12, 10] as [number, number, number], fov: PERSPECTIVE_FOV }
       : { position: [0, 28, 0.01] as [number, number, number], fov: 42 }
-  const background = studio
+  const background = blocks
+    ? `linear-gradient(180deg, ${BLOCK_COLORS.skyTop} 0%, ${BLOCK_COLORS.sky} 45%, ${BLOCK_COLORS.sky} 100%)`
+    : studio
     ? `linear-gradient(180deg, #dde3ea 0%, ${MODEL_COLORS.sky} 55%, ${MODEL_COLORS.sky} 100%)`
     : `radial-gradient(circle at 50% 10%, ${EDITOR_PALETTE.workspaceHighlight} 0%, ${EDITOR_PALETTE.workspaceStart} 48%, ${EDITOR_PALETTE.workspaceEnd} 100%)`
 
@@ -240,7 +258,8 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
               }
         }
       >
-        <Scene orbitRef={orbitRef} readOnly={readOnly} viewMode={viewMode} modelStage={modelStage} sunHour={sunHour} preset={preset} site={studio} level={planLevel} frameNonce={frameNonce} focus={focus} />
+        <Scene orbitRef={orbitRef} readOnly={readOnly} viewMode={viewMode} modelStage={modelStage} sunHour={sunHour} preset={preset} site={studio} level={planLevel} frameNonce={frameNonce} focus={focus} blocks={blocks} />
+        <FlatColours on={blocks} />
         {studio && (
           <ViewCamera
             apiRef={viewCameraRef}
@@ -250,7 +269,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
           />
         )}
         {solidModel && (
-          <MergedModel objects={mergedObjects} openings={openings} invalidRoomIds={invalidRoomIds} readOnly={readOnly} plan={topView} />
+          <MergedModel objects={mergedObjects} openings={openings} invalidRoomIds={invalidRoomIds} readOnly={readOnly} plan={topView} blocks={blocks} />
         )}
         {individualRooms.map((r) => (
           <RoomMesh
@@ -262,6 +281,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
             invalid={invalidRoomIds.has(r.id)}
             modelStage={modelStage}
             plan={topView}
+            blocks={blocks}
           />
         ))}
         {!modelStage && <NeighbourHighlights readOnly={readOnly} planY={topView ? (planFloor?.elevation ?? 0) + floorHeight + 0.35 : undefined} />}
@@ -286,7 +306,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
           <SiteLayer orbitRef={orbitRef} readOnly={readOnly} topView={topView} planY={(planFloor?.elevation ?? 0) + floorHeight + 0.4} />
         )}
         {ghostRooms.map((r) => (
-          <RoomMesh key={r.id} room={r} orbitRef={orbitRef} readOnly viewMode={viewMode} modelStage={modelStage} ghost />
+          <RoomMesh key={r.id} room={r} orbitRef={orbitRef} readOnly viewMode={viewMode} modelStage={modelStage} ghost blocks={blocks} />
         ))}
         {/* Ambient occlusion only in Persp: Top and Axo are drawings (orthographic),
             and AO under an orthographic camera was costly enough to slow the
@@ -320,6 +340,7 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
           readOnly={readOnly}
           modelStage={modelStage}
           alerts={{ massing: zoningIssueCount }}
+          onOpenChange={setOpenTool}
           tools={{
             assistant: !readOnly && !modelStage && <AssistantPanel />,
             site: <SitePanel defaultOpen topView={topView} onRequestTop={() => applyPreset('top')} />,
@@ -411,6 +432,24 @@ function RendererAutoClear() {
     gl.autoClear = true
     invalidate()
   }, [gl, invalidate])
+  return null
+}
+
+/** Blocks style shows the palette as chosen: the renderer's default filmic
+ * tone mapping desaturates and darkens flat colours. Restored when off. */
+function FlatColours({ on }: { on: boolean }) {
+  const gl = useThree((s) => s.gl)
+  const invalidate = useThree((s) => s.invalidate)
+  useEffect(() => {
+    if (!on) return
+    const previous = gl.toneMapping
+    gl.toneMapping = THREE.NoToneMapping
+    invalidate()
+    return () => {
+      gl.toneMapping = previous
+      invalidate()
+    }
+  }, [on, gl, invalidate])
   return null
 }
 

@@ -196,6 +196,47 @@ export const MODEL_COLORS = {
   contextEdge: '#a9a8a2',
 } as const
 
+/**
+ * Block planning (plan 005): how the layout stage draws the 3D view. On a
+ * dark ground every room is a see-through volume in its room type's colour,
+ * so furniture and the rooms behind show through, and walls are faint glass
+ * dividers (the rooms already carry the boundary). `model` is the white model
+ * above, kept for the model stage and for the sun studies.
+ */
+export type ViewStyle = 'blocks' | 'model'
+
+/** Blocks style: how opaque a room volume (and a wall) is. */
+export const BLOCK_OPACITY = 0.3
+
+/** The camera a plan opens with in the layout stage: true isometric. */
+export const DEFAULT_LAYOUT_PRESET: Exclude<CameraPreset, 'top'> = 'axo'
+/** Blocks style: the camera stays at least 20 degrees above the ground, so
+ * rooms are never seen edge-on behind their walls (OrbitControls polar angle). */
+export const BLOCKS_MAX_POLAR_ANGLE = (70 * Math.PI) / 180
+
+/** Blocks style: one fixed light from high over the camera's side (south-east),
+ * so faces read by tone and shadows stay short; no time of day. */
+export const BLOCKS_LIGHT_DIRECTION: [number, number, number] = [0.36, 0.86, 0.36]
+
+/** Dark-scene palette for block planning (the ground is Hypar's viewer
+ * background, a blue-black rather than pure black). Room colours come from
+ * blockFill, one per room type. */
+export const BLOCK_COLORS = {
+  /** Walls: a pale glass divider between the coloured rooms. */
+  wall: '#aab4c3',
+  edge: '#4a5466',
+  /** Selection lifts a block's colour toward white. */
+  highlight: '#ffffff',
+  ground: '#13171f',
+  plot: '#181d27',
+  plotLine: '#7d889a',
+  gridCell: '#1f2530',
+  gridSection: '#2b3240',
+  slab: '#1c222c',
+  sky: '#13171f',
+  skyTop: '#0b0e13',
+} as const
+
 /** A room floor keeps its colour identity as a pale, desaturated tint. */
 export const floorTint = (roomColor: string) => mixHex(roomColor, MODEL_COLORS.floorBase, 0.8)
 

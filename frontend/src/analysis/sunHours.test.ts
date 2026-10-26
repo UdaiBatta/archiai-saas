@@ -126,3 +126,22 @@ describe('example villa + a 40 x 15 x 5-floor mass', () => {
     expect(summary.rooms.filter((r) => r.hours !== null).length).toBeGreaterThanOrEqual(3)
   }, 20000)
 })
+
+describe('sun-hours geometry and the display style (plan 005)', () => {
+  it('always ray-casts against the full-height building, whatever the 3D view shows', async () => {
+    const { useViewStyle } = await import('../components/canvas/viewStyleStore')
+    const layout = layoutPlanToCanvas(EXAMPLE.plan as unknown as LayoutPlan)
+    const scene = (style: 'blocks' | 'model') => {
+      useViewStyle.getState().setStyle(style)
+      return buildSunScene({ objects: layout.rooms, masses: [], site: null }).triangles
+    }
+    const blocks = scene('blocks')
+    const model = scene('model')
+    expect(Array.from(blocks)).toEqual(Array.from(model))
+    // Walls keep their full storey height: nothing was cut.
+    let top = 0
+    for (let i = 1; i < blocks.length; i += 3) top = Math.max(top, blocks[i])
+    expect(top).toBeGreaterThan(2.3)
+    useViewStyle.getState().setStyle('blocks')
+  })
+})

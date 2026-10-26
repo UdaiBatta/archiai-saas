@@ -69,6 +69,9 @@ interface EditorDockProps {
   /** 3D model stage: Furniture instead of Room, and no lenses. */
   modelStage?: boolean
   className?: string
+  /** Told which tool's popover is open (null when none), e.g. so the view can
+   * show the real building while the Sun tool is open. */
+  onOpenChange?: (tool: string | null) => void
 }
 
 /**
@@ -76,7 +79,7 @@ interface EditorDockProps {
  * views, plan lenses and the view tools (Site, Views, Sun, Floors); the
  * add-object menu and each view tool open in a popover above it.
  */
-export function EditorDock({ preset, onPreset, tools = {}, alerts, readOnly = false, modelStage = false, className = '' }: EditorDockProps) {
+export function EditorDock({ preset, onPreset, tools = {}, alerts, readOnly = false, modelStage = false, className = '', onOpenChange }: EditorDockProps) {
   const viewMode = useCanvasStore((s) => s.viewMode)
   const setViewMode = useCanvasStore((s) => s.setViewMode)
   const [open, setOpen] = useState<DockPopover | null>(null)
@@ -88,6 +91,7 @@ export function EditorDock({ preset, onPreset, tools = {}, alerts, readOnly = fa
   const { edit, history, addMenu } = useEditTools({ modelStage, closeMenu: () => setOpen(null) })
   const popovers: Partial<Record<DockPopover, ReactNode>> = { ...tools, more: addMenu }
   const popoverLabel = openTool === 'more' ? 'Add object' : available.find((tool) => tool.id === openTool)?.label
+  useEffect(() => { onOpenChange?.(openTool) }, [openTool, onOpenChange])
   const toggle = (id: DockPopover) => (openTool === id ? close(true) : setOpen(id))
   const editItem = (tool: EditTool): ToolbarItem => ({
     ...tool,

@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useThree, type ThreeEvent } from '@react-three/fiber'
+import * as THREE from 'three'
 import { type Room, useCanvasStore } from '../../store/canvasStore'
 import { COMPONENT_REGISTRY } from '../../store/componentRegistry'
 import { isPrimaryPointerButton, objectPointerIntent } from '../../store/interactionModel'
 import { formatArea, formatDims } from '../../utils/format'
+import { buildBlockModel } from './blockGeometry'
 import { buildMergedModel } from './mergedGeometry'
+import { BLOCK_OPACITY } from './modelView'
 import { roomLabelLayout, roomPlanArea, roomWorldBounds } from './topViewModel'
 
 /** Same list back while its items are the same objects: a drag replaces only
@@ -25,15 +28,17 @@ interface MergedModelProps {
   readOnly: boolean
   /** Top view: hover tooltips for rooms too small to label. */
   plan: boolean
+  /** Block planning look (plan 005) instead of the white model. */
+  blocks?: boolean
 }
 
 /** The unselected walls, floors and windows as 3 draw calls (see mergedModel). */
-export function MergedModel({ objects, openings, invalidRoomIds, readOnly, plan }: MergedModelProps) {
+export function MergedModel({ objects, openings, invalidRoomIds, readOnly, plan, blocks = false }: MergedModelProps) {
   const stableObjects = useStableList(objects)
   const stableOpenings = useStableList(openings)
   const model = useMemo(
-    () => buildMergedModel(stableObjects, stableOpenings, invalidRoomIds),
-    [stableObjects, stableOpenings, invalidRoomIds],
+    () => (blocks ? buildBlockModel : buildMergedModel)(stableObjects, stableOpenings, invalidRoomIds),
+    [blocks, stableObjects, stableOpenings, invalidRoomIds],
   )
   useEffect(() => () => {
     model.solid?.dispose()
@@ -53,6 +58,9 @@ export function MergedModel({ objects, openings, invalidRoomIds, readOnly, plan 
     if (readOnly || !isPrimaryPointerButton(event.button)) return
     const room = ownerOf(owners)(event)
     if (!room) return
+    // Blocks: a click through a see-through room volume falls to what is
+    // inside it (furniture, or the room's own floor), not the glass.
+    if (blocks && owners === model.glassOwners && COMPONENT_REGISTRY[room.objectType]?.category === 'space') return
     const state = useCanvasStore.getState()
     if (state.placementMode) {
       event.stopPropagation()
@@ -89,7 +97,7 @@ export function MergedModel({ objects, openings, invalidRoomIds, readOnly, plan 
           onPointerMove={onPointerMove(model.solidOwners)}
           onPointerOut={onPointerOut}
         >
-          <meshStandardMaterial vertexColors roughness={0.93} metalness={0} />
+          <meshStandardMaterial vertexColors roughness={blocks ? 1 : 0.93} metalness={0} />
         </mesh>
       )}
       {model.glass && (
@@ -100,7 +108,9 @@ export function MergedModel({ objects, openings, invalidRoomIds, readOnly, plan 
           onPointerMove={onPointerMove(model.glassOwners)}
           onPointerOut={onPointerOut}
         >
-          <meshStandardMaterial vertexColors transparent opacity={0.35} depthWrite={false} roughness={0.05} metalness={0.1} />
+          {blocks
+            ? <meshStandardMaterial vertexColors transparent opacity={BLOCK_OPACITY} depthWrite={false} side={THREE.DoubleSide} roughness={0.3} metalness={0} />
+            : <meshStandardMaterial vertexColors transparent opacity={0.35} depthWrite={false} roughness={0.05} metalness={0.1} />}
         </mesh>
       )}
       {model.edges && (
