@@ -11,7 +11,7 @@ import { useCanvasStore } from '../store/canvasStore'
 import { MODEL_COLORS } from '../components/canvas/modelView'
 import { EDITOR_PALETTE } from '../components/canvas/editorPalette'
 import { snappedCoord } from '../components/canvas/plan2dGeometry'
-import { usePixelsPerMetre } from '../components/canvas/TopPlanOverlay'
+import { HANDLE_PX, usePixelsPerMetre } from '../components/canvas/HandleMark'
 import { buildableEnvelope, type Region } from './siteGeometry'
 import { parseSite, type Site, type SitePoint } from './siteTypes'
 import { edgeLabels, frontEdgeIndex, moveCorner, streetDirection, withBoundary } from './siteEdit'
@@ -22,7 +22,6 @@ import { useSiteUi } from './siteUiStore'
 const GROUND_LINE_Y = -0.14
 const GROUND = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
 const ENVELOPE = '#3f7f6a'
-const HANDLE_PX = 11
 
 const at = (p: SitePoint, y: number): [number, number, number] => [p.x, y, p.z]
 const closed = (pts: SitePoint[], y: number) => [...pts, pts[0]].map((p) => at(p, y))
@@ -195,7 +194,7 @@ function snap(point: THREE.Vector3): SitePoint {
 /** Corner grips: drag previews locally, release commits one undo step. */
 function CornerGrips({ site, y, orbitRef, onPreview }: { site: Site; y: number; orbitRef: RefObject<{ enabled: boolean }>; onPreview: (site: Site | null) => void }) {
   const gl = useThree((s) => s.gl)
-  const size = HANDLE_PX / usePixelsPerMetre()
+  const size = HANDLE_PX.corner / usePixelsPerMetre()
   const drag = useRef<{ pointerId: number; index: number; start: Site; current: Site } | null>(null)
 
   const end = () => {

@@ -15,12 +15,13 @@ import {
 } from '../../store/interactionModel'
 import { DimensionAnnotations } from './DimensionAnnotations'
 import { ResizeHandles } from './ResizeHandles'
+import { ShapeHandles } from './ShapeHandles'
 import { roomVisualTreatment } from './roomVisualTreatment'
 import { EDITOR_PALETTE, displayRoomColor } from './editorPalette'
 import { wallModelPieces } from './modelGeometry'
 import { furnitureParts } from './furnitureParts'
 import { BLOCK_COLORS, BLOCK_OPACITY, MODEL_COLORS, floorTint, mixHex } from './modelView'
-import { blockEdge, blockFill } from './blockGeometry'
+import { blockEdge, blockFill, blockVolumeGeometry } from './blockGeometry'
 import { roomLabelLayout, roomPlanArea, roomWorldBounds } from './topViewModel'
 import { formatArea, formatDims } from '../../utils/format'
 
@@ -153,8 +154,10 @@ export function RoomMesh({
       : invalid
         ? mixHex(floorTint(displayRoomColor(room)), MODEL_COLORS.invalid, 0.35)
         : floorTint(displayRoomColor(room))
-  // A polygon room's floor follows its outline, not its bounding box.
+  // A polygon room's floor follows its outline, not its bounding box. A
+  // blocks room is the same inset volume the merged model draws.
   const polygonSlab = useMemo(() => {
+    if (blockVolume) return blockVolumeGeometry(room, renderHeight)
     const vertices = room.polygonVertices
     if (!modelSurface || !vertices || vertices.length < 3) return null
     const shape = new THREE.Shape(
@@ -165,7 +168,7 @@ export function RoomMesh({
     geometry.rotateX(Math.PI / 2)
     geometry.translate(0, renderHeight / 2, 0)
     return geometry
-  }, [modelSurface, room.polygonVertices, room.position.x, room.position.z, renderHeight])
+  }, [blockVolume, modelSurface, room, renderHeight])
   useEffect(() => () => polygonSlab?.dispose(), [polygonSlab])
   const see = ghost ? 0.12 : isGlass ? 0.35 : blocks && (isSpace || wallPieces) ? BLOCK_OPACITY : 1
   const edgeColor = blockVolume ? blockEdge(modelColor) : blocks ? BLOCK_COLORS.edge : isSpace ? MODEL_COLORS.floorEdge : MODEL_COLORS.edge
@@ -462,12 +465,16 @@ export function RoomMesh({
   return (
     <>
       {mesh}
-      {!plan && !modelStage && isSelected && (isPlanView || room.objectType === 'room') && (
-        <ResizeHandles
+      {!plan && !modelStage && isSelected && (isPlanView || room.objectType === 'room') && !room.polygonVertices && (
+        <ResizeHandles room={room} orbitRef={orbitRef} readOnly={readOnly} />
+      )}
+      {/* Shaping works the same in Top (plan) and 3D; in Top the grips sit
+          above the plan annotations. */}
+      {!modelStage && isSelected && !readOnly && room.objectType === 'room' && (
+        <ShapeHandles
           room={room}
-          orbitRef={orbitRef}
-          readOnly={readOnly}
-          viewMode={viewMode}
+          orbitRef={orbitRef as RefObject<{ enabled: boolean }>}
+          y={room.position.y + room.size.h / 2 + (plan ? 0.6 : 0.1)}
         />
       )}
       {label}

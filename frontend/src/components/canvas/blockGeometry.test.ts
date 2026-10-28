@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import type { Room } from '../../store/canvasStore'
 import { BLOCK_FLOOR_M, blockFill, buildBlockModel } from './blockGeometry'
 import { buildMergedModel } from './mergedGeometry'
+import { BLOCK_GAP_M } from './modelView'
 
 const box = (patch: Partial<Room> & { id: string }): Room =>
   ({
@@ -101,7 +102,8 @@ describe('buildBlockModel', () => {
     const position = polygon.glass!.getAttribute('position')
     let maxX = -Infinity
     for (let i = 0; i < position.count; i++) if (position.getY(i) > 0.5) maxX = Math.max(maxX, position.getX(i))
-    expect(maxX).toBeCloseTo(2)
+    // Inset by the border gap, like every room block.
+    expect(maxX).toBeCloseTo(2 - BLOCK_GAP_M)
     expect(polygon.glassOwners.every((id) => id === 'L')).toBe(true)
   })
 

@@ -1,13 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { useCanvasStore, type Room } from '../../store/canvasStore'
-import { insertPolygonVertex, resizeRoomFromPlanHandle } from './plan2dGeometry'
+import { resizeRoomFromPlanHandle } from './plan2dGeometry'
 import {
   cloneRoom,
   dimensionStrings,
   planEditPatch,
   planHandlePoints,
-  polygonEdgeMidpoints,
   roomLabelLayout,
   roomPlanArea,
   roomWorldBounds,
@@ -138,14 +137,6 @@ describe('planHandlePoints', () => {
   })
 })
 
-describe('polygonEdgeMidpoints', () => {
-  it('returns one midpoint per edge, wrapping to the first vertex', () => {
-    expect(polygonEdgeMidpoints([{ x: 0, z: 0 }, { x: 4, z: 0 }, { x: 0, z: 2 }])).toEqual([
-      { x: 2, z: 0 }, { x: 2, z: 1 }, { x: 0, z: 1 },
-    ])
-  })
-})
-
 describe('planEditPatch', () => {
   beforeEach(() => {
     useCanvasStore.getState().loadLayout({
@@ -185,7 +176,7 @@ describe('planEditPatch', () => {
     const polygon = room({
       polygonVertices: [{ x: 2, z: 2 }, { x: 6, z: 2 }, { x: 6, z: 6 }, { x: 2, z: 6 }],
     })
-    const inserted = { ...polygon, ...insertPolygonVertex(polygon, 0)! }
+    const inserted = { ...polygon, polygonVertices: [{ x: 2, z: 2 }, { x: 4, z: 2 }, { x: 6, z: 2 }, { x: 6, z: 6 }, { x: 2, z: 6 }] }
     expect(planEditPatch(polygon, inserted)?.polygonVertices).toHaveLength(5)
   })
 })

@@ -207,6 +207,9 @@ export type ViewStyle = 'blocks' | 'model'
 
 /** Blocks style: how opaque a room volume (and a wall) is. */
 export const BLOCK_OPACITY = 0.3
+/** Blocks style: each room volume stops this far inside its outline, so a
+ * dark border shows between neighbouring rooms (about half a wall). */
+export const BLOCK_GAP_M = 0.08
 
 /** The camera a plan opens with in the layout stage: true isometric. */
 export const DEFAULT_LAYOUT_PRESET: Exclude<CameraPreset, 'top'> = 'axo'
@@ -236,6 +239,14 @@ export const BLOCK_COLORS = {
   sky: '#13171f',
   skyTop: '#0b0e13',
 } as const
+
+/** Top plan annotations (labels, dimensions, symbols) on the white model's
+ * light ground and on the blocks' dark one. */
+export const PLAN_INK = {
+  model: { text: MODEL_COLORS.plotLine, halo: '#ffffff', line: MODEL_COLORS.plotLine, faint: MODEL_COLORS.floorEdge, chip: MODEL_COLORS.plot },
+  blocks: { text: '#e8ecf2', halo: BLOCK_COLORS.ground, line: '#b9c2cf', faint: BLOCK_COLORS.plotLine, chip: BLOCK_COLORS.slab },
+} as const
+export type PlanInk = (typeof PLAN_INK)[keyof typeof PLAN_INK]
 
 /** A room floor keeps its colour identity as a pale, desaturated tint. */
 export const floorTint = (roomColor: string) => mixHex(roomColor, MODEL_COLORS.floorBase, 0.8)

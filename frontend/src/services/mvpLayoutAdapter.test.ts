@@ -447,3 +447,24 @@ describe('canonical MVP layout adapter', () => {
     })
   })
 })
+
+describe('the building outline sent for checking', () => {
+  const canvas = layoutPlanToCanvas(layout, { requirements })
+  const rooms = canvas.rooms.filter((o) => o.objectType === 'room')
+  const extent = (() => {
+    const plan = canvasObjectsToLayoutPlan(rooms, { x: 0, z: 0, w: 9, d: 12 }, 'east')
+    const x1 = Math.max(...plan.rooms.map((r) => r.x + r.w)), y1 = Math.max(...plan.rooms.map((r) => r.y + r.h))
+    return { plan, x1, y1 }
+  })()
+
+  it('is left out while the rooms fill the plot', () => {
+    const filled = canvasObjectsToLayoutPlan(rooms, { x: 0, z: 0, w: extent.x1, d: extent.y1 }, 'east')
+    expect(filled.footprint).toBeUndefined()
+  })
+
+  it('is the rooms\' extent once the plot is bigger than them', () => {
+    const grown = canvasObjectsToLayoutPlan(rooms, { x: 0, z: 0, w: extent.x1 + 4, d: extent.y1 }, 'east')
+    expect(grown.footprint).toMatchObject({ w: expect.closeTo(extent.x1 - Math.min(...grown.rooms.map((r) => r.x))), h: expect.any(Number) })
+    expect(grown.plot.width_m).toBeCloseTo(extent.x1 + 4)
+  })
+})

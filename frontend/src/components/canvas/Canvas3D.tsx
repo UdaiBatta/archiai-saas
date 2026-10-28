@@ -22,6 +22,8 @@ import { hardViolationRoomIds, parseMvpQuality } from './qualityModel'
 import * as THREE from 'three'
 import { BLOCK_COLORS, DEFAULT_LAYOUT_PRESET, MODEL_COLORS, PERSPECTIVE_FOV, floorDisplay, type CameraPreset } from './modelView'
 import { blocksActive, useViewStyle } from './viewStyleStore'
+import { ExplodedRooms } from './ExplodedRooms'
+import { useViewTransition } from './viewTransition'
 import { useSunAnalysis, useSunResultStale } from '../../analysis/sunAnalysis'
 import { DOCK_CARD, EditorDock } from './EditorDock'
 import { SavedViewsPanel, ViewCamera, type ViewCameraApi } from './SavedViewsPanel'
@@ -130,7 +132,12 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
   const heatmapShown = useSunAnalysis((s) => s.show && s.result !== null)
   const heatmapStale = useSunResultStale()
   const sunStudy = openTool === 'sun' || openTool === 'analysis' || (heatmapShown && !heatmapStale)
-  const blocks = blocksActive({ studio, topView, modelStage, style: viewStyle, sunStudy })
+  const blocks = blocksActive({ studio, modelStage, style: viewStyle, sunStudy })
+  // 3D <-> Top is one animated shot (Scene starts it): annotations step
+  // aside for the flight, and in blocks the rooms fly apart and back.
+  const transitionAt = useViewTransition((s) => s.startedAt)
+  const flying = transitionAt !== null
+  const exploding = blocks && flying
   // Ambient occlusion is a presentation option, off by default and not
   // remembered: a full-screen pass at 4x multisampling was the heaviest thing
   // in Persp on laptop GPUs, and a remembered "on" made Persp feel slow for
@@ -268,24 +275,27 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
             onRestored={() => setPendingRestore(null)}
           />
         )}
-        {solidModel && (
-          <MergedModel objects={mergedObjects} openings={openings} invalidRoomIds={invalidRoomIds} readOnly={readOnly} plan={topView} blocks={blocks} />
-        )}
-        {individualRooms.map((r) => (
-          <RoomMesh
-            key={r.id}
-            room={r}
-            orbitRef={orbitRef}
-            readOnly={readOnly}
-            viewMode={viewMode}
-            invalid={invalidRoomIds.has(r.id)}
-            modelStage={modelStage}
-            plan={topView}
-            blocks={blocks}
-          />
-        ))}
-        {!modelStage && <NeighbourHighlights readOnly={readOnly} planY={topView ? (planFloor?.elevation ?? 0) + floorHeight + 0.35 : undefined} />}
-        {topView && (
+        <group visible={!exploding}>
+          {solidModel && (
+            <MergedModel objects={mergedObjects} openings={openings} invalidRoomIds={invalidRoomIds} readOnly={readOnly} plan={topView} blocks={blocks} />
+          )}
+          {!exploding && individualRooms.map((r) => (
+            <RoomMesh
+              key={r.id}
+              room={r}
+              orbitRef={orbitRef}
+              readOnly={readOnly}
+              viewMode={viewMode}
+              invalid={invalidRoomIds.has(r.id)}
+              modelStage={modelStage}
+              plan={topView}
+              blocks={blocks}
+            />
+          ))}
+        </group>
+        {exploding && transitionAt !== null && <ExplodedRooms rooms={visibleRooms} startedAt={transitionAt} />}
+        {!modelStage && !flying && <NeighbourHighlights readOnly={readOnly} planY={topView ? (planFloor?.elevation ?? 0) + floorHeight + 0.35 : undefined} />}
+        {topView && !flying && (
           <TopPlanOverlay
             orbitRef={orbitRef}
             readOnly={readOnly}
@@ -294,11 +304,12 @@ export function Canvas3D({ className, readOnly = false, modelStage = false, brie
             focusedRoomId={focusedRoomId}
             bounds={planBounds}
             y={(planFloor?.elevation ?? 0) + floorHeight + 0.4}
+            blocks={blocks}
           />
         )}
-        {!readOnly && <PlacementGhost />}
-        {!readOnly && <WallLineHighlight />}
-        {comments && <CommentLayer />}
+        {!readOnly && !flying && <PlacementGhost />}
+        {!readOnly && !flying && <WallLineHighlight />}
+        {comments && !flying && <CommentLayer />}
         {studio && <SunHoursLayer />}
         {studio && <ContextLayer />}
         {studio && <MassLayer orbitRef={orbitRef} readOnly={readOnly} topView={topView} focusedMassId={focusedMassId} />}

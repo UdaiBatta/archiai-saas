@@ -15,6 +15,7 @@ import { quarterTurnPlanSize } from '../utils/quarterTurn'
 import { snapDoorToWall, upsertConnection } from './connections'
 import { snapToNeighbours } from './edgeSnap'
 import { moveWallRun, wallRun } from './wallLines'
+import { outlinePatch, simplifyOutline, type OutlinePoint } from './roomOutline'
 import type { Connection, ConnectionKind } from '../types/contracts'
 
 export type { CanvasObjectType } from './componentRegistry'
@@ -190,6 +191,11 @@ interface CanvasState {
   setLastSavedAt: (timestamp: string | null) => void
   setRecoveredDraftAvailable: (available: boolean) => void
   updateRoom: (id: string, patch: Partial<Omit<Room, 'id'>>, options?: UpdateOptions) => void
+  /** Reshape a room to these outline points (see roomOutline). Ignored when
+   * they are not a valid room. `commit` also drops redundant points. */
+  setRoomOutline: (id: string, points: OutlinePoint[], options?: UpdateOptions & { commit?: boolean }) => void
+  /** Resize the plot from its north-west corner, never smaller than the rooms on it. */
+  setPlotSize: (w: number, d: number, options?: { log?: boolean; historySnapshot?: CanvasHistorySnapshot }) => void
   /** Choose how two adjacent rooms meet: solid wall, door, or open. */
   setConnection: (roomA: string, roomB: string, kind: ConnectionKind) => void
   /** Move a wall line (see wallLines.ts) by `delta` metres from `base`
@@ -515,15 +521,21 @@ function normalizeRoom(room: Partial<Room>, floor?: CanvasFloor): Room {
   }
 }
 
+/** The plot every storey stands on. */
+const sharedPlot = (floors: CanvasFloor[]) => floors.find((floor) => floor.footprint)?.footprint
+
 function normalizeLayout(layout: CanvasLayout) {
   const floorHeight = layout.building?.floorHeight ?? DEFAULT_FLOOR_HEIGHT
   const sourceFloors = layout.floors?.length ? layout.floors : [DEFAULT_FLOOR]
+  // Every storey stands on the same plot. Floors added before new ones were
+  // given it were saved without one, and the views could not frame them.
+  const plot = sourceFloors.find((floor) => floor.footprint)?.footprint ?? layout.building?.footprint
   const floors = sourceFloors.map((floor) => ({
     id: floor.id,
     name: floor.name || floorName(floor.level),
     level: floor.level,
     elevation: floor.elevation ?? floor.level * floorHeight,
-    footprint: floor.footprint,
+    footprint: floor.footprint ?? plot,
   }))
   const rooms = layout.floors?.length
     ? layout.floors.flatMap((floor) =>
@@ -819,6 +831,60 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         activityLog: logEntry ? [logEntry, ...state.activityLog] : state.activityLog,
         ...(shouldLog ? pushHistory(state, options?.historySnapshot) : {}),
         ...(shouldLog ? markUnsaved() : {}),
+      }
+    }),
+  setRoomOutline: (id, points, options) =>
+    set((state) => {
+      const room = state.rooms.find((r) => r.id === id)
+      if (!room) return state
+      const patch = outlinePatch(options?.commit ? simplifyOutline(points) : points, room)
+      if (!patch) return state
+      const { polygonVertices, ...rest } = patch
+      const updated: Room = { ...room, ...rest }
+      if (polygonVertices) updated.polygonVertices = polygonVertices
+      else delete updated.polygonVertices
+      const shouldLog = options?.log ?? true
+      return {
+        rooms: state.rooms.map((r) => (r.id === id ? updated : r)),
+        ...(shouldLog
+          ? {
+              activityLog: [
+                {
+                  id: nextId('activity'),
+                  action: options?.action ?? ('object.resized' as CanvasEditAction),
+                  objectId: id,
+                  objectLabel: updated.label,
+                  previousValue: options?.previousValue ?? room,
+                  newValue: updated,
+                  createdAt: new Date().toISOString(),
+                },
+                ...state.activityLog,
+              ],
+              ...pushHistory(state, options?.historySnapshot),
+              ...markUnsaved(),
+            }
+          : {}),
+      }
+    }),
+  setPlotSize: (w, d, options) =>
+    set((state) => {
+      const current = state.floors[0]?.footprint
+      if (!current) return state
+      // Rooms stay on the plot: it cannot shrink past the furthest one.
+      let minW = 1, minD = 1
+      for (const o of state.rooms) {
+        if (o.objectType !== 'room' && o.objectType !== 'stair') continue
+        const size = quarterTurnPlanSize(o.size, o.rotation.y)
+        minW = Math.max(minW, o.position.x + size.w / 2 - current.x)
+        minD = Math.max(minD, o.position.z + size.d / 2 - current.z)
+      }
+      const clamp = (value: number, min: number) => Math.round(Math.min(200, Math.max(min, value)) * 100) / 100
+      const footprint = { ...current, w: clamp(w, minW), d: clamp(d, minD) }
+      if (footprint.w === current.w && footprint.d === current.d) return state
+      const floors = state.floors.map((floor) => ({ ...floor, footprint }))
+      return {
+        floors,
+        ...((options?.log ?? true) ? { ...pushHistory(state, options?.historySnapshot), ...markUnsaved() } : {}),
       }
     }),
   moveWallLine: (wallId, delta, options) =>
@@ -1267,6 +1333,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         name: floorName(level),
         level,
         elevation: level * state.floorHeight,
+        footprint: sharedPlot(state.floors),
       }
       return {
         floors: [...state.floors, floor],
@@ -1284,6 +1351,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         name: floorName(level),
         level,
         elevation: level * state.floorHeight,
+        footprint: sharedPlot(state.floors),
       }
       return {
         floors: [...state.floors, floor],

@@ -21,6 +21,8 @@ export const EDITOR_PALETTE = {
   planFrame: '#D7D7D5',
   selection: '#FF5A36',
   selectionSoft: '#FF9A7A',
+  /** The white ring round an editing grip. */
+  handleRing: '#FFFFFF',
   invalid: '#C97B70',
   dimension: '#A9AAAC',
   chrome: '#1C1D1E',

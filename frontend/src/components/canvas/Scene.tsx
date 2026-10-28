@@ -1,14 +1,17 @@
-import { useEffect, useMemo, useRef, type RefObject } from 'react'
-import { useThree } from '@react-three/fiber'
-import { OrbitControls, OrthographicCamera, Grid, Html, Line, Edges, GizmoHelper, GizmoViewcube } from '@react-three/drei'
+import { useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from 'react'
+import { useFrame, useThree } from '@react-three/fiber'
+import { OrbitControls, Grid, Html, Line, Edges, GizmoHelper, GizmoViewcube } from '@react-three/drei'
 import * as THREE from 'three'
 import { CanvasViewMode, useCanvasStore } from '../../store/canvasStore'
 import { canClearSelectionFromEmptyCanvas } from '../../store/interactionModel'
 import { edgeCardinals, northAngleDeg, parseOrientation, type ScreenEdge } from './orientationModel'
 import { sunAt } from './sunModel'
 import { useSunContext } from '../../analysis/sunStore'
-import { BLOCKS_LIGHT_DIRECTION, BLOCKS_MAX_POLAR_ANGLE, BLOCK_COLORS, MODEL_COLORS, presetView, sceneExtent, shadowFrustum, type CameraPreset } from './modelView'
+import { BLOCKS_LIGHT_DIRECTION, BLOCKS_MAX_POLAR_ANGLE, BLOCK_COLORS, MODEL_COLORS, PERSPECTIVE_FOV, presetView, sceneExtent, shadowFrustum, type CameraPreset } from './modelView'
 import { parseMasses, parseSite } from '../../site/siteTypes'
+import { PlotBoundary } from './PlotBoundary'
+import { poseOf, poseOfView, useViewTransition, type CameraPose } from './viewTransition'
+import { SwingCamera } from './SwingCamera'
 
 /** Site ground sits below floor level so the ground-floor slab reads as a plinth. */
 const GROUND_Y = -0.2
@@ -84,9 +87,56 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
   // Reframe when the site changes, not on every mass edit (that would jump
   // the camera mid push/pull).
   const siteKey = siteModel ? siteModel.boundary.map((p) => `${p.x.toFixed(1)},${p.z.toFixed(1)}`).join(';') : ''
-  const framingKey = `${frameNonce}:${selectedFloor}:${viewMode}:${modelStage}:${preset}:${footprint?.w ?? 0}:${footprint?.d ?? 0}:${siteKey}`
+  // 3D <-> Top is one animated shot (viewTransition): the last drawn camera
+  // is where the swing starts, the newly framed view is where it lands.
+  const transitionAt = useViewTransition((s) => s.startedAt)
+  const lastPose = useRef<CameraPose | null>(null)
+  const swing = useRef<{ from: CameraPose; to: CameraPose | null } | null>(null)
+  useFrame(({ camera: shown }) => {
+    const target = orbitRef.current?.target
+    if (useViewTransition.getState().startedAt === null && target) lastPose.current = poseOf(shown, target, viewportSize.height)
+  })
+  const lastPresetRef = useRef(preset)
+  useLayoutEffect(() => {
+    const previous = lastPresetRef.current
+    lastPresetRef.current = preset
+    if ((previous === 'top') === (preset === 'top') || !studio || modelStage || !lastPose.current) return
+    useViewTransition.getState().start()
+    swing.current = useViewTransition.getState().startedAt !== null ? { from: lastPose.current, to: null } : null
+  }, [preset])
+  const swingTo = transitionAt !== null ? swing.current?.to : null
+
+  // The camera each view draws through, set explicitly on every render:
+  // Persp (and every 3D <-> Top flight) uses the canvas's perspective camera,
+  // Axo and Top an orthographic one. (drei's makeDefault cameras hand back to
+  // whichever camera was default when they mounted, and a stale one there
+  // left Top drawn through the perspective camera.)
+  const set = useThree((s) => s.set)
+  const get = useThree((s) => s.get)
+  const perspectiveCamera = useRef<THREE.PerspectiveCamera | null>(null)
+  if (!perspectiveCamera.current) {
+    const initial = get().camera as THREE.PerspectiveCamera
+    perspectiveCamera.current = initial.isPerspectiveCamera ? initial : new THREE.PerspectiveCamera(PERSPECTIVE_FOV, 1, 0.1, 1000)
+  }
+  const orthoCamera = useMemo(() => new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 2000), [])
+  const wantOrtho = !isPlanView && preset !== 'perspective' && !swingTo
+  useLayoutEffect(() => {
+    // R3F sizes an orthographic default camera in pixels, as drei's did.
+    orthoCamera.left = -viewportSize.width / 2
+    orthoCamera.right = viewportSize.width / 2
+    orthoCamera.top = viewportSize.height / 2
+    orthoCamera.bottom = -viewportSize.height / 2
+    orthoCamera.updateProjectionMatrix()
+    const wanted = wantOrtho ? orthoCamera : perspectiveCamera.current!
+    if (get().camera !== wanted) set({ camera: wanted })
+  })
+  const framingKey = `${frameNonce}:${selectedFloor}:${viewMode}:${modelStage}:${preset}:${footprint?.w ?? 0}:${footprint?.d ?? 0}:${siteKey}:${transitionAt === null}`
   useEffect(() => {
-    if (!extent) return
+    const pending = useViewTransition.getState().startedAt !== null ? swing.current : null
+    if (!extent) {
+      if (pending) useViewTransition.getState().end()
+      return
+    }
     const bounds = extent
     const elevation = visibleFloors[0]?.elevation ?? 0
     // Studio chrome: 48 px top bar; dock + status bar take ~112 px at the bottom.
@@ -97,10 +147,18 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
       const distance = view.position[1] - elevation
       view.position = [view.target[0], elevation + distance * 1.7, view.target[2] + 0.01]
     }
-    camera.position.set(...view.position)
-    camera.zoom = view.zoom
-    camera.updateProjectionMatrix()
-    camera.lookAt(...view.target)
+    if (pending) {
+      // Mid-transition: the swing camera flies there; the real camera is
+      // placed when it lands (this effect runs again then).
+      pending.to ??= poseOfView(view, preset === 'perspective' ? PERSPECTIVE_FOV : null, viewportSize.height)
+      return
+    }
+    swing.current = null
+    const live = get().camera as THREE.PerspectiveCamera | THREE.OrthographicCamera
+    live.position.set(...view.position)
+    live.zoom = view.zoom
+    live.updateProjectionMatrix()
+    live.lookAt(...view.target)
     orbitRef.current?.target?.set(...view.target)
     orbitRef.current?.update?.()
     // frameloop="demand": moving the camera here draws nothing by itself, so
@@ -172,7 +230,9 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
         shadow-camera-near={shadow.near}
         shadow-camera-far={shadow.far}
       />
-      {!isPlanView && preset !== 'perspective' && <OrthographicCamera makeDefault near={0.1} far={2000} />}
+      {swingTo && swing.current && transitionAt !== null && (
+        <SwingCamera from={swing.current.from} to={swingTo} startedAt={transitionAt} />
+      )}
 
       {visibleFloors.map((floor) => {
         const plot = floor.footprint
@@ -229,10 +289,15 @@ export function Scene({ orbitRef, readOnly = false, viewMode = '3d', modelStage 
           showPlot={!siteModel}
           northAngle={orientationNorth}
           fadeDistance={shadow.radius * 8}
-          ortho={preset !== 'perspective'}
+          // No fog mid-flight: the swing starts with a long lens from far off.
+          ortho={preset !== 'perspective' || transitionAt !== null}
           blocks={blocks}
         />
       )}
+
+      {/* The plot edge, sized by dragging or typing (the site layer draws a
+          real boundary instead once one is drawn). */}
+      {footprint && !siteModel && <PlotBoundary orbitRef={orbitRef} readOnly={readOnly || modelStage} />}
 
       {/* Orientation markers: cardinal letters at the footprint edges, the
           facing edge labelled as Front — same mapping as the 2D plan. */}
@@ -425,7 +490,7 @@ function SiteGround({
   const colors = blocks ? BLOCK_COLORS : MODEL_COLORS
   const cx = plot.x + plot.w / 2
   const cz = plot.z + plot.d / 2
-  const x0 = plot.x, x1 = plot.x + plot.w, z0 = plot.z, z1 = plot.z + plot.d
+  const x1 = plot.x + plot.w, z0 = plot.z
   const size = Math.min(4, Math.max(1.2, Math.max(plot.w, plot.d) * 0.08))
   const offset = size * 2.2
   // Classic split north arrow in shape space (+y = north), laid on the ground.
@@ -472,14 +537,6 @@ function SiteGround({
         fadeStrength={1.5}
         fadeFrom={ortho ? 0 : 1}
       />
-      {showPlot && (
-        <Line
-          points={[[x0, 0, z0], [x1, 0, z0], [x1, 0, z1], [x0, 0, z1], [x0, 0, z0]]}
-          position={[0, GROUND_Y + 0.04, 0]}
-          color={colors.plotLine}
-          lineWidth={1.6}
-        />
-      )}
       <group position={[x1 + offset, GROUND_Y + 0.04, z0 - offset]} rotation={[0, -northAngle, 0]} scale={size}>
         <group rotation={[-Math.PI / 2, 0, 0]}>
           <mesh geometry={arrowDark} raycast={() => null}>

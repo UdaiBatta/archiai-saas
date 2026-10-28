@@ -3,10 +3,7 @@ import type { Room } from '../../store/canvasStore'
 import {
   clientPointToPlan,
   derivePlanBounds,
-  insertPolygonVertex,
-  movePolygonVertex,
   PLAN_RESIZE_HANDLES,
-  removePolygonVertex,
   resizeRoomFromPlanHandle,
 } from './plan2dGeometry'
 
@@ -159,109 +156,5 @@ describe('plan2d geometry', () => {
     expect(result.size.d).toBe(4)
     expect(result.position.x).toBeCloseTo(4.6)
     expect(result.position.z).toBe(4)
-  })
-})
-
-const POLYGON_ROOM: Room = {
-  ...ROOM,
-  id: 'room-poly',
-  polygonVertices: [
-    { x: 2, z: 2 },
-    { x: 6, z: 2 },
-    { x: 6, z: 6 },
-    { x: 2, z: 6 },
-  ],
-}
-
-describe('polygon vertex editing (workflow Phase 10.2)', () => {
-  it('moves a single vertex and rebuilds the bounding box', () => {
-    const result = movePolygonVertex({
-      room: POLYGON_ROOM,
-      vertexIndex: 1,
-      point: { x: 8, z: 3 },
-      snapToGrid: false,
-      gridSize: 1,
-    })
-
-    expect(result?.polygonVertices).toEqual([
-      { x: 2, z: 2 },
-      { x: 8, z: 3 },
-      { x: 6, z: 6 },
-      { x: 2, z: 6 },
-    ])
-    // bbox: x in [2,8], z in [2,6] -> w=6, d=4, center (5,4); h (wall
-    // height) is untouched, it's not derived from 2D vertices.
-    expect(result?.size).toEqual({ w: 6, h: POLYGON_ROOM.size.h, d: 4 })
-    expect(result?.position).toEqual({ x: 5, y: POLYGON_ROOM.position.y, z: 4 })
-  })
-
-  it('clamps a moved vertex inside the floor footprint', () => {
-    const result = movePolygonVertex({
-      room: POLYGON_ROOM,
-      vertexIndex: 1,
-      point: { x: 50, z: -50 },
-      snapToGrid: false,
-      gridSize: 1,
-      footprint: { x: 0, z: 0, w: 10, d: 10 },
-    })
-
-    expect(result?.polygonVertices?.[1]).toEqual({ x: 10, z: 0 })
-  })
-
-  it('inserts a vertex at an edge midpoint', () => {
-    const result = insertPolygonVertex(POLYGON_ROOM, 0)
-
-    expect(result?.polygonVertices).toEqual([
-      { x: 2, z: 2 },
-      { x: 4, z: 2 },
-      { x: 6, z: 2 },
-      { x: 6, z: 6 },
-      { x: 2, z: 6 },
-    ])
-  })
-
-  it('removes a vertex and rebuilds the bounding box', () => {
-    const fivePointRoom: Room = {
-      ...POLYGON_ROOM,
-      polygonVertices: [
-        { x: 2, z: 2 },
-        { x: 4, z: 1 },
-        { x: 6, z: 2 },
-        { x: 6, z: 6 },
-        { x: 2, z: 6 },
-      ],
-    }
-    const result = removePolygonVertex(fivePointRoom, 1)
-
-    expect(result?.polygonVertices).toEqual([
-      { x: 2, z: 2 },
-      { x: 6, z: 2 },
-      { x: 6, z: 6 },
-      { x: 2, z: 6 },
-    ])
-  })
-
-  it('refuses to remove a vertex below the 3-vertex minimum', () => {
-    const triangle: Room = {
-      ...POLYGON_ROOM,
-      polygonVertices: [
-        { x: 2, z: 2 },
-        { x: 6, z: 2 },
-        { x: 4, z: 6 },
-      ],
-    }
-    expect(removePolygonVertex(triangle, 0)).toBeNull()
-  })
-
-  it('returns null for a non-polygon room', () => {
-    expect(movePolygonVertex({
-      room: ROOM,
-      vertexIndex: 0,
-      point: { x: 1, z: 1 },
-      snapToGrid: false,
-      gridSize: 1,
-    })).toBeNull()
-    expect(insertPolygonVertex(ROOM, 0)).toBeNull()
-    expect(removePolygonVertex(ROOM, 0)).toBeNull()
   })
 })

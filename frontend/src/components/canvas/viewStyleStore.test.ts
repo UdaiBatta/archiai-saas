@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { blocksActive, useViewStyle } from './viewStyleStore'
 
-const layout = { studio: true, topView: false, modelStage: false, style: 'blocks' as const, sunStudy: false }
+const layout = { studio: true, modelStage: false, style: 'blocks' as const, sunStudy: false }
 
 describe('blocks style', () => {
   it('is the default look while laying out', () => {
@@ -10,8 +10,7 @@ describe('blocks style', () => {
     expect(blocksActive(layout)).toBe(true)
   })
 
-  it('stays out of the Top plan, the model stage, the sun studies, and Model style', () => {
-    expect(blocksActive({ ...layout, topView: true })).toBe(false)
+  it('stays out of the model stage, the sun studies, and Model style', () => {
     expect(blocksActive({ ...layout, modelStage: true })).toBe(false)
     expect(blocksActive({ ...layout, sunStudy: true })).toBe(false)
     expect(blocksActive({ ...layout, style: 'model' })).toBe(false)
